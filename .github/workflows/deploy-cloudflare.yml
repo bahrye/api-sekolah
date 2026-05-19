@@ -40,4 +40,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy . --project-name=api-sekolah-kita --branch main --commit-dirty=true --commit-hash ${{ github.sha }}
+          command: pages deploy . --project-name=api-sekolah-kita --branch production --commit-dirty=true --commit-hash ${{ github.sha }}
