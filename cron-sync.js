@@ -55,6 +55,7 @@ import {
   getRowFpStatsForReport,
   recordRowFpStats,
   recordRowFpBackfillNote,
+  pauseBackfillForSync,
   CRON_BACKFILL_WALL_MS,
   CRON_BACKFILL_MAX_BATCHES,
 } from './functions/lib/backfill-row-fp.js';
@@ -76,7 +77,10 @@ const CRON_TICK_MAX_CHUNKS = 1;
 /** Burst: banyak chunk ringan (fp_skip tinggi) dalam satu background job */
 const CRON_TICK_BURST_MAX_CHUNKS_IDLE = 10;
 const CRON_TICK_BURST_MAX_CHUNKS_LIGHT = 6;
+/** Sync mingguan / run dari offset 0 — burst agresif sejak menit pertama */
+const CRON_TICK_BURST_MAX_CHUNKS_WEEKLY = 18;
 const CRON_TICK_BURST_WALL_MS = 86_000;
+const CRON_TICK_BURST_WALL_WEEKLY_MS = 96_000;
 const CRON_BURST_MAX_WRITES_PER_CHUNK = 12;
 const CRON_BURST_MIN_FP_RATIO = 0.75;
 /** 25×20 = 500 — zona fp_skip / sync mingguan (fallback 400 jika timeout) */
@@ -90,6 +94,7 @@ const CRON_TICK_PAGES_HEAVY = 6;
 /** Batas CPU background (harus > wall tulis berat ~68s + margin D1) */
 const CHUNK_EXEC_TIMEOUT_MS = 92_000;
 const CHUNK_EXEC_TIMEOUT_BURST_MS = 108_000;
+const CHUNK_EXEC_TIMEOUT_WEEKLY_MS = 118_000;
 const MANUAL_MAX_CHUNKS = 3;
 const MANUAL_WALL_MS = 45_000;
 
@@ -220,10 +225,11 @@ async function pickCronBatchPlan(db, opts = {}) {
 
   if (opts.assumeLight) {
     return {
-      maxChunks: CRON_TICK_BURST_MAX_CHUNKS_IDLE,
+      maxChunks: CRON_TICK_BURST_MAX_CHUNKS_WEEKLY,
       maxPages: opts.maxPages ?? CRON_TICK_PAGES_FULL,
-      wallMs: CRON_TICK_BURST_WALL_MS,
+      wallMs: CRON_TICK_BURST_WALL_WEEKLY_MS,
       recentWrites: 0,
+      weeklyFast: true,
     };
   }
 
@@ -401,7 +407,9 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
   };
   const burstMode = batchOpts.maxChunks > 1;
   const execTimeout = burstMode
-    ? CHUNK_EXEC_TIMEOUT_BURST_MS
+    ? batchOpts.weeklyFast
+      ? CHUNK_EXEC_TIMEOUT_WEEKLY_MS
+      : CHUNK_EXEC_TIMEOUT_BURST_MS
     : Math.max(CHUNK_EXEC_TIMEOUT_MS, batchOpts.wallMs + 12_000);
   try {
     if (prog.runState === 'stalled') {
@@ -541,6 +549,13 @@ async function runBackfillCronIfDue(env) {
     return { ran: false, reason: 'cron_nonaktif' };
   }
 
+  const prog = await getSyncProgress(env.DB);
+  if (prog.runState === 'running') {
+    const detail = 'menunggu — sync mingguan sedang berjalan';
+    await recordRowFpBackfillNote(env.DB, detail);
+    return { ran: false, reason: 'sync_running' };
+  }
+
   if (await isChunkLocked(env.DB)) {
     const detail = 'menunggu — chunk sync memakai lock';
     await recordRowFpBackfillNote(env.DB, detail);
@@ -636,18 +651,18 @@ async function runScheduledTick(env, ctx) {
  * @param {ExecutionContext} ctx
  */
 async function runScheduledWeeklyRun(env, ctx) {
-  await runBackfillCronIfDue(env);
   const offset = 0;
   await markSyncRunStarted(env.DB);
-  await recordCronTick(env.DB, 'CF Cron run — sync mingguan Senin 01:00 WITA @ 0');
+  await pauseBackfillForSync(env.DB);
+  await recordCronTick(env.DB, 'CF Cron run — sync mingguan (mode cepat, fp_skip)');
   await appendCronJobActivityLog(env.DB, {
     kind: 'cron_run',
     action: 'accepted',
-    detail: 'Cloudflare Cron /run (Senin 01:00 WITA)',
+    detail: 'sync mingguan · burst 18×500/hal · /tick tiap menit',
     offset,
   });
   scheduleResumeInBackground(ctx, env, offset, { assumeLight: true });
-  return { status: 'accepted', offset };
+  return { status: 'accepted', offset, mode: 'weekly_fast' };
 }
 
 export default {
@@ -790,18 +805,21 @@ export default {
 
         if (offset === 0 && !resume) {
           await markSyncRunStarted(env.DB);
+          await pauseBackfillForSync(env.DB);
         } else {
           await markSyncResumeAt(env.DB, offset);
         }
 
+        const weeklyStart = offset === 0 && !resume;
+        const fastOff = url.searchParams.get('fast') === '0';
+        const burstOn = url.searchParams.get('burst') === '1';
+        const assumeLight = weeklyStart ? !fastOff : burstOn;
+
         const batchOpts = await pickCronBatchPlan(env.DB, {
           maxChunks: waitForResult ? MANUAL_MAX_CHUNKS : undefined,
           wallMs: waitForResult ? MANUAL_WALL_MS : undefined,
-          maxPages:
-            offset === 0 && !resume
-              ? CRON_TICK_PAGES_FULL
-              : undefined,
-          assumeLight: url.searchParams.get('burst') === '1',
+          maxPages: weeklyStart ? CRON_TICK_PAGES_FULL : undefined,
+          assumeLight,
         });
 
         if (!waitForResult) {
@@ -809,15 +827,25 @@ export default {
           await appendCronJobActivityLog(env.DB, {
             kind: 'cron_run',
             action: 'accepted',
-            detail: resume ? 'lanjutkan sync' : 'sync penuh dimulai',
+            detail: resume
+              ? 'lanjutkan sync'
+              : assumeLight
+                ? 'sync mingguan mode cepat (burst 18×500/hal, fp_skip)'
+                : 'sync penuh dimulai',
             offset,
           });
           scheduleResumeInBackground(ctx, env, offset, batchOpts);
           return new Response(
             JSON.stringify({
               status: 'accepted',
-              message: 'Batch dijadwalkan di background. Pantau dashboard status.',
+              message: assumeLight
+                ? 'Sync mingguan mode cepat di background (~9.000 sekolah/menit jika data tidak berubah). Pantau dashboard status.'
+                : 'Batch dijadwalkan di background. Pantau dashboard status.',
               offset_dimulai: offset,
+              mode: assumeLight ? 'weekly_fast' : 'normal',
+              perkiraan: assumeLight
+                ? `~${CRON_TICK_BURST_MAX_CHUNKS_WEEKLY * CRON_TICK_PAGES_FULL * PAGE_SIZE} sekolah per menit (fp_skip tinggi)`
+                : undefined,
             }),
             { status: 202, headers: jsonHeaders }
           );

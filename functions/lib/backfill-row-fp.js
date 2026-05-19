@@ -138,6 +138,18 @@ export async function recordRowFpStats(
  * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {string} note
  */
+/**
+ * Jeda backfill saat sync mingguan agar D1 tidak berebut.
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ */
+export async function pauseBackfillForSync(db) {
+  const meta = await getApiMeta(db);
+  const rf = await getRowFpStatsForReport(db, meta.totalSekolah);
+  if (rf.selesai || !rf.backfill_cron) return;
+  await recordRowFpStats(db, rf.null_count ?? 0, { active: false, cronEnabled: false });
+  await recordRowFpBackfillNote(db, 'dijeda — sync mingguan berjalan');
+}
+
 export async function recordRowFpBackfillNote(db, note) {
   await db
     .prepare(

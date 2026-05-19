@@ -61,7 +61,7 @@ export async function buildSyncStatusReport(db, { lastChunk } = {}) {
           ? 'Cron /tick tiap menit akan melanjutkan otomatis dari offset terakhir (status kembali running). Opsional: GET /run?offset=...&secret=...'
           : runState === 'running'
             ? cron.enabled
-              ? 'Cron /tick tiap menit: ~400–500 sekolah/chunk; jika data sudah sinkron (fp_skip tinggi, sedikit ubah) otomatis burst hingga ~10 chunk (~5.000 sekolah/menit) agar scan mingguan jauh lebih cepat.'
+              ? 'Sync mingguan mode cepat: burst ~18×500/hal per menit (~9.000 sekolah/menit) bila fp_skip tinggi. Halaman sama dengan API = tanpa baca D1.'
               : 'Panggil /run sekali (atau tunggu jadwal mingguan) untuk mengaktifkan /tick otomatis.'
             : null,
     },
