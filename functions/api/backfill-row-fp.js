@@ -55,7 +55,8 @@ export async function onRequest(context) {
     const meta = await getApiMeta(context.env.DB);
     const remainingBefore = await countNullRowFp(context.env.DB);
     await recordRowFpStats(context.env.DB, remainingBefore, {
-      active: statsOnly ? false : remainingBefore > 0 && !noChain,
+      active: statsOnly ? false : remainingBefore > 0,
+      cronEnabled: statsOnly ? false : remainingBefore > 0,
     });
 
     if (statsOnly) {
@@ -91,11 +92,17 @@ export async function onRequest(context) {
       );
     }
 
-    await recordRowFpStats(context.env.DB, remainingBefore, { active: true });
+    await recordRowFpStats(context.env.DB, remainingBefore, {
+      active: true,
+      cronEnabled: true,
+    });
     const batch = await backfillRowFpBatch(context.env.DB, batchSize);
     const remainingAfter = await countNullRowFp(context.env.DB);
     const done = batch.done || remainingAfter === 0;
-    await recordRowFpStats(context.env.DB, remainingAfter, { active: !done });
+    await recordRowFpStats(context.env.DB, remainingAfter, {
+      active: !done,
+      cronEnabled: !done,
+    });
 
     if (!done && !noChain) {
       const continueUrl = buildBackfillContinueUrl(requestUrl.href, secret || undefined);
@@ -113,7 +120,7 @@ export async function onRequest(context) {
         ? 'Backfill row_fp selesai.'
         : noChain
           ? `Batch selesai (${batch.processed} baris). Panggil lagi untuk melanjutkan.`
-          : 'Backfill berjalan di background. Pantau di halaman status atau stats=1.',
+          : 'Batch Pages selesai; Worker cron (/tick tiap menit) melanjutkan otomatis. Pantau di dashboard status.',
       batch,
       row_fp,
       row_fp_null: remainingAfter,

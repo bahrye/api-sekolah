@@ -51,6 +51,11 @@ import {
 } from './functions/lib/sync-meta.js';
 import { buildSyncStatusReport } from './functions/lib/sync-status.js';
 import {
+  runBackfillCronStep,
+  getRowFpStatsForReport,
+  recordRowFpStats,
+} from './functions/lib/backfill-row-fp.js';
+import {
   appendActivityLog,
   appendCronJobActivityLog,
 } from './functions/lib/sync-activity-log.js';
@@ -496,6 +501,53 @@ function skipMessage(plan) {
 }
 
 /**
+ * Lanjutkan backfill row_fp via cron (chain Pages sering terputus ~10–15%).
+ * @param {object} env
+ * @param {ExecutionContext} ctx
+ */
+async function maybeScheduleBackfillCron(env, ctx) {
+  const meta = await getApiMeta(env.DB);
+  const rf = await getRowFpStatsForReport(env.DB, meta.totalSekolah);
+
+  if (rf.selesai) {
+    if (rf.backfill_cron || rf.backfill_active) {
+      await recordRowFpStats(env.DB, 0, { active: false, cronEnabled: false });
+    }
+    return;
+  }
+
+  if (!rf.measured || rf.null_count == null || rf.null_count <= 0) return;
+
+  let cronOn = rf.backfill_cron;
+  if (rf.backfill_active && rf.backfill_stale && !cronOn) {
+    await recordRowFpStats(env.DB, rf.null_count, { active: true, cronEnabled: true });
+    cronOn = true;
+  }
+
+  if (!cronOn) return;
+  if (await isChunkLocked(env.DB)) return;
+
+  const prog = await getSyncProgress(env.DB);
+  if (prog.runState === 'running') return;
+
+  ctx.waitUntil(
+    (async () => {
+      try {
+        const result = await runBackfillCronStep(env.DB);
+        await recordCronTick(
+          env.DB,
+          result.done
+            ? 'backfill row_fp selesai'
+            : `backfill row_fp +${result.batch.processed} (sisa ~${result.null_remaining.toLocaleString('id-ID')})`
+        );
+      } catch (err) {
+        await recordCronTick(env.DB, `backfill row_fp gagal: ${err?.message || err}`);
+      }
+    })()
+  );
+}
+
+/**
  * Cloudflare Cron — tiap menit (setara GET /tick).
  * @param {object} env
  * @param {ExecutionContext} ctx
@@ -519,6 +571,7 @@ async function runScheduledTick(env, ctx) {
         apiTotal: plan.apiTotal,
       });
     }
+    await maybeScheduleBackfillCron(env, ctx);
     return { status: 'skipped', plan };
   }
 

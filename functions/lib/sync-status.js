@@ -154,6 +154,8 @@ function statusBadgeClass(runState) {
 function rowFpStatusLabel(rf) {
   if (!rf?.measured) return 'Belum diukur';
   if (rf.selesai) return 'Lengkap';
+  if (rf.backfill_cron && !rf.selesai) return 'Backfill (cron/menit)';
+  if (rf.backfill_stale) return 'Dilanjutkan cron';
   if (rf.backfill_active) return 'Backfill berjalan';
   return 'Perlu dilengkapi';
 }
@@ -355,6 +357,8 @@ export function renderSyncStatusHtml(report) {
       function rowFpStatusLabel(rf) {
         if (!rf || !rf.measured) return 'Belum diukur';
         if (rf.selesai) return 'Lengkap';
+        if (rf.backfill_cron && !rf.selesai) return 'Backfill (cron/menit)';
+        if (rf.backfill_stale) return 'Dilanjutkan cron';
         if (rf.backfill_active) return 'Backfill berjalan';
         return 'Perlu dilengkapi';
       }
@@ -363,6 +367,7 @@ export function renderSyncStatusHtml(report) {
         var base = 'text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ';
         if (!rf || !rf.measured) return base + 'bg-slate-100 text-slate-600';
         if (rf.selesai) return base + 'bg-green-100 text-green-800';
+        if (rf.backfill_cron) return base + 'bg-amber-100 text-amber-800';
         if (rf.backfill_active) return base + 'bg-amber-100 text-amber-800';
         return base + 'bg-violet-100 text-violet-800';
       }
@@ -413,6 +418,8 @@ export function renderSyncStatusHtml(report) {
           rf.null_count,
           rf.percent_filled,
           rf.backfill_active,
+          rf.backfill_cron,
+          rf.backfill_stale,
           rf.stats_at,
           JSON.stringify(r.activity_log || []),
         ].join('|');

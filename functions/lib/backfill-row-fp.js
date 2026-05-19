@@ -4,6 +4,7 @@ import {
   SELECT_COLS,
   ROW_FP_COLUMN,
 } from './sekolah-schema.js';
+import { getApiMeta } from './sync-meta.js';
 
 /** Baris per request — aman untuk batas CPU Pages */
 export const BACKFILL_BATCH_SIZE = 150;
@@ -12,6 +13,13 @@ const WRITE_BATCH = 50;
 const KEY_ROW_FP_NULL = 'row_fp_null_count';
 const KEY_ROW_FP_STATS_AT = 'row_fp_stats_at';
 const KEY_ROW_FP_BACKFILL_ACTIVE = 'row_fp_backfill_active';
+const KEY_ROW_FP_BACKFILL_CRON = 'row_fp_backfill_cron';
+
+/** Tanpa pembaruan stats selama ini → chain Pages dianggap mati, cron Worker lanjutkan */
+export const BACKFILL_STALE_MS = 5 * 60 * 1000;
+
+/** Batch per tick cron Worker (lebih besar dari Pages) */
+export const WORKER_BACKFILL_BATCH_SIZE = 400;
 
 export const PAGES_BACKFILL_URL = 'https://api-sekolah-kita.pages.dev/backfill-row-fp.html';
 export const WORKER_SYNC_STATUS_URL =
@@ -94,7 +102,11 @@ export function buildBackfillContinueUrl(requestUrl, secret) {
  * @param {number} nullCount
  * @param {{ active?: boolean }} [opts]
  */
-export async function recordRowFpStats(db, nullCount, { active = false } = {}) {
+export async function recordRowFpStats(
+  db,
+  nullCount,
+  { active = false, cronEnabled = false } = {}
+) {
   const now = new Date().toISOString();
   const upsert = (key, value) =>
     db
@@ -108,7 +120,33 @@ export async function recordRowFpStats(db, nullCount, { active = false } = {}) {
     upsert(KEY_ROW_FP_NULL, String(Math.max(0, nullCount))),
     upsert(KEY_ROW_FP_STATS_AT, now),
     upsert(KEY_ROW_FP_BACKFILL_ACTIVE, active ? '1' : '0'),
+    upsert(KEY_ROW_FP_BACKFILL_CRON, cronEnabled ? '1' : '0'),
   ]);
+}
+
+/**
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {number} [batchSize]
+ */
+export async function runBackfillCronStep(db, batchSize = WORKER_BACKFILL_BATCH_SIZE) {
+  const meta = await getApiMeta(db);
+  const before = await getRowFpStatsForReport(db, meta.totalSekolah);
+  const batch = await backfillRowFpBatch(db, batchSize);
+
+  let nullRemaining = before.null_count ?? 0;
+  if (batch.done) {
+    nullRemaining = 0;
+  } else if (batch.processed > 0) {
+    nullRemaining = Math.max(0, nullRemaining - batch.processed);
+  }
+
+  const done = batch.done || nullRemaining === 0;
+  await recordRowFpStats(db, nullRemaining, {
+    active: !done,
+    cronEnabled: !done,
+  });
+
+  return { batch, null_remaining: nullRemaining, done };
 }
 
 /**
@@ -118,8 +156,13 @@ export async function recordRowFpStats(db, nullCount, { active = false } = {}) {
 export async function getRowFpStatsForReport(db, totalSekolah = null) {
   try {
     const { results } = await db
-      .prepare(`SELECT key, value FROM sync_meta WHERE key IN (?, ?, ?)`)
-      .bind(KEY_ROW_FP_NULL, KEY_ROW_FP_STATS_AT, KEY_ROW_FP_BACKFILL_ACTIVE)
+      .prepare(`SELECT key, value FROM sync_meta WHERE key IN (?, ?, ?, ?)`)
+      .bind(
+        KEY_ROW_FP_NULL,
+        KEY_ROW_FP_STATS_AT,
+        KEY_ROW_FP_BACKFILL_ACTIVE,
+        KEY_ROW_FP_BACKFILL_CRON
+      )
       .all();
 
     const map = Object.fromEntries((results || []).map((r) => [r.key, r.value]));
@@ -130,6 +173,11 @@ export async function getRowFpStatsForReport(db, totalSekolah = null) {
       nullCount != null && total != null ? Math.max(0, total - nullCount) : null;
     const percentFilled =
       filled != null && total != null ? Math.round((filled / total) * 1000) / 10 : null;
+    const statsAt = map[KEY_ROW_FP_STATS_AT] ?? null;
+    const statsAge = statsAt ? Date.now() - new Date(statsAt).getTime() : BACKFILL_STALE_MS + 1;
+    const backfill_active = map[KEY_ROW_FP_BACKFILL_ACTIVE] === '1';
+    const backfill_cron = map[KEY_ROW_FP_BACKFILL_CRON] === '1';
+    const backfill_stale = backfill_active && statsAge > BACKFILL_STALE_MS;
 
     return {
       null_count: Number.isFinite(nullCount) ? nullCount : null,
@@ -137,11 +185,11 @@ export async function getRowFpStatsForReport(db, totalSekolah = null) {
       total,
       percent_filled: percentFilled,
       selesai: nullCount === 0,
-      backfill_active: map[KEY_ROW_FP_BACKFILL_ACTIVE] === '1',
-      stats_at: map[KEY_ROW_FP_STATS_AT] ?? null,
-      stats_at_wib: map[KEY_ROW_FP_STATS_AT]
-        ? formatStatsWib(map[KEY_ROW_FP_STATS_AT])
-        : null,
+      backfill_active,
+      backfill_cron,
+      backfill_stale,
+      stats_at: statsAt,
+      stats_at_wib: statsAt ? formatStatsWib(statsAt) : null,
       measured: nullRaw != null,
       halaman_backfill: PAGES_BACKFILL_URL,
     };
@@ -153,6 +201,8 @@ export async function getRowFpStatsForReport(db, totalSekolah = null) {
       percent_filled: null,
       selesai: false,
       backfill_active: false,
+      backfill_cron: false,
+      backfill_stale: false,
       stats_at: null,
       stats_at_wib: null,
       measured: false,

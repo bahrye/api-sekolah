@@ -32,7 +32,10 @@
       <p id="rf-pct" class="text-xl font-bold text-slate-900">—</p>
       <p id="rf-counts" class="text-sm text-slate-600 mt-1">—</p>
       <p id="rf-at" class="text-xs text-slate-400 mt-2">Terakhir diukur: —</p>
-      <p id="rf-hint" class="text-[11px] text-slate-400 mt-3 text-center">Status diperbarui otomatis di latar belakang</p>
+      <p id="rf-hint" class="text-[11px] text-violet-700 bg-violet-50 border border-violet-100 rounded-lg px-2 py-2 mt-3 text-center leading-relaxed">
+        Setelah «Mulai», Worker cron melanjutkan <strong>~400 baris/menit</strong> walau tab ditutup.
+        Chain Pages sering berhenti di ~10–15% — itu normal; cron yang menyelesaikan.
+      </p>
     </div>
 
     <form id="form" class="space-y-4 bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
@@ -95,6 +98,8 @@
     function badgeLabel(rf) {
       if (!rf || !rf.measured) return 'Belum diukur';
       if (rf.selesai) return 'Lengkap';
+      if (rf.backfill_cron) return 'Backfill (cron/menit)';
+      if (rf.backfill_stale) return 'Dilanjutkan cron';
       if (rf.backfill_active) return 'Backfill berjalan';
       return 'Perlu dilengkapi';
     }
