@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="API data master satuan pendidikan Indonesia — cepat, edge serverless, ratusan ribu sekolah.">
+    <meta name="theme-color" content="#2563eb">
+    <title>EduAPI Indonesia — Dokumentasi API Sekolah</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/favicon.svg">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        pre code { white-space: pre-wrap; word-break: break-word; }
+        .api-url-scroll {
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased flex flex-col min-h-screen">
+
+    <header class="bg-white/95 backdrop-blur border-b border-slate-200 sticky top-0 z-20">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center gap-3">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <img src="/favicon.svg" alt="" width="36" height="36" class="w-9 h-9 shrink-0 rounded-lg shadow-sm">
+                <div class="min-w-0">
+                    <h1 class="text-base sm:text-xl font-bold text-slate-900 truncate">EduAPI Indonesia</h1>
+                    <p class="text-[10px] sm:text-xs text-slate-500 hidden sm:block">Data Satuan Pendidikan</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <a href="https://api-sekolah-cron.syamsulbahri-agro27b.workers.dev/"
+                   class="hidden sm:inline-flex text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full transition-colors">
+                    Status sync
+                </a>
+                <a href="https://github.com/syamsulbahri" target="_blank" rel="noopener noreferrer"
+                   class="text-xs sm:text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 sm:bg-transparent px-2.5 py-1 rounded-full sm:px-0 sm:py-0">
+                    v1.0.0
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+
+        <section class="mb-8 sm:mb-12">
+            <p class="text-xs font-semibold uppercase tracking-wider text-blue-600 mb-2">REST API · Cloudflare Edge</p>
+            <h2 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight mb-3 leading-tight">
+                API Data Master Pendidikan
+            </h2>
+            <p class="text-slate-600 text-base sm:text-lg max-w-2xl leading-relaxed">
+                Gateway API super cepat berbasis Edge Serverless untuk mengakses ratusan ribu data master satuan pendidikan di seluruh Indonesia.
+            </p>
+
+            <div id="sync-status" class="mt-6 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 sm:p-5 shadow-sm">
+                <div class="flex flex-col sm:flex-row sm:items-start gap-4">
+                    <div class="flex items-start gap-3 flex-1 min-w-0">
+                        <div class="shrink-0 w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center" aria-hidden="true">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        </div>
+                        <div class="min-w-0">
+                            <h3 class="text-sm sm:text-base font-bold text-slate-900 mb-1">Pembaruan data berkala</h3>
+                            <p class="text-sm text-slate-600 leading-relaxed">
+                                Database disinkronkan otomatis dari portal resmi
+                                <strong class="text-slate-800">setiap minggu</strong>, pada hari
+                                <strong class="text-slate-800">Senin pukul 01:00 WITA</strong>
+                                (02:00 UTC). Hanya data baru atau yang berubah yang ditulis ulang.
+                            </p>
+                            <a href="https://api-sekolah-cron.syamsulbahri-agro27b.workers.dev/"
+                               class="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-emerald-700 hover:text-emerald-900 transition-colors">
+                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                                Cek status sinkronisasi
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="sm:text-right shrink-0 w-full sm:w-auto sm:max-w-[240px] bg-white/80 rounded-lg border border-blue-100 px-3 py-2.5">
+                        <p class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-blue-600 mb-0.5">Update terakhir</p>
+                        <p id="last-update-at" class="text-sm font-semibold text-slate-900">Memuat…</p>
+                        <p id="last-update-iso" class="text-[10px] text-slate-400 mt-0.5 font-mono break-all"></p>
+                        <p id="total-data-count" class="text-[10px] text-slate-500 mt-1.5"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-5 flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 w-full">
+                <a id="try-api" href="/api/sekolah?limit=5"
+                   class="inline-flex items-center justify-center gap-2 bg-blue-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shrink-0">
+                    Coba API langsung
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                </a>
+                <div class="flex items-stretch gap-2 w-full sm:flex-1 sm:min-w-0">
+                    <div class="api-url-scroll flex-1 min-w-0 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm"
+                         title="Geser kiri/kanan untuk melihat URL lengkap">
+                        <code id="base-url" class="block whitespace-nowrap px-3 py-2.5 font-mono text-[11px] sm:text-xs text-slate-700">/api/sekolah?limit=5</code>
+                    </div>
+                    <button type="button" id="copy-api-url"
+                            class="shrink-0 inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-2.5 rounded-lg hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm"
+                            aria-label="Salin URL API">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        <span id="copy-api-label">Salin</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+            <div class="lg:col-span-2 space-y-6 sm:space-y-8 order-2 lg:order-1">
+
+                <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50">
+                        <h3 class="font-semibold text-slate-800 text-sm sm:text-base">Endpoint Utama</h3>
+                    </div>
+                    <div class="p-4 sm:p-6">
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-slate-800 text-slate-200 p-3 rounded-lg font-mono text-xs sm:text-sm overflow-x-auto">
+                            <span class="self-start sm:self-auto bg-green-500 text-white px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0">GET</span>
+                            <span class="break-all">/api/sekolah</span>
+                        </div>
+                        <p class="mt-4 text-sm text-slate-600 leading-relaxed">
+                            Mengembalikan daftar sekolah dalam format JSON. Gunakan parameter di bawah untuk pencarian dan paginasi.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50">
+                        <h3 class="font-semibold text-slate-800 text-sm sm:text-base">Parameter URL (Query)</h3>
+                    </div>
+
+                    <!-- Mobile: cards -->
+                    <div class="md:hidden divide-y divide-slate-100">
+                        <article class="p-4">
+                            <p class="font-mono font-semibold text-blue-600 text-sm mb-1">keyword</p>
+                            <p class="text-sm text-slate-600 mb-2">Cari berdasarkan NPSN atau nama sekolah.</p>
+                            <code class="block text-[11px] bg-slate-100 rounded px-2 py-1.5 break-all">?keyword=surabaya</code>
+                        </article>
+                        <article class="p-4">
+                            <p class="font-mono font-semibold text-blue-600 text-sm mb-1">limit</p>
+                            <p class="text-sm text-slate-600 mb-2">Data per halaman (default 20, maks. 50).</p>
+                            <code class="block text-[11px] bg-slate-100 rounded px-2 py-1.5 break-all">?limit=50</code>
+                        </article>
+                        <article class="p-4">
+                            <p class="font-mono font-semibold text-blue-600 text-sm mb-1">offset</p>
+                            <p class="text-sm text-slate-600 mb-2">Paginasi — mulai dari baris ke-n.</p>
+                            <code class="block text-[11px] bg-slate-100 rounded px-2 py-1.5 break-all">?offset=100</code>
+                        </article>
+                    </div>
+
+                    <!-- Desktop: table -->
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-600 min-w-[520px]">
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 whitespace-nowrap">Parameter</th>
+                                    <th scope="col" class="px-6 py-3">Deskripsi</th>
+                                    <th scope="col" class="px-6 py-3 whitespace-nowrap">Contoh</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-6 py-4 font-mono font-medium text-blue-600 whitespace-nowrap">keyword</td>
+                                    <td class="px-6 py-4">Mencari berdasarkan NPSN atau penggalan nama sekolah.</td>
+                                    <td class="px-6 py-4 font-mono text-xs"><span class="bg-slate-100 rounded px-2 py-1 inline-block">?keyword=60723552</span></td>
+                                </tr>
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-6 py-4 font-mono font-medium text-blue-600 whitespace-nowrap">limit</td>
+                                    <td class="px-6 py-4">Jumlah data per halaman (default: 20, maksimal: 50).</td>
+                                    <td class="px-6 py-4 font-mono text-xs"><span class="bg-slate-100 rounded px-2 py-1 inline-block">?limit=50</span></td>
+                                </tr>
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-6 py-4 font-mono font-medium text-blue-600 whitespace-nowrap">offset</td>
+                                    <td class="px-6 py-4">Titik mulai paginasi (default: 0).</td>
+                                    <td class="px-6 py-4 font-mono text-xs"><span class="bg-slate-100 rounded px-2 py-1 inline-block">?offset=20</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden lg:hidden">
+                    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
+                        <h3 class="font-semibold text-slate-800 text-sm">Metadata respons</h3>
+                    </div>
+                    <ul class="p-4 text-sm text-slate-600 space-y-2">
+                        <li><code class="text-blue-600 text-xs">total_data_tersedia</code> — jumlah hasil di database</li>
+                        <li><code class="text-blue-600 text-xs">waktu_update_data_terakhir</code> — update terakhir (WIB)</li>
+                    </ul>
+                </section>
+            </div>
+
+            <div class="lg:col-span-1 order-1 lg:order-2">
+                <section class="bg-slate-900 rounded-xl shadow-lg border border-slate-700 overflow-hidden flex flex-col max-h-[min(70vh,520px)] lg:max-h-none lg:min-h-[420px] lg:h-full sticky top-[4.5rem] lg:top-24">
+                    <div class="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-slate-700 bg-slate-800 flex justify-between items-center shrink-0">
+                        <h3 class="font-medium text-slate-300 text-xs sm:text-sm">Contoh Respons (JSON)</h3>
+                        <div class="flex gap-1.5" aria-hidden="true">
+                            <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500"></div>
+                            <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-yellow-500"></div>
+                            <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500"></div>
+                        </div>
+                    </div>
+                    <div class="p-3 sm:p-4 overflow-auto flex-grow text-[10px] sm:text-xs font-mono text-emerald-400 leading-relaxed">
+<pre><code>{
+  "status": "success",
+  "metadata": {
+    "total_data_tersedia": 552577,
+    "limit_ditampilkan": 20,
+    "offset_saat_ini": 0,
+    "waktu_update_data_terakhir": "17 Mei 2026 pukul 18.26",
+    "waktu_update_data_terakhir_iso": "2026-05-17T11:26:31Z"
+  },
+  "data": [
+    {
+      "npsn": "60723552",
+      "nama": "MIS BUTUNG",
+      "bentuk_pendidikan": "MI",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "SWASTA",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN AGAMA",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "TANUNTUNG",
+      "nama_kecamatan": "KEC. HERLANG",
+      "nama_kabupaten": "KAB. BULUKUMBA",
+      "nama_provinsi": "PROV. SULAWESI SELATAN",
+      "alamat_jalan": "BUTUNG"
+    }
+  ]
+}</code></pre>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-white border-t border-slate-200 mt-auto">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
+            <p class="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-md">
+                Data bersumber dari portal resmi <b>belajar.id</b>. Pembaruan otomatis setiap Senin, 01:00 WITA (Cloudflare Cron).
+            </p>
+            <div class="flex flex-wrap items-center justify-center gap-2">
+                <span class="text-xs sm:text-sm text-slate-600 font-medium">Dibuat oleh</span>
+                <a href="https://wa.me/qr/FMVS3NLDIRUAA1" target="_blank" rel="noopener noreferrer"
+                   class="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold tracking-wide hover:bg-blue-200 transition-all">
+                    Syamsul Bahri
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        (function () {
+            var base = window.location.origin;
+            var apiUrl = base + '/api/sekolah?limit=5';
+            var el = document.getElementById('base-url');
+            var link = document.getElementById('try-api');
+            var copyBtn = document.getElementById('copy-api-url');
+            var copyLabel = document.getElementById('copy-api-label');
+            if (el) el.textContent = apiUrl;
+            if (link) link.href = apiUrl;
+
+            if (copyBtn) {
+                copyBtn.addEventListener('click', function () {
+                    var text = link ? link.href : apiUrl;
+                    function showCopied() {
+                        if (copyLabel) copyLabel.textContent = 'Tersalin!';
+                        copyBtn.classList.add('border-emerald-300', 'bg-emerald-50', 'text-emerald-800');
+                        setTimeout(function () {
+                            if (copyLabel) copyLabel.textContent = 'Salin';
+                            copyBtn.classList.remove('border-emerald-300', 'bg-emerald-50', 'text-emerald-800');
+                        }, 2000);
+                    }
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(showCopied).catch(function () {
+                            fallbackCopy(text);
+                            showCopied();
+                        });
+                    } else {
+                        fallbackCopy(text);
+                        showCopied();
+                    }
+                });
+            }
+
+            function fallbackCopy(text) {
+                var ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+                document.body.removeChild(ta);
+            }
+
+            var lastAt = document.getElementById('last-update-at');
+            var lastIso = document.getElementById('last-update-iso');
+            var totalEl = document.getElementById('total-data-count');
+
+            function loadStatus() {
+                fetch(base + '/api/status')
+                    .then(function (r) { return r.json(); })
+                    .then(function (json) {
+                        if (json.status !== 'success') {
+                            if (lastAt) lastAt.textContent = 'Tidak tersedia';
+                            return;
+                        }
+                        if (lastAt) {
+                            lastAt.textContent = json.waktu_update_data_terakhir || 'Belum tercatat';
+                        }
+                        if (lastIso && json.waktu_update_data_terakhir_iso) {
+                            lastIso.textContent = json.waktu_update_data_terakhir_iso;
+                        }
+                        if (totalEl && json.total_data_tersedia != null) {
+                            totalEl.textContent = Number(json.total_data_tersedia).toLocaleString('id-ID') + ' sekolah terindeks';
+                        }
+                    })
+                    .catch(function () {
+                        if (lastAt) lastAt.textContent = 'Gagal memuat';
+                    });
+            }
+
+            loadStatus();
+            setInterval(loadStatus, 60000);
+        })();
+    </script>
+</body>
+</html>

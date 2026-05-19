@@ -1,0 +1,6 @@
+.dev.vars
+.env
+.env.*
+.sync-secret.local
+.wrangler/
+node_modules/

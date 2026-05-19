@@ -1,0 +1,9 @@
+name = "api-sekolah-kita"
+pages_build_output_dir = "./"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "nama-database-anda"
+database_id = "313936c9-fefa-4f1a-87e3-59a63fd605e5"
+
+# Cron Worker (Cloudflare Cron Triggers): npx wrangler deploy -c wrangler.cron.toml
