@@ -24,7 +24,7 @@
     <div class="bg-white border border-violet-200 rounded-xl p-5 shadow-sm mb-4">
       <div class="flex justify-between items-center mb-3">
         <span class="text-sm font-semibold text-slate-700">Progres row_fp</span>
-        <span id="rf-badge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">Memuat…</span>
+        <span id="rf-badge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">…</span>
       </div>
       <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-2">
         <div id="rf-bar" class="h-full bg-violet-600 rounded-full transition-all duration-500" style="width:0%"></div>
@@ -85,14 +85,50 @@
     const saved = sessionStorage.getItem(STORAGE_KEY);
     if (saved) secretEl.value = saved;
 
+    applyRowFpUi({ measured: false });
+    rfBadge.textContent = 'Memuat…';
+
     let pollTimer = null;
-    let backfillPollTimer = null;
 
     function badgeClass(rf) {
       if (!rf || !rf.measured) return 'text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600';
       if (rf.selesai) return 'text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-800';
+      if (rf.backfill_cron) return 'text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800';
       if (rf.backfill_active) return 'text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800';
       return 'text-xs font-bold px-2.5 py-1 rounded-full bg-violet-100 text-violet-800';
+    }
+
+    function showLoadError(msg) {
+      rfBadge.className = badgeClass(null);
+      rfBadge.textContent = 'Gagal muat';
+      rfPct.textContent = '—';
+      rfCounts.textContent = msg;
+      rfAt.textContent = 'Terakhir diukur: —';
+    }
+
+    async function fetchJson(url, ms) {
+      const ctrl = new AbortController();
+      const t = setTimeout(function () {
+        ctrl.abort();
+      }, ms || 12000);
+      try {
+        const res = await fetch(url, { cache: 'no-store', signal: ctrl.signal });
+        const text = await res.text();
+        var json;
+        try {
+          json = JSON.parse(text);
+        } catch (e) {
+          throw new Error(
+            res.ok
+              ? 'Respons bukan JSON'
+              : 'HTTP ' + res.status + ' — pastikan endpoint /api/row-fp-status sudah di-deploy'
+          );
+        }
+        if (!res.ok && json.status === 'error') throw new Error(json.message || 'HTTP ' + res.status);
+        return json;
+      } finally {
+        clearTimeout(t);
+      }
     }
 
     function badgeLabel(rf) {
@@ -120,9 +156,9 @@
     }
 
     async function fetchPublicRowFp() {
-      const res = await fetch(STATUS_URL, { cache: 'no-store' });
-      const json = await res.json();
+      const json = await fetchJson(STATUS_URL, 12000);
       if (json.row_fp) applyRowFpUi(json.row_fp);
+      else showLoadError('Data status kosong — coba muat ulang halaman.');
       return json.row_fp;
     }
 
@@ -140,30 +176,22 @@
 
     function startBgPoll() {
       stopBgPoll();
-      pollTimer = setInterval(() => fetchPublicRowFp().catch(() => {}), 4000);
-      backfillPollTimer = setInterval(async () => {
-        if (!secretEl.value.trim()) return;
-        try {
-          const res = await fetch(apiUrl({ stats: '1' }), { cache: 'no-store' });
-          const json = await res.json();
-          if (json.row_fp) applyRowFpUi(json.row_fp);
-          if (json.selesai) {
-            actionStatus.textContent = 'Backfill selesai.';
-            stopBackfillPoll();
-            setBusy(false);
-          }
-        } catch () { /* abaikan */ }
-      }, 3000);
+      pollTimer = setInterval(function () {
+        fetchPublicRowFp()
+          .then(function (rf) {
+            if (rf && rf.selesai) {
+              actionStatus.textContent = 'Backfill selesai.';
+              stopBgPoll();
+              setBusy(false);
+            }
+          })
+          .catch(function () { /* abaikan, interval berikutnya */ });
+      }, 5000);
     }
 
     function stopBgPoll() {
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = null;
-    }
-
-    function stopBackfillPoll() {
-      if (backfillPollTimer) clearInterval(backfillPollTimer);
-      backfillPollTimer = null;
     }
 
     document.getElementById('form').addEventListener('submit', async (e) => {
@@ -176,8 +204,7 @@
       startBgPoll();
 
       try {
-        const res = await fetch(apiUrl(), { cache: 'no-store' });
-        const json = await res.json();
+        const json = await fetchJson(apiUrl(), 90000);
         logEl.textContent = JSON.stringify(json, null, 2);
         logEl.classList.remove('hidden');
         if (json.status === 'error') throw new Error(json.message);
@@ -185,47 +212,50 @@
         if (json.selesai) {
           actionStatus.textContent = 'Selesai — semua row_fp terisi.';
           setBusy(false);
-          stopBackfillPoll();
         } else {
           actionStatus.textContent =
             'Batch ' + (json.batch?.processed ?? 0) + ' baris · sisa ' +
-            (json.row_fp_null?.toLocaleString('id-ID') ?? '?') + ' · memantau…';
+            (json.row_fp_null?.toLocaleString('id-ID') ?? '?') +
+            ' · cron Worker melanjutkan tiap menit.';
         }
       } catch (err) {
         actionStatus.textContent = 'Gagal: ' + err.message;
         setBusy(false);
-        stopBackfillPoll();
+        stopBgPoll();
       }
     });
 
     btnStats.addEventListener('click', async () => {
       sessionStorage.setItem(STORAGE_KEY, secretEl.value.trim());
-      actionStatus.textContent = 'Menghitung (memindai D1, sekali)…';
       try {
-        const res = await fetch(apiUrl({ stats: '1' }), { cache: 'no-store' });
-        const json = await res.json();
+        actionStatus.textContent = 'Menghitung sisa NULL (sekali, bisa 10–30 detik)…';
+        const json = await fetchJson(apiUrl({ stats: '1' }), 120000);
         if (json.status === 'error') throw new Error(json.message);
         if (json.row_fp) applyRowFpUi(json.row_fp);
         actionStatus.textContent = json.selesai
           ? 'Semua baris sudah punya row_fp.'
           : 'Tersisa ' + json.row_fp_null.toLocaleString('id-ID') + ' baris kosong.';
-        await fetchPublicRowFp();
       } catch (e) {
         actionStatus.textContent = 'Gagal: ' + e.message;
       }
     });
 
-    fetchPublicRowFp().catch(() => {
-      rfBadge.textContent = 'Offline';
+    fetchPublicRowFp().catch(function (e) {
+      showLoadError(
+        e && e.name === 'AbortError'
+          ? 'Timeout — server tidak menjawab. Cek deploy Pages (/api/row-fp-status).'
+          : (e && e.message) || 'Tidak dapat memuat status.'
+      );
     });
-    pollTimer = setInterval(() => fetchPublicRowFp().catch(() => {}), 4000);
+    pollTimer = setInterval(function () {
+      fetchPublicRowFp().catch(function () {});
+    }, 5000);
 
-    document.addEventListener('visibilitychange', () => {
+    document.addEventListener('visibilitychange', function () {
       if (document.hidden) {
         stopBgPoll();
-        stopBackfillPoll();
       } else if (!btnStart.disabled) {
-        fetchPublicRowFp();
+        fetchPublicRowFp().catch(function () {});
       }
     });
   </script>
