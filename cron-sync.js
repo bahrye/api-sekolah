@@ -51,7 +51,7 @@ import {
 } from './functions/lib/sync-meta.js';
 import { buildSyncStatusReport } from './functions/lib/sync-status.js';
 import {
-  runBackfillCronStep,
+  runBackfillCronBurst,
   getRowFpStatsForReport,
   recordRowFpStats,
 } from './functions/lib/backfill-row-fp.js';
@@ -533,12 +533,12 @@ async function maybeScheduleBackfillCron(env, ctx) {
   ctx.waitUntil(
     (async () => {
       try {
-        const result = await runBackfillCronStep(env.DB);
+        const result = await runBackfillCronBurst(env.DB);
         await recordCronTick(
           env.DB,
           result.done
-            ? 'backfill row_fp selesai'
-            : `backfill row_fp +${result.batch.processed} (sisa ~${result.null_remaining.toLocaleString('id-ID')})`
+            ? `backfill row_fp selesai (${result.total_processed.toLocaleString('id-ID')} baris, ${result.batches} batch)`
+            : `backfill row_fp +${result.total_processed.toLocaleString('id-ID')} (${result.batches}×batch, sisa ~${result.null_remaining.toLocaleString('id-ID')})`
         );
       } catch (err) {
         await recordCronTick(env.DB, `backfill row_fp gagal: ${err?.message || err}`);

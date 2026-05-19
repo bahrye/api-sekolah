@@ -6,9 +6,11 @@ import {
 } from './sekolah-schema.js';
 import { getApiMeta } from './sync-meta.js';
 
-/** Baris per request — aman untuk batas CPU Pages */
-export const BACKFILL_BATCH_SIZE = 150;
-const WRITE_BATCH = 50;
+/** Baris per request Pages (batch pertama; sisanya cron Worker) */
+export const BACKFILL_BATCH_SIZE = 400;
+/** Maks per query D1 */
+export const BACKFILL_BATCH_MAX = 500;
+const WRITE_BATCH = 100;
 
 const KEY_ROW_FP_NULL = 'row_fp_null_count';
 const KEY_ROW_FP_STATS_AT = 'row_fp_stats_at';
@@ -18,8 +20,11 @@ const KEY_ROW_FP_BACKFILL_CRON = 'row_fp_backfill_cron';
 /** Tanpa pembaruan stats selama ini → chain Pages dianggap mati, cron Worker lanjutkan */
 export const BACKFILL_STALE_MS = 5 * 60 * 1000;
 
-/** Batch per tick cron Worker (lebih besar dari Pages) */
-export const WORKER_BACKFILL_BATCH_SIZE = 400;
+/** Baris per batch cron Worker */
+export const WORKER_BACKFILL_BATCH_SIZE = 500;
+/** Burst: banyak batch dalam satu background job cron (~50–85 detik) */
+export const BACKFILL_BURST_MAX_BATCHES = 14;
+export const BACKFILL_BURST_WALL_MS = 88_000;
 
 export const PAGES_BACKFILL_URL = 'https://api-sekolah-kita.pages.dev/backfill-row-fp.html';
 export const WORKER_SYNC_STATUS_URL =
@@ -47,7 +52,7 @@ export async function countNullRowFp(db) {
  * @param {number} [batchSize]
  */
 export async function backfillRowFpBatch(db, batchSize = BACKFILL_BATCH_SIZE) {
-  const limit = Math.max(1, Math.min(500, batchSize));
+  const limit = Math.max(1, Math.min(BACKFILL_BATCH_MAX, batchSize));
   const { results } = await db
     .prepare(
       `SELECT ${SELECT_COLS} FROM sekolah WHERE ${ROW_FP_COLUMN} IS NULL OR ${ROW_FP_COLUMN} = '' LIMIT ?`
@@ -60,12 +65,11 @@ export async function backfillRowFpBatch(db, batchSize = BACKFILL_BATCH_SIZE) {
     return { processed: 0, updated: 0, done: true };
   }
 
-  const statements = [];
-  for (const row of rows) {
-    const rowFp = await fingerprintRow(row);
-    row[ROW_FP_COLUMN] = rowFp;
-    statements.push(buildRowFpOnlyStatement(db, row));
-  }
+  const fingerprints = await Promise.all(rows.map((row) => fingerprintRow(row)));
+  const statements = rows.map((row, i) => {
+    row[ROW_FP_COLUMN] = fingerprints[i];
+    return buildRowFpOnlyStatement(db, row);
+  });
 
   for (let i = 0; i < statements.length; i += WRITE_BATCH) {
     await db.batch(statements.slice(i, i + WRITE_BATCH));
@@ -125,28 +129,83 @@ export async function recordRowFpStats(
 }
 
 /**
+ * Burst backfill — banyak batch per tick cron (jauh lebih cepat dari 1×/menit).
  * @param {import('@cloudflare/workers-types').D1Database} db
- * @param {number} [batchSize]
+ * @param {{ batchSize?: number, maxBatches?: number, wallMs?: number }} [opts]
  */
-export async function runBackfillCronStep(db, batchSize = WORKER_BACKFILL_BATCH_SIZE) {
+export async function runBackfillCronBurst(
+  db,
+  { batchSize = WORKER_BACKFILL_BATCH_SIZE, maxBatches = BACKFILL_BURST_MAX_BATCHES, wallMs = BACKFILL_BURST_WALL_MS } = {}
+) {
   const meta = await getApiMeta(db);
   const before = await getRowFpStatsForReport(db, meta.totalSekolah);
-  const batch = await backfillRowFpBatch(db, batchSize);
-
   let nullRemaining = before.null_count ?? 0;
-  if (batch.done) {
-    nullRemaining = 0;
-  } else if (batch.processed > 0) {
-    nullRemaining = Math.max(0, nullRemaining - batch.processed);
+
+  if (nullRemaining <= 0) {
+    await recordRowFpStats(db, 0, { active: false, cronEnabled: false });
+    return {
+      total_processed: 0,
+      batches: 0,
+      null_remaining: 0,
+      done: true,
+      last_batch: { processed: 0, updated: 0, done: true },
+    };
   }
 
-  const done = batch.done || nullRemaining === 0;
+  const wallStart = Date.now();
+  let totalProcessed = 0;
+  let batches = 0;
+  let done = false;
+  let lastBatch = { processed: 0, updated: 0, done: true };
+
+  const burstCap =
+    nullRemaining > 300_000
+      ? Math.min(maxBatches + 4, 20)
+      : nullRemaining > 100_000
+        ? Math.min(maxBatches + 2, 18)
+        : maxBatches;
+
+  while (batches < burstCap && Date.now() - wallStart < wallMs - 4_000) {
+    lastBatch = await backfillRowFpBatch(db, batchSize);
+    batches += 1;
+    totalProcessed += lastBatch.processed;
+
+    if (lastBatch.done || lastBatch.processed === 0) {
+      done = true;
+      nullRemaining = 0;
+      break;
+    }
+
+    nullRemaining = Math.max(0, nullRemaining - lastBatch.processed);
+  }
+
+  done = done || nullRemaining === 0;
   await recordRowFpStats(db, nullRemaining, {
     active: !done,
     cronEnabled: !done,
   });
 
-  return { batch, null_remaining: nullRemaining, done };
+  return {
+    total_processed: totalProcessed,
+    batches,
+    null_remaining: nullRemaining,
+    done,
+    last_batch: lastBatch,
+  };
+}
+
+/** @deprecated gunakan runBackfillCronBurst — satu batch saja */
+export async function runBackfillCronStep(db, batchSize = WORKER_BACKFILL_BATCH_SIZE) {
+  const r = await runBackfillCronBurst(db, { batchSize, maxBatches: 1, wallMs: 60_000 });
+  return {
+    batch: {
+      processed: r.total_processed,
+      updated: r.total_processed,
+      done: r.done,
+    },
+    null_remaining: r.null_remaining,
+    done: r.done,
+  };
 }
 
 /**

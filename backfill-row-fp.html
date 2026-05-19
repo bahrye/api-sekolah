@@ -33,8 +33,8 @@
       <p id="rf-counts" class="text-sm text-slate-600 mt-1">—</p>
       <p id="rf-at" class="text-xs text-slate-400 mt-2">Terakhir diukur: —</p>
       <p id="rf-hint" class="text-[11px] text-violet-700 bg-violet-50 border border-violet-100 rounded-lg px-2 py-2 mt-3 text-center leading-relaxed">
-        Setelah «Mulai», Worker cron melanjutkan <strong>~400 baris/menit</strong> walau tab ditutup.
-        Chain Pages sering berhenti di ~10–15% — itu normal; cron yang menyelesaikan.
+        Setelah «Mulai», Worker cron memproses <strong>burst ~7.000 baris/menit</strong> (14×500) walau tab ditutup.
+        Chain Pages hanya batch pertama; sisanya cron otomatis.
       </p>
     </div>
 
