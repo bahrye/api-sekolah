@@ -27,13 +27,12 @@ export const ROW_FP_VERSION = '1';
 const ROW_HASH_FIELDS = FIELDS.filter((k) => k !== 'NPSN');
 
 /**
- * Hash isi baris (bukan per kolom kuota). Dipakai untuk skip UPDATE jika data sama.
- * @param {Record<string, string>} row
+ * Normalisasi nilai dari API/SQL agar hash stabil (spasi, null).
+ * @param {unknown} value
  */
-export async function fingerprintRow(row) {
-  const payload = ROW_FP_VERSION + '|' + ROW_HASH_FIELDS.map((k) => row[k] ?? '').join('\x1f');
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+export function normalizeFieldValue(value) {
+  if (value == null) return '';
+  return String(value).trim();
 }
 
 /**
@@ -41,21 +40,31 @@ export async function fingerprintRow(row) {
  */
 export function mapFromApi(item) {
   return {
-    NPSN: String(item.npsn ?? item.NPSN ?? ''),
-    Nama: String(item.nama ?? item.Nama ?? ''),
-    Bentuk: String(item.bentukPendidikan ?? item.Bentuk ?? ''),
-    BentukGroup: String(item.bentukPendidikanGroup ?? item.BentukGroup ?? ''),
-    Jenis: String(item.jenisPendidikan ?? item.Jenis ?? ''),
-    Status: String(item.statusSatuanPendidikan ?? item.Status ?? ''),
-    Jenjang: String(item.jenjangPendidikan ?? item.Jenjang ?? ''),
-    Pembina: String(item.pembina ?? item.Pembina ?? ''),
-    Jalur: String(item.jalurPendidikan ?? item.Jalur ?? ''),
-    Kelurahan: String(item.namaDesa ?? item.Kelurahan ?? ''),
-    Kecamatan: String(item.namaKecamatan ?? item.Kecamatan ?? ''),
-    Kabupaten: String(item.namaKabupaten ?? item.Kabupaten ?? ''),
-    Provinsi: String(item.namaProvinsi ?? item.Provinsi ?? ''),
-    Alamat: String(item.alamatJalan ?? item.Alamat ?? ''),
+    NPSN: normalizeFieldValue(item.npsn ?? item.NPSN),
+    Nama: normalizeFieldValue(item.nama ?? item.Nama),
+    Bentuk: normalizeFieldValue(item.bentukPendidikan ?? item.Bentuk),
+    BentukGroup: normalizeFieldValue(item.bentukPendidikanGroup ?? item.BentukGroup),
+    Jenis: normalizeFieldValue(item.jenisPendidikan ?? item.Jenis),
+    Status: normalizeFieldValue(item.statusSatuanPendidikan ?? item.Status),
+    Jenjang: normalizeFieldValue(item.jenjangPendidikan ?? item.Jenjang),
+    Pembina: normalizeFieldValue(item.pembina ?? item.Pembina),
+    Jalur: normalizeFieldValue(item.jalurPendidikan ?? item.Jalur),
+    Kelurahan: normalizeFieldValue(item.namaDesa ?? item.Kelurahan),
+    Kecamatan: normalizeFieldValue(item.namaKecamatan ?? item.Kecamatan),
+    Kabupaten: normalizeFieldValue(item.namaKabupaten ?? item.Kabupaten),
+    Provinsi: normalizeFieldValue(item.namaProvinsi ?? item.Provinsi),
+    Alamat: normalizeFieldValue(item.alamatJalan ?? item.Alamat),
   };
+}
+
+/**
+ * Hash isi baris (bukan per kolom kuota). Dipakai untuk skip UPDATE jika data sama.
+ * @param {Record<string, string>} row
+ */
+export async function fingerprintRow(row) {
+  const payload = ROW_FP_VERSION + '|' + ROW_HASH_FIELDS.map((k) => row[k] ?? '').join('\x1f');
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -88,9 +97,19 @@ export function formatRowResponse(row) {
 export function rowChanged(a, b) {
   for (const key of FIELDS) {
     if (key === 'NPSN') continue;
-    if ((a[key] ?? '') !== (b[key] ?? '')) return true;
+    if (normalizeFieldValue(a[key]) !== normalizeFieldValue(b[key])) return true;
   }
   return false;
+}
+
+/**
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {Record<string, string>} row
+ */
+export function buildRowFpOnlyStatement(db, row) {
+  return db
+    .prepare(`UPDATE sekolah SET ${ROW_FP_COLUMN} = ? WHERE NPSN = ?`)
+    .bind(row[ROW_FP_COLUMN] ?? row.row_fp ?? '', row.NPSN);
 }
 
 export const INSERT_COLUMNS = `${SELECT_COLS}, ${ROW_FP_COLUMN}`;

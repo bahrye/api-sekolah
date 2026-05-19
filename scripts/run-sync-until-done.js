@@ -146,7 +146,7 @@ async function main() {
     const pct = json.progress_percent ?? '?';
 
     console.log(
-      `[${chunkNum}] offset ${offset}→${next} (${pct}%) | scan=${c.scanned} upd=${c.updated} ins=${c.inserted} skip=${c.skipped} fp_skip=${c.pages_fp_skip ?? 0} (${pagesThisChunk} hal/~${pagesThisChunk * 20})`
+      `[${chunkNum}] offset ${offset}→${next} (${pct}%) | scan=${c.scanned} upd=${c.updated} ins=${c.inserted} skip=${c.skipped} isi_fp=${c.row_fp_backfill ?? 0} fp_skip=${c.pages_fp_skip ?? 0} (${pagesThisChunk} hal/~${pagesThisChunk * 20})`
     );
 
     const needStepDown =

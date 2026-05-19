@@ -7,12 +7,15 @@ import {
 import {
   mapFromApi,
   fingerprintRow,
+  rowChanged,
   ROW_FP_COLUMN,
+  SELECT_COLS,
   INSERT_COLUMNS,
   INSERT_PLACEHOLDERS,
   insertBindValues,
   UPDATE_SET_CLAUSE,
   updateBindValues,
+  buildRowFpOnlyStatement,
 } from './sekolah-schema.js';
 import {
   CHUNK_RECORDS_LADDER,
@@ -108,16 +111,16 @@ async function fetchPageWithMeta(offset) {
 }
 
 /**
- * Baca NPSN + row_fp saja (1 baris = 1 kuota baca, bukan per kolom).
+ * Baca baris lengkap + row_fp (1 baris = 1 kuota baca; kolom tambahan tidak menambah kuota).
  * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {string[]} npsns
  */
-async function fetchExistingFpByNpsn(db, npsns) {
+async function fetchExistingRowsByNpsn(db, npsns) {
   if (npsns.length === 0) return new Map();
 
   const placeholders = npsns.map(() => '?').join(',');
   const { results } = await db
-    .prepare(`SELECT NPSN, ${ROW_FP_COLUMN} FROM sekolah WHERE NPSN IN (${placeholders})`)
+    .prepare(`SELECT ${SELECT_COLS}, ${ROW_FP_COLUMN} FROM sekolah WHERE NPSN IN (${placeholders})`)
     .bind(...npsns)
     .all();
 
@@ -176,6 +179,7 @@ export async function syncSekolahChunk(
     inserted: 0,
     updated: 0,
     skipped: 0,
+    row_fp_backfill: 0,
     pages: 0,
     pages_fp_skip: 0,
     pages_fp_saved: 0,
@@ -245,7 +249,7 @@ export async function syncSekolahChunk(
       stats.pages_fp_skip += 1;
     } else {
       const npsns = rows.map((r) => r.NPSN);
-      const existing = await fetchExistingFpByNpsn(db, npsns);
+      const existing = await fetchExistingRowsByNpsn(db, npsns);
       const writes = [];
 
       for (const row of rows) {
@@ -258,6 +262,10 @@ export async function syncSekolahChunk(
           writes.push(buildInsertStatement(db, row));
           stats.inserted += 1;
         } else if ((old[ROW_FP_COLUMN] ?? '') === rowFp) {
+          stats.skipped += 1;
+        } else if (!old[ROW_FP_COLUMN] && !rowChanged(old, row)) {
+          writes.push(buildRowFpOnlyStatement(db, row));
+          stats.row_fp_backfill += 1;
           stats.skipped += 1;
         } else {
           writes.push(buildUpdateStatement(db, row));

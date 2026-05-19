@@ -33,6 +33,7 @@ export function formatActivityText({ offsetFrom, offsetTo, stats, note }) {
   if (stats.inserted) parts.push(`tambah ${stats.inserted}`);
   if (stats.updated) parts.push(`ubah ${stats.updated}`);
   if (stats.skipped) parts.push(`lewati ${stats.skipped}`);
+  if (stats.row_fp_backfill) parts.push(`isi_fp ${stats.row_fp_backfill}`);
   if (stats.pages_fp_skip) parts.push(`fp_skip ${stats.pages_fp_skip}`);
   if (stats.pages) parts.push(`${stats.pages} hal`);
 
@@ -78,6 +79,7 @@ export async function appendActivityLog(db, entry) {
     inserted: entry.stats.inserted ?? 0,
     updated: entry.stats.updated ?? 0,
     skipped: entry.stats.skipped ?? 0,
+    row_fp_backfill: entry.stats.row_fp_backfill ?? 0,
     pages_fp_skip: entry.stats.pages_fp_skip ?? 0,
     pages: entry.stats.pages ?? 0,
     max_pages: entry.stats.max_pages ?? entry.stats.pages ?? 0,
