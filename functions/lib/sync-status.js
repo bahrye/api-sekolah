@@ -154,8 +154,8 @@ function statusBadgeClass(runState) {
 function rowFpStatusLabel(rf) {
   if (!rf?.measured) return 'Belum diukur';
   if (rf.selesai) return 'Lengkap';
+  if (rf.backfill_stale) return 'Terhenti — cron lanjutkan';
   if (rf.backfill_cron && !rf.selesai) return 'Backfill (cron/menit)';
-  if (rf.backfill_stale) return 'Dilanjutkan cron';
   if (rf.backfill_active) return 'Backfill berjalan';
   return 'Perlu dilengkapi';
 }
@@ -250,6 +250,7 @@ export function renderSyncStatusHtml(report) {
       <p id="row-fp-percent" class="text-xl font-bold text-slate-900">${rf.percent_filled != null ? esc(rf.percent_filled) + '% terisi' : '—'}</p>
       <p id="row-fp-counts" class="text-sm text-slate-600 mt-1">${rf.measured ? `Kosong: ${Number(rf.null_count).toLocaleString('id-ID')} · Terisi: ${Number(rf.filled_count).toLocaleString('id-ID')}${rf.total ? ' / ' + Number(rf.total).toLocaleString('id-ID') : ''}` : 'Klik tombol di bawah untuk mengukur sisa NULL (butuh secret).'}</p>
       <p id="row-fp-stats-at" class="text-xs text-slate-400 mt-2">Terakhir diukur: ${esc(rf.stats_at_wib || 'belum pernah')}</p>
+      <p id="row-fp-note" class="text-xs text-violet-700 mt-1${rf.backfill_note ? '' : ' hidden'}">${esc(rf.backfill_note || '')}</p>
       <a id="row-fp-cta" href="${esc(backfillUrl)}" class="mt-4 inline-flex w-full items-center justify-center gap-2 bg-violet-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-violet-700 transition-colors shadow-sm">
         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
         Cek &amp; backfill row_fp
@@ -357,8 +358,8 @@ export function renderSyncStatusHtml(report) {
       function rowFpStatusLabel(rf) {
         if (!rf || !rf.measured) return 'Belum diukur';
         if (rf.selesai) return 'Lengkap';
+        if (rf.backfill_stale) return 'Terhenti — cron lanjutkan';
         if (rf.backfill_cron && !rf.selesai) return 'Backfill (cron/menit)';
-        if (rf.backfill_stale) return 'Dilanjutkan cron';
         if (rf.backfill_active) return 'Backfill berjalan';
         return 'Perlu dilengkapi';
       }
@@ -399,6 +400,15 @@ export function renderSyncStatusHtml(report) {
         }
         var at = document.getElementById('row-fp-stats-at');
         if (at) at.textContent = 'Terakhir diukur: ' + (rf.stats_at_wib || 'belum pernah');
+        var noteEl = document.getElementById('row-fp-note');
+        if (noteEl) {
+          if (rf.backfill_note) {
+            noteEl.textContent = rf.backfill_note;
+            noteEl.classList.remove('hidden');
+          } else {
+            noteEl.classList.add('hidden');
+          }
+        }
         var cta = document.getElementById('row-fp-cta');
         if (cta && rf.halaman_backfill) cta.href = rf.halaman_backfill;
       }
@@ -420,6 +430,7 @@ export function renderSyncStatusHtml(report) {
           rf.backfill_active,
           rf.backfill_cron,
           rf.backfill_stale,
+          rf.backfill_note,
           rf.stats_at,
           JSON.stringify(r.activity_log || []),
         ].join('|');

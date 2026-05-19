@@ -54,6 +54,9 @@ import {
   runBackfillCronBurst,
   getRowFpStatsForReport,
   recordRowFpStats,
+  recordRowFpBackfillNote,
+  CRON_BACKFILL_WALL_MS,
+  CRON_BACKFILL_MAX_BATCHES,
 } from './functions/lib/backfill-row-fp.js';
 import {
   appendActivityLog,
@@ -501,50 +504,57 @@ function skipMessage(plan) {
 }
 
 /**
- * Lanjutkan backfill row_fp via cron (chain Pages sering terputus ~10–15%).
+ * Backfill row_fp — di-await langsung di cron (waitUntil tidak andal di Cron Trigger).
  * @param {object} env
- * @param {ExecutionContext} ctx
  */
-async function maybeScheduleBackfillCron(env, ctx) {
+async function runBackfillCronIfDue(env) {
   const meta = await getApiMeta(env.DB);
   const rf = await getRowFpStatsForReport(env.DB, meta.totalSekolah);
 
   if (rf.selesai) {
     if (rf.backfill_cron || rf.backfill_active) {
       await recordRowFpStats(env.DB, 0, { active: false, cronEnabled: false });
+      await recordRowFpBackfillNote(env.DB, 'selesai');
     }
-    return;
+    return { ran: false, reason: 'selesai' };
   }
 
-  if (!rf.measured || rf.null_count == null || rf.null_count <= 0) return;
+  if (!rf.measured || rf.null_count == null || rf.null_count <= 0) {
+    return { ran: false, reason: 'belum_diukur' };
+  }
 
   let cronOn = rf.backfill_cron;
-  if (rf.backfill_active && rf.backfill_stale && !cronOn) {
+  if ((rf.backfill_active && rf.backfill_stale && !cronOn) || (rf.backfill_active && !cronOn)) {
     await recordRowFpStats(env.DB, rf.null_count, { active: true, cronEnabled: true });
     cronOn = true;
   }
 
-  if (!cronOn) return;
-  if (await isChunkLocked(env.DB)) return;
+  if (!cronOn) {
+    return { ran: false, reason: 'cron_nonaktif' };
+  }
 
-  const prog = await getSyncProgress(env.DB);
-  if (prog.runState === 'running') return;
+  if (await isChunkLocked(env.DB)) {
+    await recordRowFpBackfillNote(env.DB, 'menunggu — chunk sync memakai lock');
+    return { ran: false, reason: 'chunk_lock' };
+  }
 
-  ctx.waitUntil(
-    (async () => {
-      try {
-        const result = await runBackfillCronBurst(env.DB);
-        await recordCronTick(
-          env.DB,
-          result.done
-            ? `backfill row_fp selesai (${result.total_processed.toLocaleString('id-ID')} baris, ${result.batches} batch)`
-            : `backfill row_fp +${result.total_processed.toLocaleString('id-ID')} (${result.batches}×batch, sisa ~${result.null_remaining.toLocaleString('id-ID')})`
-        );
-      } catch (err) {
-        await recordCronTick(env.DB, `backfill row_fp gagal: ${err?.message || err}`);
-      }
-    })()
-  );
+  try {
+    const result = await runBackfillCronBurst(env.DB, {
+      wallMs: CRON_BACKFILL_WALL_MS,
+      maxBatches: CRON_BACKFILL_MAX_BATCHES,
+    });
+    const note = result.done
+      ? `selesai (+${result.total_processed.toLocaleString('id-ID')}, ${result.batches} batch)`
+      : `+${result.total_processed.toLocaleString('id-ID')} (${result.batches} batch, sisa ~${result.null_remaining.toLocaleString('id-ID')})`;
+    await recordRowFpBackfillNote(env.DB, note);
+    await recordCronTick(env.DB, `backfill row_fp ${note}`);
+    return { ran: true, result };
+  } catch (err) {
+    const msg = err?.message || String(err);
+    await recordRowFpBackfillNote(env.DB, `gagal: ${msg}`);
+    await recordCronTick(env.DB, `backfill row_fp gagal: ${msg}`);
+    return { ran: false, reason: 'error', error: msg };
+  }
 }
 
 /**
@@ -553,16 +563,17 @@ async function maybeScheduleBackfillCron(env, ctx) {
  * @param {ExecutionContext} ctx
  */
 async function runScheduledTick(env, ctx) {
+  const backfill = await runBackfillCronIfDue(env);
+
   const plan = await planResumeCron(env);
 
-  await recordCronTick(
-    env.DB,
-    plan.action === 'skip'
-      ? `CF Cron lewati — ${plan.reason}`
-      : `CF Cron tick @ ${plan.offset}`
-  );
-
   if (plan.action === 'skip') {
+    await recordCronTick(
+      env.DB,
+      backfill.ran
+        ? `CF Cron · sync lewati (${plan.reason}) · backfill OK`
+        : `CF Cron lewati — ${plan.reason}`
+    );
     if (plan.reason !== 'completed') {
       await appendCronJobActivityLog(env.DB, {
         kind: 'cron_skip',
@@ -571,9 +582,10 @@ async function runScheduledTick(env, ctx) {
         apiTotal: plan.apiTotal,
       });
     }
-    await maybeScheduleBackfillCron(env, ctx);
-    return { status: 'skipped', plan };
+    return { status: 'skipped', plan, backfill };
   }
+
+  await recordCronTick(env.DB, `CF Cron tick @ ${plan.offset}`);
 
   const acquired = await tryAcquireChunkLock(env.DB, plan.offset);
   if (!acquired) {
@@ -584,11 +596,11 @@ async function runScheduledTick(env, ctx) {
       offset: plan.offset,
       apiTotal: plan.apiTotal,
     });
-    return { status: 'skipped', reason: 'chunk_in_progress', plan };
+    return { status: 'skipped', reason: 'chunk_in_progress', plan, backfill };
   }
 
   scheduleResumeInBackground(ctx, env, plan.offset, {}, true);
-  return { status: 'accepted', plan };
+  return { status: 'accepted', plan, backfill };
 }
 
 /**
@@ -597,6 +609,7 @@ async function runScheduledTick(env, ctx) {
  * @param {ExecutionContext} ctx
  */
 async function runScheduledWeeklyRun(env, ctx) {
+  await runBackfillCronIfDue(env);
   const offset = 0;
   await markSyncRunStarted(env.DB);
   await recordCronTick(env.DB, 'CF Cron run — sync mingguan Senin 01:00 WITA @ 0');
@@ -643,6 +656,27 @@ export default {
         return new Response(FAVICON_SYNC_SVG, { headers: FAVICON_SYNC_HEADERS });
       }
 
+      if (pathname === '/backfill-tick') {
+        const auth = assertSyncAuthorized(request, url, env);
+        if (!auth.ok) return auth.response;
+
+        const metaBf = await getApiMeta(env.DB);
+        const rfBf = await getRowFpStatsForReport(env.DB, metaBf.totalSekolah);
+        if (!rfBf.backfill_cron && rfBf.null_count != null && rfBf.null_count > 0) {
+          await recordRowFpStats(env.DB, rfBf.null_count, { active: true, cronEnabled: true });
+        }
+        const backfill = await runBackfillCronIfDue(env);
+        const report = await buildSyncStatusReport(env.DB);
+        return new Response(
+          JSON.stringify({
+            status: 'success',
+            backfill,
+            row_fp: report.row_fp,
+          }),
+          { headers: jsonHeaders }
+        );
+      }
+
       if (pathname === '/run' || pathname === '/tick') {
         const auth = assertSyncAuthorized(request, url, env);
         if (!auth.ok) return auth.response;
@@ -650,6 +684,7 @@ export default {
         const waitForResult = url.searchParams.get('wait') === '1';
 
         if (pathname === '/tick') {
+          const backfill = await runBackfillCronIfDue(env);
           const plan = await planResumeCron(env);
 
           if (plan.action === 'skip') {
@@ -668,6 +703,7 @@ export default {
                 reason: plan.reason,
                 message: skipMessage(plan),
                 offset: plan.offset,
+                backfill,
               }),
               { headers: jsonHeaders }
             );

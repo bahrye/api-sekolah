@@ -16,6 +16,11 @@ const KEY_ROW_FP_NULL = 'row_fp_null_count';
 const KEY_ROW_FP_STATS_AT = 'row_fp_stats_at';
 const KEY_ROW_FP_BACKFILL_ACTIVE = 'row_fp_backfill_active';
 const KEY_ROW_FP_BACKFILL_CRON = 'row_fp_backfill_cron';
+const KEY_ROW_FP_BACKFILL_NOTE = 'row_fp_backfill_note';
+
+/** Cron Trigger: jangan pakai waitUntil — await langsung (batas ~30s) */
+export const CRON_BACKFILL_WALL_MS = 28_000;
+export const CRON_BACKFILL_MAX_BATCHES = 8;
 
 /** Tanpa pembaruan stats selama ini → chain Pages dianggap mati, cron Worker lanjutkan */
 export const BACKFILL_STALE_MS = 5 * 60 * 1000;
@@ -120,12 +125,27 @@ export async function recordRowFpStats(
       )
       .bind(key, value);
 
-  await db.batch([
+  const statements = [
     upsert(KEY_ROW_FP_NULL, String(Math.max(0, nullCount))),
     upsert(KEY_ROW_FP_STATS_AT, now),
     upsert(KEY_ROW_FP_BACKFILL_ACTIVE, active ? '1' : '0'),
     upsert(KEY_ROW_FP_BACKFILL_CRON, cronEnabled ? '1' : '0'),
-  ]);
+  ];
+  await db.batch(statements);
+}
+
+/**
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {string} note
+ */
+export async function recordRowFpBackfillNote(db, note) {
+  await db
+    .prepare(
+      `INSERT INTO sync_meta (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    )
+    .bind(KEY_ROW_FP_BACKFILL_NOTE, note)
+    .run();
 }
 
 /**
@@ -170,9 +190,13 @@ export async function runBackfillCronBurst(
     batches += 1;
     totalProcessed += lastBatch.processed;
 
-    if (lastBatch.done || lastBatch.processed === 0) {
+    if (lastBatch.done) {
       done = true;
       nullRemaining = 0;
+      break;
+    }
+
+    if (lastBatch.processed === 0) {
       break;
     }
 
@@ -215,12 +239,13 @@ export async function runBackfillCronStep(db, batchSize = WORKER_BACKFILL_BATCH_
 export async function getRowFpStatsForReport(db, totalSekolah = null) {
   try {
     const { results } = await db
-      .prepare(`SELECT key, value FROM sync_meta WHERE key IN (?, ?, ?, ?)`)
+      .prepare(`SELECT key, value FROM sync_meta WHERE key IN (?, ?, ?, ?, ?)`)
       .bind(
         KEY_ROW_FP_NULL,
         KEY_ROW_FP_STATS_AT,
         KEY_ROW_FP_BACKFILL_ACTIVE,
-        KEY_ROW_FP_BACKFILL_CRON
+        KEY_ROW_FP_BACKFILL_CRON,
+        KEY_ROW_FP_BACKFILL_NOTE
       )
       .all();
 
@@ -237,6 +262,7 @@ export async function getRowFpStatsForReport(db, totalSekolah = null) {
     const backfill_active = map[KEY_ROW_FP_BACKFILL_ACTIVE] === '1';
     const backfill_cron = map[KEY_ROW_FP_BACKFILL_CRON] === '1';
     const backfill_stale = backfill_active && statsAge > BACKFILL_STALE_MS;
+    const backfill_note = map[KEY_ROW_FP_BACKFILL_NOTE] ?? null;
 
     return {
       null_count: Number.isFinite(nullCount) ? nullCount : null,
@@ -247,6 +273,7 @@ export async function getRowFpStatsForReport(db, totalSekolah = null) {
       backfill_active,
       backfill_cron,
       backfill_stale,
+      backfill_note,
       stats_at: statsAt,
       stats_at_wib: statsAt ? formatStatsWib(statsAt) : null,
       measured: nullRaw != null,
