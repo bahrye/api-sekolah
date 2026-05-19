@@ -4,51 +4,77 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
-  <title>Backfill row_fp — EduAPI</title>
+  <title>Status backfill row_fp — EduAPI</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen font-sans antialiased">
-  <main class="max-w-lg mx-auto px-4 py-10">
-    <h1 class="text-xl font-bold text-slate-900 mb-1">Isi kolom <code class="text-sm bg-slate-200 px-1 rounded">row_fp</code></h1>
-    <p class="text-sm text-slate-600 mb-6 leading-relaxed">
-      Menghitung hash dari data yang sudah ada di D1 (tanpa API belajar.id).
-      Butuh <strong>SYNC_SECRET</strong> yang sama dengan sinkronisasi manual.
-    </p>
+  <main class="max-w-lg mx-auto px-4 py-8">
+    <header class="flex items-center justify-between gap-3 mb-6">
+      <div>
+        <h1 class="text-lg font-bold text-slate-900">Backfill <code class="text-sm bg-violet-100 px-1 rounded">row_fp</code></h1>
+        <p class="text-xs text-slate-500 mt-0.5">Pemantauan &amp; pengisian sidik jari baris</p>
+      </div>
+      <a href="https://api-sekolah-cron.syamsulbahri-agro27b.workers.dev/"
+         class="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg">
+        Status sync
+      </a>
+    </header>
+
+    <div class="bg-white border border-violet-200 rounded-xl p-5 shadow-sm mb-4">
+      <div class="flex justify-between items-center mb-3">
+        <span class="text-sm font-semibold text-slate-700">Progres row_fp</span>
+        <span id="rf-badge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">Memuat…</span>
+      </div>
+      <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-2">
+        <div id="rf-bar" class="h-full bg-violet-600 rounded-full transition-all duration-500" style="width:0%"></div>
+      </div>
+      <p id="rf-pct" class="text-xl font-bold text-slate-900">—</p>
+      <p id="rf-counts" class="text-sm text-slate-600 mt-1">—</p>
+      <p id="rf-at" class="text-xs text-slate-400 mt-2">Terakhir diukur: —</p>
+      <p id="rf-hint" class="text-[11px] text-slate-400 mt-3 text-center">Status diperbarui otomatis di latar belakang</p>
+    </div>
 
     <form id="form" class="space-y-4 bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
       <div>
-        <label for="secret" class="block text-xs font-semibold text-slate-600 mb-1">Secret</label>
+        <label for="secret" class="block text-xs font-semibold text-slate-600 mb-1">SYNC_SECRET</label>
         <input type="password" id="secret" name="secret" autocomplete="off" required
-               class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
-               placeholder="SYNC_SECRET">
+               class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-violet-500 focus:outline-none"
+               placeholder="Sama dengan sync manual">
       </div>
 
       <div class="flex flex-wrap gap-2">
         <button type="submit" id="btn-start"
-                class="inline-flex items-center justify-center bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                class="flex-1 min-w-[140px] inline-flex justify-center bg-violet-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-violet-700 disabled:opacity-50">
           Mulai backfill
         </button>
         <button type="button" id="btn-stats"
-                class="inline-flex items-center justify-center bg-white border border-slate-200 text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-slate-50 disabled:opacity-50">
-          Cek sisa NULL
+                class="inline-flex justify-center bg-white border border-slate-200 text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-slate-50 disabled:opacity-50">
+          Ukur ulang
         </button>
       </div>
 
-      <p id="status" class="text-sm text-slate-600 min-h-[1.25rem]" role="status" aria-live="polite"></p>
-      <pre id="log" class="text-xs bg-slate-900 text-slate-100 rounded-lg p-3 overflow-auto max-h-48 hidden"></pre>
+      <p id="action-status" class="text-sm text-slate-600 min-h-[1.25rem]" role="status" aria-live="polite"></p>
+      <pre id="log" class="text-xs bg-slate-900 text-slate-100 rounded-lg p-3 overflow-auto max-h-40 hidden"></pre>
     </form>
 
-    <p class="mt-6 text-xs text-slate-500">
-      Atau buka langsung:
-      <code class="block mt-1 break-all bg-slate-100 p-2 rounded">/api/backfill-row-fp?secret=…</code>
+    <p class="mt-6 text-xs text-slate-500 leading-relaxed">
+      Setelah backfill, kartu <strong>row_fp</strong> di
+      <a href="https://api-sekolah-cron.syamsulbahri-agro27b.workers.dev/" class="text-emerald-700 underline">dashboard status sync</a>
+      ikut terperbarui (polling ~4 detik, tanpa secret).
     </p>
     <a href="/" class="inline-block mt-4 text-sm text-blue-600 hover:underline">← Beranda API</a>
   </main>
   <script>
+    const STATUS_URL = '/api/row-fp-status';
     const STORAGE_KEY = 'eduapi_sync_secret';
     const secretEl = document.getElementById('secret');
-    const statusEl = document.getElementById('status');
+    const rfBadge = document.getElementById('rf-badge');
+    const rfBar = document.getElementById('rf-bar');
+    const rfPct = document.getElementById('rf-pct');
+    const rfCounts = document.getElementById('rf-counts');
+    const rfAt = document.getElementById('rf-at');
+    const actionStatus = document.getElementById('action-status');
     const logEl = document.getElementById('log');
     const btnStart = document.getElementById('btn-start');
     const btnStats = document.getElementById('btn-stats');
@@ -57,6 +83,43 @@
     if (saved) secretEl.value = saved;
 
     let pollTimer = null;
+    let backfillPollTimer = null;
+
+    function badgeClass(rf) {
+      if (!rf || !rf.measured) return 'text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600';
+      if (rf.selesai) return 'text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-800';
+      if (rf.backfill_active) return 'text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800';
+      return 'text-xs font-bold px-2.5 py-1 rounded-full bg-violet-100 text-violet-800';
+    }
+
+    function badgeLabel(rf) {
+      if (!rf || !rf.measured) return 'Belum diukur';
+      if (rf.selesai) return 'Lengkap';
+      if (rf.backfill_active) return 'Backfill berjalan';
+      return 'Perlu dilengkapi';
+    }
+
+    function applyRowFpUi(rf) {
+      if (!rf) return;
+      rfBadge.className = badgeClass(rf);
+      rfBadge.textContent = badgeLabel(rf);
+      const pct = rf.percent_filled != null ? Math.min(100, rf.percent_filled) : 0;
+      rfBar.style.width = pct + '%';
+      rfPct.textContent = rf.percent_filled != null ? rf.percent_filled + '% terisi' : '—';
+      rfCounts.textContent = rf.measured
+        ? 'Kosong: ' + Number(rf.null_count).toLocaleString('id-ID') +
+          ' · Terisi: ' + Number(rf.filled_count).toLocaleString('id-ID') +
+          (rf.total ? ' / ' + Number(rf.total).toLocaleString('id-ID') : '')
+        : 'Klik «Ukur ulang» (butuh secret) untuk menghitung sisa NULL.';
+      rfAt.textContent = 'Terakhir diukur: ' + (rf.stats_at_wib || 'belum pernah');
+    }
+
+    async function fetchPublicRowFp() {
+      const res = await fetch(STATUS_URL, { cache: 'no-store' });
+      const json = await res.json();
+      if (json.row_fp) applyRowFpUi(json.row_fp);
+      return json.row_fp;
+    }
 
     function apiUrl(params) {
       const u = new URL('/api/backfill-row-fp', location.origin);
@@ -65,85 +128,99 @@
       return u.toString();
     }
 
-    function log(msg) {
-      logEl.classList.remove('hidden');
-      logEl.textContent += msg + '\n';
-      logEl.scrollTop = logEl.scrollHeight;
-    }
-
     function setBusy(busy) {
       btnStart.disabled = busy;
       btnStats.disabled = busy;
     }
 
-    async function fetchStats() {
-      const res = await fetch(apiUrl({ stats: '1' }), { cache: 'no-store' });
-      const json = await res.json();
-      if (!res.ok && json.status === 'error') throw new Error(json.message || res.statusText);
-      return json;
-    }
-
-    function startPolling() {
-      stopPolling();
-      pollTimer = setInterval(async () => {
+    function startBgPoll() {
+      stopBgPoll();
+      pollTimer = setInterval(() => fetchPublicRowFp().catch(() => {}), 4000);
+      backfillPollTimer = setInterval(async () => {
+        if (!secretEl.value.trim()) return;
         try {
-          const json = await fetchStats();
-          statusEl.textContent = `Sisa row_fp kosong: ${json.row_fp_null?.toLocaleString('id-ID') ?? '?'}`;
+          const res = await fetch(apiUrl({ stats: '1' }), { cache: 'no-store' });
+          const json = await res.json();
+          if (json.row_fp) applyRowFpUi(json.row_fp);
           if (json.selesai) {
-            statusEl.textContent += ' — Selesai.';
-            stopPolling();
+            actionStatus.textContent = 'Backfill selesai.';
+            stopBackfillPoll();
             setBusy(false);
           }
-        } catch (e) {
-          statusEl.textContent = 'Gagal memantau: ' + e.message;
-        }
-      }, 2500);
+        } catch () { /* abaikan */ }
+      }, 3000);
     }
 
-    function stopPolling() {
+    function stopBgPoll() {
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = null;
     }
 
+    function stopBackfillPoll() {
+      if (backfillPollTimer) clearInterval(backfillPollTimer);
+      backfillPollTimer = null;
+    }
+
     document.getElementById('form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      logEl.classList.add('hidden');
       logEl.textContent = '';
       sessionStorage.setItem(STORAGE_KEY, secretEl.value.trim());
       setBusy(true);
-      statusEl.textContent = 'Memulai batch pertama + chain background…';
+      actionStatus.textContent = 'Memulai backfill (chain background)…';
+      startBgPoll();
 
       try {
         const res = await fetch(apiUrl(), { cache: 'no-store' });
         const json = await res.json();
-        log(JSON.stringify(json, null, 2));
-
+        logEl.textContent = JSON.stringify(json, null, 2);
+        logEl.classList.remove('hidden');
         if (json.status === 'error') throw new Error(json.message);
-
+        if (json.row_fp) applyRowFpUi(json.row_fp);
         if (json.selesai) {
-          statusEl.textContent = 'Selesai — tidak ada row_fp kosong.';
+          actionStatus.textContent = 'Selesai — semua row_fp terisi.';
           setBusy(false);
-          return;
+          stopBackfillPoll();
+        } else {
+          actionStatus.textContent =
+            'Batch ' + (json.batch?.processed ?? 0) + ' baris · sisa ' +
+            (json.row_fp_null?.toLocaleString('id-ID') ?? '?') + ' · memantau…';
         }
-
-        statusEl.textContent =
-          `Batch ${json.batch?.processed ?? 0} baris. Sisa: ${json.row_fp_null?.toLocaleString('id-ID')}. Memantau…`;
-        startPolling();
       } catch (err) {
-        statusEl.textContent = 'Gagal: ' + err.message;
+        actionStatus.textContent = 'Gagal: ' + err.message;
         setBusy(false);
+        stopBackfillPoll();
       }
     });
 
     btnStats.addEventListener('click', async () => {
       sessionStorage.setItem(STORAGE_KEY, secretEl.value.trim());
-      statusEl.textContent = 'Memuat…';
+      actionStatus.textContent = 'Menghitung (memindai D1, sekali)…';
       try {
-        const json = await fetchStats();
-        statusEl.textContent = json.selesai
+        const res = await fetch(apiUrl({ stats: '1' }), { cache: 'no-store' });
+        const json = await res.json();
+        if (json.status === 'error') throw new Error(json.message);
+        if (json.row_fp) applyRowFpUi(json.row_fp);
+        actionStatus.textContent = json.selesai
           ? 'Semua baris sudah punya row_fp.'
-          : `Sisa row_fp kosong: ${json.row_fp_null?.toLocaleString('id-ID')}`;
+          : 'Tersisa ' + json.row_fp_null.toLocaleString('id-ID') + ' baris kosong.';
+        await fetchPublicRowFp();
       } catch (e) {
-        statusEl.textContent = 'Gagal: ' + e.message;
+        actionStatus.textContent = 'Gagal: ' + e.message;
+      }
+    });
+
+    fetchPublicRowFp().catch(() => {
+      rfBadge.textContent = 'Offline';
+    });
+    pollTimer = setInterval(() => fetchPublicRowFp().catch(() => {}), 4000);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopBgPoll();
+        stopBackfillPoll();
+      } else if (!btnStart.disabled) {
+        fetchPublicRowFp();
       }
     });
   </script>

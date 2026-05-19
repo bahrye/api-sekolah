@@ -9,6 +9,7 @@ import {
 } from './sync-meta.js';
 import { ESTIMATED_TOTAL_RECORDS, progressPercent } from './sync-sekolah.js';
 import { getActivityLog, activityKindLabel } from './sync-activity-log.js';
+import { getRowFpStatsForReport, PAGES_BACKFILL_URL } from './backfill-row-fp.js';
 
 /**
  * @param {import('@cloudflare/workers-types').D1Database} db
@@ -21,6 +22,7 @@ export async function buildSyncStatusReport(db, { lastChunk } = {}) {
   const chunkLocked = await isChunkLocked(db);
   const activity_log = await getActivityLog(db);
   const apiTotal = prog.apiTotal ?? meta.totalSekolah ?? ESTIMATED_TOTAL_RECORDS;
+  const row_fp = await getRowFpStatsForReport(db, meta.totalSekolah ?? apiTotal);
   const currentOffset = prog.currentOffset ?? 0;
   let resolved = resolveSyncRunState(prog, apiTotal, cron, { chunkLocked });
   if (resolved.stale && prog.runState === 'running') {
@@ -98,6 +100,8 @@ export async function buildSyncStatusReport(db, { lastChunk } = {}) {
     },
     catatan_keamanan:
       'Memulai sinkron manual (/run) memerlukan SYNC_SECRET. Dashboard ini hanya menampilkan status.',
+    row_fp,
+    row_fp_halaman: PAGES_BACKFILL_URL,
     activity_log,
     ...(lastChunk ? { chunk_terakhir: lastChunk } : {}),
   };
@@ -145,6 +149,26 @@ function statusBadgeClass(runState) {
 }
 
 /**
+ * @param {object} rf
+ */
+function rowFpStatusLabel(rf) {
+  if (!rf?.measured) return 'Belum diukur';
+  if (rf.selesai) return 'Lengkap';
+  if (rf.backfill_active) return 'Backfill berjalan';
+  return 'Perlu dilengkapi';
+}
+
+/**
+ * @param {object} rf
+ */
+function rowFpBadgeClass(rf) {
+  if (!rf?.measured) return 'bg-slate-100 text-slate-600';
+  if (rf.selesai) return 'bg-green-100 text-green-800';
+  if (rf.backfill_active) return 'bg-amber-100 text-amber-800';
+  return 'bg-violet-100 text-violet-800';
+}
+
+/**
  * @param {object} report
  */
 export function renderSyncStatusHtml(report) {
@@ -158,6 +182,9 @@ export function renderSyncStatusHtml(report) {
 
   const barPct = Math.min(100, s.progress_percent || 0);
   const homeUrl = 'https://api-sekolah-kita.pages.dev';
+  const rf = report.row_fp || {};
+  const rowFpPct = rf.percent_filled != null ? Math.min(100, rf.percent_filled) : 0;
+  const backfillUrl = report.row_fp_halaman || PAGES_BACKFILL_URL;
 
   return `<!DOCTYPE html>
 <html lang="id">
@@ -182,7 +209,7 @@ export function renderSyncStatusHtml(report) {
       </div>
       <a href="${homeUrl}" class="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg">← Beranda</a>
     </header>
-    <p id="refresh-hint" class="text-[11px] text-center text-slate-400 mb-4 -mt-2">Memperbarui progres &amp; log otomatis · sinkron penuh pukul <span id="refresh-at">—</span></p>
+    <p id="refresh-hint" class="text-[11px] text-center text-slate-400 mb-4 -mt-2">Memperbarui sync, row_fp &amp; log otomatis · sinkron penuh pukul <span id="refresh-at">—</span></p>
 
     <div class="bg-white rounded-xl border border-slate-200 p-5 mb-4 shadow-sm">
       <div class="flex justify-between items-center mb-3">
@@ -205,6 +232,26 @@ export function renderSyncStatusHtml(report) {
       <p><span class="text-slate-500">Job /tick aktif</span><br><strong id="sync-cron-active">${(report.cron_job?.enabled ?? report.cron?.enabled) ? 'Ya (sync berjalan)' : 'Tidak (idle / selesai)'}</strong></p>
       <p><span class="text-slate-500">Jadwal</span><br>${esc(report.jadwal)}</p>
       <p id="sync-catatan" class="text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3 text-xs leading-relaxed${s.catatan ? '' : ' hidden'}">${esc(s.catatan || '')}</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-violet-200 p-5 mb-4 shadow-sm">
+      <div class="flex justify-between items-start gap-2 mb-3">
+        <div>
+          <span class="text-sm font-semibold text-slate-700">Kolom <code class="text-xs bg-violet-50 px-1 rounded">row_fp</code></span>
+          <p class="text-[11px] text-slate-500 mt-0.5">Sidik jari baris · hemat kuota sync</p>
+        </div>
+        <span id="row-fp-badge" class="text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${rowFpBadgeClass(rf)}">${esc(rowFpStatusLabel(rf))}</span>
+      </div>
+      <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-2">
+        <div id="row-fp-progress-bar" class="h-full bg-violet-600 rounded-full transition-all duration-500" style="width:${rowFpPct}%"></div>
+      </div>
+      <p id="row-fp-percent" class="text-xl font-bold text-slate-900">${rf.percent_filled != null ? esc(rf.percent_filled) + '% terisi' : '—'}</p>
+      <p id="row-fp-counts" class="text-sm text-slate-600 mt-1">${rf.measured ? `Kosong: ${Number(rf.null_count).toLocaleString('id-ID')} · Terisi: ${Number(rf.filled_count).toLocaleString('id-ID')}${rf.total ? ' / ' + Number(rf.total).toLocaleString('id-ID') : ''}` : 'Klik tombol di bawah untuk mengukur sisa NULL (butuh secret).'}</p>
+      <p id="row-fp-stats-at" class="text-xs text-slate-400 mt-2">Terakhir diukur: ${esc(rf.stats_at_wib || 'belum pernah')}</p>
+      <a id="row-fp-cta" href="${esc(backfillUrl)}" class="mt-4 inline-flex w-full items-center justify-center gap-2 bg-violet-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-violet-700 transition-colors shadow-sm">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Cek &amp; backfill row_fp
+      </a>
     </div>
 
     <div class="bg-white rounded-xl border border-slate-200 p-5 mb-4 shadow-sm">
@@ -305,9 +352,56 @@ export function renderSyncStatusHtml(report) {
           .join('');
       }
 
+      function rowFpStatusLabel(rf) {
+        if (!rf || !rf.measured) return 'Belum diukur';
+        if (rf.selesai) return 'Lengkap';
+        if (rf.backfill_active) return 'Backfill berjalan';
+        return 'Perlu dilengkapi';
+      }
+
+      function rowFpBadgeClass(rf) {
+        var base = 'text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ';
+        if (!rf || !rf.measured) return base + 'bg-slate-100 text-slate-600';
+        if (rf.selesai) return base + 'bg-green-100 text-green-800';
+        if (rf.backfill_active) return base + 'bg-amber-100 text-amber-800';
+        return base + 'bg-violet-100 text-violet-800';
+      }
+
+      function applyRowFp(rf) {
+        if (!rf) return;
+        var pct = rf.percent_filled != null ? Math.min(100, rf.percent_filled) : 0;
+        var badge = document.getElementById('row-fp-badge');
+        if (badge) {
+          badge.className = rowFpBadgeClass(rf);
+          badge.textContent = rowFpStatusLabel(rf);
+        }
+        var bar = document.getElementById('row-fp-progress-bar');
+        if (bar) bar.style.width = pct + '%';
+        var pctEl = document.getElementById('row-fp-percent');
+        if (pctEl) {
+          pctEl.textContent =
+            rf.percent_filled != null ? rf.percent_filled + '% terisi' : '—';
+        }
+        var counts = document.getElementById('row-fp-counts');
+        if (counts) {
+          counts.textContent = rf.measured
+            ? 'Kosong: ' +
+              Number(rf.null_count).toLocaleString('id-ID') +
+              ' · Terisi: ' +
+              Number(rf.filled_count).toLocaleString('id-ID') +
+              (rf.total ? ' / ' + Number(rf.total).toLocaleString('id-ID') : '')
+            : 'Klik tombol di bawah untuk mengukur sisa NULL (butuh secret).';
+        }
+        var at = document.getElementById('row-fp-stats-at');
+        if (at) at.textContent = 'Terakhir diukur: ' + (rf.stats_at_wib || 'belum pernah');
+        var cta = document.getElementById('row-fp-cta');
+        if (cta && rf.halaman_backfill) cta.href = rf.halaman_backfill;
+      }
+
       function reportSnapshot(r) {
         var s = r.sinkronisasi || {};
         var cj = r.cron_job || r.cron || {};
+        var rf = r.row_fp || {};
         return [
           s.run_state,
           s.current_offset,
@@ -316,6 +410,10 @@ export function renderSyncStatusHtml(report) {
           r.database && r.database.waktu_update_terakhir_iso,
           cj.last_call_at,
           cj.last_call_note,
+          rf.null_count,
+          rf.percent_filled,
+          rf.backfill_active,
+          rf.stats_at,
           JSON.stringify(r.activity_log || []),
         ].join('|');
       }
@@ -388,6 +486,8 @@ export function renderSyncStatusHtml(report) {
 
         var list = document.getElementById('activity-log-list');
         if (list) list.innerHTML = renderActivityLog(r.activity_log);
+
+        applyRowFp(r.row_fp);
       }
 
       function fetchStatus() {

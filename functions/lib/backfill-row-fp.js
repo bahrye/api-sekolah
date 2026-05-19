@@ -9,6 +9,14 @@ import {
 export const BACKFILL_BATCH_SIZE = 150;
 const WRITE_BATCH = 50;
 
+const KEY_ROW_FP_NULL = 'row_fp_null_count';
+const KEY_ROW_FP_STATS_AT = 'row_fp_stats_at';
+const KEY_ROW_FP_BACKFILL_ACTIVE = 'row_fp_backfill_active';
+
+export const PAGES_BACKFILL_URL = 'https://api-sekolah-kita.pages.dev/backfill-row-fp.html';
+export const WORKER_SYNC_STATUS_URL =
+  'https://api-sekolah-cron.syamsulbahri-agro27b.workers.dev/';
+
 /**
  * @param {import('@cloudflare/workers-types').D1Database} db
  */
@@ -78,4 +86,90 @@ export function buildBackfillContinueUrl(requestUrl, secret) {
   next.searchParams.delete('wait');
   if (secret) next.searchParams.set('secret', secret);
   return next.toString();
+}
+
+/**
+ * Simpan perkiraan sisa NULL ke sync_meta (hemat — hindari COUNT(*) tiap polling status).
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {number} nullCount
+ * @param {{ active?: boolean }} [opts]
+ */
+export async function recordRowFpStats(db, nullCount, { active = false } = {}) {
+  const now = new Date().toISOString();
+  const upsert = (key, value) =>
+    db
+      .prepare(
+        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+      )
+      .bind(key, value);
+
+  await db.batch([
+    upsert(KEY_ROW_FP_NULL, String(Math.max(0, nullCount))),
+    upsert(KEY_ROW_FP_STATS_AT, now),
+    upsert(KEY_ROW_FP_BACKFILL_ACTIVE, active ? '1' : '0'),
+  ]);
+}
+
+/**
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {number | null} [totalSekolah]
+ */
+export async function getRowFpStatsForReport(db, totalSekolah = null) {
+  try {
+    const { results } = await db
+      .prepare(`SELECT key, value FROM sync_meta WHERE key IN (?, ?, ?)`)
+      .bind(KEY_ROW_FP_NULL, KEY_ROW_FP_STATS_AT, KEY_ROW_FP_BACKFILL_ACTIVE)
+      .all();
+
+    const map = Object.fromEntries((results || []).map((r) => [r.key, r.value]));
+    const nullRaw = map[KEY_ROW_FP_NULL];
+    const nullCount = nullRaw != null ? parseInt(nullRaw, 10) : null;
+    const total = Number.isFinite(totalSekolah) && totalSekolah > 0 ? totalSekolah : null;
+    const filled =
+      nullCount != null && total != null ? Math.max(0, total - nullCount) : null;
+    const percentFilled =
+      filled != null && total != null ? Math.round((filled / total) * 1000) / 10 : null;
+
+    return {
+      null_count: Number.isFinite(nullCount) ? nullCount : null,
+      filled_count: filled,
+      total,
+      percent_filled: percentFilled,
+      selesai: nullCount === 0,
+      backfill_active: map[KEY_ROW_FP_BACKFILL_ACTIVE] === '1',
+      stats_at: map[KEY_ROW_FP_STATS_AT] ?? null,
+      stats_at_wib: map[KEY_ROW_FP_STATS_AT]
+        ? formatStatsWib(map[KEY_ROW_FP_STATS_AT])
+        : null,
+      measured: nullRaw != null,
+      halaman_backfill: PAGES_BACKFILL_URL,
+    };
+  } catch {
+    return {
+      null_count: null,
+      filled_count: null,
+      total: totalSekolah,
+      percent_filled: null,
+      selesai: false,
+      backfill_active: false,
+      stats_at: null,
+      stats_at_wib: null,
+      measured: false,
+      halaman_backfill: PAGES_BACKFILL_URL,
+    };
+  }
+}
+
+/**
+ * @param {string} iso
+ */
+function formatStatsWib(iso) {
+  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z');
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(d);
 }

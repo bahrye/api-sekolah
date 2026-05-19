@@ -57,7 +57,10 @@ import {
 import { assertSyncAuthorized } from './functions/lib/sync-auth.js';
 import { FAVICON_SYNC_SVG, FAVICON_SYNC_HEADERS } from './functions/lib/sync-favicon.js';
 
-const jsonHeaders = { 'Content-Type': 'application/json;charset=UTF-8' };
+const jsonHeaders = {
+  'Content-Type': 'application/json;charset=UTF-8',
+  'Access-Control-Allow-Origin': '*',
+};
 
 /** Chunk per /tick saat beban normal (bukan burst) */
 const CRON_TICK_MAX_CHUNKS = 1;
