@@ -122,6 +122,8 @@ export function renderActivityLogItemsHtml(lines, esc) {
       const badgeClass =
         kind === 'cron_error'
           ? 'bg-red-100 text-red-800'
+          : kind === 'backfill'
+            ? 'bg-violet-100 text-violet-800'
           : kind === 'chunk'
             ? 'bg-blue-100 text-blue-800'
             : kind === 'cron_skip'
@@ -129,7 +131,11 @@ export function renderActivityLogItemsHtml(lines, esc) {
               : 'bg-emerald-100 text-emerald-800';
       return `
           <li class="text-xs leading-relaxed border-l-2 pl-2.5 ${
-            i === 0 ? 'border-blue-500 text-slate-800' : 'border-slate-200 text-slate-600'
+            i === 0
+              ? kind === 'backfill'
+                ? 'border-violet-500 text-slate-800'
+                : 'border-blue-500 text-slate-800'
+              : 'border-slate-200 text-slate-600'
           }">
             <span class="flex flex-wrap items-center gap-1.5 mb-0.5">
               <span class="text-[10px] text-slate-400">${esc(line.wib)}</span>
@@ -315,6 +321,7 @@ export function renderSyncStatusHtml(report) {
 
       function activityKindLabel(kind) {
         if (kind === 'chunk') return 'Chunk data';
+        if (kind === 'backfill') return 'Backfill row_fp';
         if (kind === 'cron_tick') return 'Cron /tick';
         if (kind === 'cron_skip') return 'Cron /tick';
         if (kind === 'cron_run') return 'Cron /run';
@@ -333,6 +340,8 @@ export function renderSyncStatusHtml(report) {
             var badgeClass =
               kind === 'cron_error'
                 ? 'bg-red-100 text-red-800'
+                : kind === 'backfill'
+                  ? 'bg-violet-100 text-violet-800'
                 : kind === 'chunk'
                   ? 'bg-blue-100 text-blue-800'
                   : kind === 'cron_skip'
@@ -340,7 +349,11 @@ export function renderSyncStatusHtml(report) {
                     : 'bg-emerald-100 text-emerald-800';
             return (
               '<li class="text-xs leading-relaxed border-l-2 pl-2.5 ' +
-              (i === 0 ? 'border-blue-500 text-slate-800' : 'border-slate-200 text-slate-600') +
+              (i === 0
+                ? kind === 'backfill'
+                  ? 'border-violet-500 text-slate-800'
+                  : 'border-blue-500 text-slate-800'
+                : 'border-slate-200 text-slate-600') +
               '"><span class="flex flex-wrap items-center gap-1.5 mb-0.5"><span class="text-[10px] text-slate-400">' +
               escHtml(line.wib) +
               '</span><span class="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded ' +

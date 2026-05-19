@@ -61,6 +61,7 @@ import {
 import {
   appendActivityLog,
   appendCronJobActivityLog,
+  appendBackfillActivityLog,
 } from './functions/lib/sync-activity-log.js';
 import { assertSyncAuthorized } from './functions/lib/sync-auth.js';
 import { FAVICON_SYNC_SVG, FAVICON_SYNC_HEADERS } from './functions/lib/sync-favicon.js';
@@ -515,8 +516,15 @@ async function runBackfillCronIfDue(env) {
     if (rf.backfill_cron || rf.backfill_active) {
       await recordRowFpStats(env.DB, 0, { active: false, cronEnabled: false });
       await recordRowFpBackfillNote(env.DB, 'selesai');
+      await appendBackfillActivityLog(env.DB, {
+        action: 'selesai',
+        detail: 'semua baris sudah punya row_fp',
+        processed: 0,
+        null_remaining: 0,
+      });
+      await recordCronTick(env.DB, 'backfill row_fp selesai');
     }
-    return { ran: false, reason: 'selesai' };
+    return { ran: false, reason: 'selesai', logged: true };
   }
 
   if (!rf.measured || rf.null_count == null || rf.null_count <= 0) {
@@ -534,8 +542,15 @@ async function runBackfillCronIfDue(env) {
   }
 
   if (await isChunkLocked(env.DB)) {
-    await recordRowFpBackfillNote(env.DB, 'menunggu — chunk sync memakai lock');
-    return { ran: false, reason: 'chunk_lock' };
+    const detail = 'menunggu — chunk sync memakai lock';
+    await recordRowFpBackfillNote(env.DB, detail);
+    await appendBackfillActivityLog(env.DB, {
+      action: 'lewati',
+      detail,
+      null_remaining: rf.null_count,
+    });
+    await recordCronTick(env.DB, `backfill row_fp lewati (chunk lock)`);
+    return { ran: false, reason: 'chunk_lock', logged: true };
   }
 
   try {
@@ -544,16 +559,31 @@ async function runBackfillCronIfDue(env) {
       maxBatches: CRON_BACKFILL_MAX_BATCHES,
     });
     const note = result.done
-      ? `selesai (+${result.total_processed.toLocaleString('id-ID')}, ${result.batches} batch)`
-      : `+${result.total_processed.toLocaleString('id-ID')} (${result.batches} batch, sisa ~${result.null_remaining.toLocaleString('id-ID')})`;
-    await recordRowFpBackfillNote(env.DB, note);
-    await recordCronTick(env.DB, `backfill row_fp ${note}`);
-    return { ran: true, result };
+      ? `selesai (${result.batches} batch)`
+      : `${result.batches} batch`;
+    const detail = result.done
+      ? `selesai (+${result.total_processed.toLocaleString('id-ID')})`
+      : `+${result.total_processed.toLocaleString('id-ID')}`;
+    await recordRowFpBackfillNote(env.DB, `${note}, sisa ~${result.null_remaining.toLocaleString('id-ID')}`);
+    await appendBackfillActivityLog(env.DB, {
+      action: result.done ? 'selesai' : 'chunk',
+      detail,
+      processed: result.total_processed,
+      null_remaining: result.null_remaining,
+    });
+    const cronNote = `backfill row_fp ${detail} (sisa ~${result.null_remaining.toLocaleString('id-ID')})`;
+    await recordCronTick(env.DB, cronNote);
+    return { ran: true, result, logged: true, cronNote };
   } catch (err) {
     const msg = err?.message || String(err);
     await recordRowFpBackfillNote(env.DB, `gagal: ${msg}`);
+    await appendBackfillActivityLog(env.DB, {
+      action: 'gagal',
+      detail: msg,
+      null_remaining: rf.null_count,
+    });
     await recordCronTick(env.DB, `backfill row_fp gagal: ${msg}`);
-    return { ran: false, reason: 'error', error: msg };
+    return { ran: false, reason: 'error', error: msg, logged: true };
   }
 }
 
@@ -568,12 +598,9 @@ async function runScheduledTick(env, ctx) {
   const plan = await planResumeCron(env);
 
   if (plan.action === 'skip') {
-    await recordCronTick(
-      env.DB,
-      backfill.ran
-        ? `CF Cron · sync lewati (${plan.reason}) · backfill OK`
-        : `CF Cron lewati — ${plan.reason}`
-    );
+    if (!backfill.logged) {
+      await recordCronTick(env.DB, `CF Cron lewati — ${plan.reason}`);
+    }
     if (plan.reason !== 'completed') {
       await appendCronJobActivityLog(env.DB, {
         kind: 'cron_skip',

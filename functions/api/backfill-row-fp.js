@@ -1,5 +1,6 @@
 import { assertSyncAuthorized } from '../lib/sync-auth.js';
 import { getApiMeta } from '../lib/sync-meta.js';
+import { appendBackfillActivityLog } from '../lib/sync-activity-log.js';
 import {
   backfillRowFpBatch,
   countNullRowFp,
@@ -111,6 +112,17 @@ export async function onRequest(context) {
           console.error('Chain backfill row_fp gagal:', err?.message || err);
         })
       );
+    }
+
+    if (batch.processed > 0 || done) {
+      await appendBackfillActivityLog(context.env.DB, {
+        action: done ? 'selesai' : 'chunk',
+        detail: done
+          ? `Pages batch (+${batch.processed})`
+          : `Pages +${batch.processed}`,
+        processed: batch.processed,
+        null_remaining: remainingAfter,
+      });
     }
 
     const row_fp = await getRowFpStatsForReport(context.env.DB, meta.totalSekolah);

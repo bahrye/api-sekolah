@@ -4,7 +4,7 @@ import { progressPercent } from './sync-sekolah.js';
 const KEY_ACTIVITY_LOG = 'sync_activity_log';
 const MAX_LINES = 8;
 
-/** @typedef {'chunk' | 'cron_tick' | 'cron_skip' | 'cron_run' | 'cron_error'} ActivityKind */
+/** @typedef {'chunk' | 'cron_tick' | 'cron_skip' | 'cron_run' | 'cron_error' | 'backfill'} ActivityKind */
 
 /**
  * @param {import('@cloudflare/workers-types').D1Database} db
@@ -154,10 +154,39 @@ export async function appendCronJobActivityLog(db, { kind, action, detail, offse
 }
 
 /**
+ * Log backfill row_fp di daftar aktivitas (sama dengan log Cron).
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {{ action: string, detail: string, processed?: number, null_remaining?: number | null }} opts
+ */
+export async function appendBackfillActivityLog(db, { action, detail, processed, null_remaining }) {
+  const ts = new Date().toISOString();
+  const parts = [detail];
+  if (processed != null && processed > 0) {
+    parts.push(`proses ${processed.toLocaleString('id-ID')}`);
+  }
+  if (null_remaining != null) {
+    parts.push(`sisa ~${null_remaining.toLocaleString('id-ID')}`);
+  }
+
+  const line = {
+    ts,
+    wib: formatSyncTimeWib(ts),
+    kind: 'backfill',
+    text: `Backfill row_fp · ${parts.join(' · ')}`,
+    action,
+    processed: processed ?? null,
+    null_remaining: null_remaining ?? null,
+  };
+
+  return pushActivityLine(db, line);
+}
+
+/**
  * @param {ActivityKind} kind
  */
 export function activityKindLabel(kind) {
   if (kind === 'chunk') return 'Chunk data';
+  if (kind === 'backfill') return 'Backfill row_fp';
   if (kind === 'cron_tick') return 'Cron /tick';
   if (kind === 'cron_skip') return 'Cron /tick';
   if (kind === 'cron_run') return 'Cron /run';
