@@ -136,9 +136,14 @@ export async function getSyncProgress(db) {
  * @param {{ nextOffset: number, done: boolean, apiTotal?: number }} opts
  */
 export async function recordSyncProgress(db, { nextOffset, done, apiTotal }) {
-  const state = done ? 'completed' : 'running';
+  let state;
   if (done) {
+    state = 'completed';
     await setCronEnabled(db, false);
+  } else if (await isSyncManuallyPaused(db)) {
+    state = 'stalled';
+  } else {
+    state = 'running';
   }
   const now = new Date().toISOString();
   const statements = [
@@ -191,7 +196,7 @@ export function resolveSyncRunState(prog, apiTotal, cron = null, opts = null) {
     return { runState: 'completed', stale: false, staleMinutes: 0 };
   }
   if (stored === 'stalled' && offset < apiTotal) {
-    if (chunkLocked) {
+    if (chunkLocked && cron?.enabled) {
       return { runState: 'running', stale: false, staleMinutes: 0 };
     }
     const chunkAge = prog.lastChunkAt
@@ -249,6 +254,15 @@ export async function markSyncStalled(db) {
 }
 
 /**
+ * Hentikan sync sementara — cron off + status terhenti (offset tetap).
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ */
+export async function markSyncPaused(db) {
+  await setCronEnabled(db, false);
+  await markSyncStalled(db);
+}
+
+/**
  * @param {import('@cloudflare/workers-types').D1Database} db
  */
 /**
@@ -287,6 +301,19 @@ export async function isCronEnabled(db) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Sync dijeda manual (cron off + state stalled, belum selesai).
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ */
+export async function isSyncManuallyPaused(db) {
+  if (await isCronEnabled(db)) return false;
+  const prog = await getSyncProgress(db);
+  if (prog.runState !== 'stalled') return false;
+  const meta = await getApiMeta(db);
+  const total = prog.apiTotal ?? meta.totalSekolah ?? 0;
+  return (prog.currentOffset ?? 0) < total;
 }
 
 /**

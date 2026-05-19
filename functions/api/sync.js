@@ -7,7 +7,12 @@ import {
   PAGES_FAST_MAX_PAGES,
   chunkWallMsForWorkload,
 } from '../lib/sync-sekolah.js';
-import { recordSyncProgress, markSyncRunStarted, markSyncStalled } from '../lib/sync-meta.js';
+import {
+  recordSyncProgress,
+  markSyncRunStarted,
+  markSyncStalled,
+  isSyncManuallyPaused,
+} from '../lib/sync-meta.js';
 import { assertSyncAuthorized } from '../lib/sync-auth.js';
 import { appendActivityLog } from '../lib/sync-activity-log.js';
 
@@ -54,6 +59,17 @@ export async function onRequest(context) {
   const noChain = requestUrl.searchParams.get('no_chain') === '1';
 
   try {
+    if (await isSyncManuallyPaused(context.env.DB)) {
+      return new Response(
+        JSON.stringify({
+          status: 'paused',
+          message: 'Sync dijeda. Lanjutkan lewat Worker: GET /run?offset=...&resume=1&secret=...',
+          offset,
+        }),
+        { headers: jsonHeaders }
+      );
+    }
+
     if (offset === 0 && !bootstrapOnly) {
       await markSyncRunStarted(context.env.DB);
     }

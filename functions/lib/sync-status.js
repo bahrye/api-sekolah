@@ -32,8 +32,11 @@ export async function buildSyncStatusReport(db, { lastChunk } = {}) {
   const pct = progressPercent(currentOffset);
   const remaining = Math.max(0, apiTotal - currentOffset);
 
+  const pausedManual = runState === 'stalled' && !cron.enabled && currentOffset < apiTotal;
+
   let statusLabel = 'Siap';
-  if (runState === 'running') statusLabel = 'Sedang berjalan';
+  if (pausedManual) statusLabel = 'Dijeda (cron nonaktif)';
+  else if (runState === 'running') statusLabel = 'Sedang berjalan';
   else if (runState === 'completed') statusLabel = 'Selesai';
   else if (runState === 'stalled') {
     statusLabel = resolved.staleMinutes
@@ -57,7 +60,9 @@ export async function buildSyncStatusReport(db, { lastChunk } = {}) {
       is_stale: resolved.stale,
       lanjutkan_dari_offset: runState === 'stalled' ? currentOffset : null,
       catatan:
-        runState === 'stalled'
+        pausedManual
+          ? `Sync dijeda manual. Lanjutkan besok: GET /run?offset=${currentOffset}&resume=1&secret=... (mode cepat). Jangan /run?offset=0 tanpa resume.`
+          : runState === 'stalled'
           ? 'Cron /tick tiap menit akan melanjutkan otomatis dari offset terakhir (status kembali running). Opsional: GET /run?offset=...&secret=...'
           : runState === 'running'
             ? cron.enabled

@@ -38,6 +38,7 @@ import {
   recordSyncProgress,
   markSyncRunStarted,
   markSyncStalled,
+  markSyncPaused,
   markSyncResumeAt,
   getSyncProgress,
   getApiMeta,
@@ -696,6 +697,34 @@ export default {
     try {
       if (pathname === '/favicon-sync.svg' || pathname === '/favicon.svg') {
         return new Response(FAVICON_SYNC_SVG, { headers: FAVICON_SYNC_HEADERS });
+      }
+
+      if (pathname === '/pause') {
+        const auth = assertSyncAuthorized(request, url, env);
+        if (!auth.ok) return auth.response;
+
+        const prog = await getSyncProgress(env.DB);
+        const offset = prog.currentOffset ?? 0;
+        await releaseChunkLock(env.DB);
+        await markSyncPaused(env.DB);
+        await recordCronTick(env.DB, `sync dijeda manual @ offset ${offset}`);
+        await appendCronJobActivityLog(env.DB, {
+          kind: 'cron_skip',
+          action: 'paused',
+          detail: `sync dijeda @ offset ${offset.toLocaleString('id-ID')}`,
+          offset,
+        });
+
+        const report = await buildSyncStatusReport(env.DB);
+        return new Response(
+          JSON.stringify({
+            status: 'success',
+            message: 'Sync dijeda. Cron /tick tidak akan melanjutkan sampai /run?resume=1.',
+            offset,
+            report,
+          }),
+          { headers: jsonHeaders }
+        );
       }
 
       if (pathname === '/backfill-tick') {
