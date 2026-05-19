@@ -1,15 +1,21 @@
+import { fingerprintRow } from './sekolah-schema.js';
+
 /**
  * Fingerprint per halaman API — skip baca tabel sekolah jika isi halaman sama dengan sync terakhir.
  * Naikkan saat skema/mapping berubah agar halaman diproses ulang (backfill kolom baru).
  */
-export const FP_VERSION = '4';
+/** Naikkan saat algoritma fingerprint halaman berubah (sync ulang semua halaman sekali). */
+export const FP_VERSION = '5';
 
 /**
+ * Hash halaman = gabungan hash baris (sama logika row_fp), bukan JSON mentah API.
+ * Hindari fp_skip gagal padahal row_fp cocok (lewati tanpa baca D1).
  * @param {Record<string, string>[]} rows sudah dinormalisasi (mapFromApi)
  */
 export async function fingerprintRows(rows) {
   const sorted = [...rows].sort((a, b) => a.NPSN.localeCompare(b.NPSN));
-  const text = `${FP_VERSION}|${JSON.stringify(sorted)}`;
+  const rowFps = await Promise.all(sorted.map((r) => fingerprintRow(r)));
+  const text = `${FP_VERSION}|${rowFps.join('\x1f')}`;
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
