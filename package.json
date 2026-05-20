@@ -6,9 +6,11 @@
     "deploy:cf": "wrangler deploy -c wrangler.cron.toml && wrangler pages deploy . --project-name=api-sekolah-kita --branch production --commit-dirty=true",
     "deploy": "npm run deploy:cf",
     "ship": "node scripts/ship.js",
-    "ship:all": "node scripts/ship.js && npm run deploy:cf"
+    "ship:all": "node scripts/ship.js && npm run deploy:cf",
+    "migrate:neon": "node scripts/migrate-to-neon.js"
   },
   "devDependencies": {
+    "pg": "^8.16.0",
     "wrangler": "^4.92.0"
   }
 }

@@ -2,5 +2,6 @@
 .env
 .env.*
 .sync-secret.local
+.env.migrate.local
 .wrangler/
 node_modules/
