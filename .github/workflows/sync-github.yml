@@ -67,5 +67,8 @@ jobs:
               echo "Step gagal HTTP ${code}"
               exit 1
             fi
-            [ "${i}" -lt 12 ] && sleep 5
+            if [ "${i}" -lt 12 ]; then
+              sleep 5
+            fi
           done
+          echo "12 step selesai (~240 baris)."
