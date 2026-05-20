@@ -1,8 +1,8 @@
-/** Tangga ukuran chunk (sekolah): ~600 → … → 400 (PAGE_SIZE = 200) */
-export const CHUNK_RECORDS_LADDER = [600, 560, 520, 480, 440, 400];
+/** Tangga ukuran chunk (sekolah): ~200 → … → 80 (PAGE_SIZE API = 20) */
+export const CHUNK_RECORDS_LADDER = [200, 160, 140, 120, 100, 80];
 
-/** 3 → 3 → … → 2 halaman API (200 sekolah/hal) */
-export const CHUNK_PAGES_LADDER = [3, 3, 3, 2, 2, 2];
+/** 10 → … → 4 hal API (20 sekolah/hal) */
+export const CHUNK_PAGES_LADDER = [10, 8, 7, 6, 5, 4];
 
 export const CHUNK_PAGES_TOP = CHUNK_PAGES_LADDER[0];
 export const CHUNK_PAGES_FLOOR = CHUNK_PAGES_LADDER[CHUNK_PAGES_LADDER.length - 1];
@@ -11,7 +11,7 @@ export const CHUNK_PAGES_FLOOR = CHUNK_PAGES_LADDER[CHUNK_PAGES_LADDER.length - 
  * @param {number} maxPages
  * @param {number} [pageSize]
  */
-export function recordsForMaxPages(maxPages, pageSize = 200) {
+export function recordsForMaxPages(maxPages, pageSize = 20) {
   return maxPages * pageSize;
 }
 
@@ -20,7 +20,7 @@ export function recordsForMaxPages(maxPages, pageSize = 200) {
  * @param {number} maxPages
  * @param {number} [pageSize]
  */
-export function chunkMetTarget(scanned, maxPages, pageSize = 200) {
+export function chunkMetTarget(scanned, maxPages, pageSize = 20) {
   return scanned >= recordsForMaxPages(maxPages, pageSize) * 0.92;
 }
 
@@ -68,7 +68,7 @@ export function normalizeChunkTier(pagesHint) {
  * @param {number} maxPages
  * @param {number} [pageSize]
  */
-export function shouldStepDownChunk(scanned, maxPages, pageSize = 200) {
+export function shouldStepDownChunk(scanned, maxPages, pageSize = 20) {
   if (maxPages < CHUNK_PAGES_FLOOR) return false;
   return !chunkMetTarget(scanned, maxPages, pageSize);
 }

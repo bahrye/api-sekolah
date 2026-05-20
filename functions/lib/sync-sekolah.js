@@ -33,14 +33,15 @@ export {
 const API_URL =
   'https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/360';
 
-/** Jumlah sekolah per request ke API belajar.id (limit query) */
-export const PAGE_SIZE = 200;
+/** API belajar.id memakai maks ~20 baris per request (limit=200 tetap mengembalikan 20) */
+export const PAGE_SIZE = 20;
 
 export { mapFromApi };
 
-/** 3 halaman × 200 record ≈ 600 sekolah per chunk (Worker cron) */
-export const DEFAULT_MAX_PAGES = 3;
-export const MAX_PAGES_HARD_CAP = 3;
+/** ~10 hal × 20 = 200 sekolah per chunk (Worker cron) */
+export const DEFAULT_MAX_PAGES = 10;
+/** Maks hal per chunk (batas subrequest Worker) */
+export const MAX_PAGES_HARD_CAP = 12;
 /** Pages Functions: 1 hal (~200 sekolah) */
 export const PAGES_SAFE_MAX_PAGES = 1;
 /** Target ringan (~400 sekolah = 2 hal) */

@@ -4,7 +4,7 @@ import { fingerprintRow } from './sekolah-schema.js';
  * Fingerprint per halaman API — skip baca tabel sekolah jika isi halaman sama dengan sync terakhir.
  */
 /** Naik saat PAGE_SIZE berubah (indeks halaman API bergeser). */
-export const FP_VERSION = '6';
+export const FP_VERSION = '7';
 
 /**
  * @param {Record<string, string>[]} rows sudah dinormalisasi (mapFromApi)

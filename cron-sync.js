@@ -120,11 +120,11 @@ const CRON_TICK_BURST_WALL_MS = 86_000;
 const CRON_TICK_BURST_WALL_WEEKLY_MS = 96_000;
 const CRON_BURST_MAX_WRITES_PER_CHUNK = 12;
 const CRON_BURST_MIN_FP_RATIO = 0.75;
-/** 3×200 ≈ 600 — zona fp_skip / sync mingguan */
+/** 10×20 ≈ 200 — zona fp_skip / sync mingguan */
 const CRON_TICK_PAGES_FULL = PAGES_FULL_MAX_PAGES;
-/** 2×200 = 400 — fallback jika 600 tidak muat */
+/** 6×20 = 120 — fallback */
 const CRON_TICK_PAGES_FAST = PAGES_FAST_MAX_PAGES;
-/** 1×200 — fallback stabil */
+/** 4×20 = 80 — fallback stabil */
 const CRON_TICK_PAGES_SAFE = PAGES_SAFE_MAX_PAGES;
 /** 1 hal — chunk timeout atau banyak tulis D1 */
 const CRON_TICK_PAGES_HEAVY = 1;
@@ -136,7 +136,7 @@ const MANUAL_MAX_CHUNKS = 3;
 const MANUAL_WALL_MS = 45_000;
 
 /**
- * Coba ~600 (3×200/hal) jika chunk ringan; turun bertahap ke 400 lalu 200 jika timeout atau berat.
+ * Coba ~10 hal (200 sekolah) jika chunk ringan; turun bertahap ke 6 lalu 4 hal jika timeout.
  * @param {{ kind?: string, offset_from?: number, offset_to?: number, pages?: number, pages_fp_skip?: number, updated?: number, inserted?: number, timed_out?: boolean }} line
  */
 function analyzeChunkLine(line) {
@@ -1041,7 +1041,7 @@ export default {
               offset_dimulai: offset,
               mode: assumeLight ? 'weekly_fast' : 'normal',
               perkiraan: assumeLight
-                ? `~${CRON_TICK_BURST_MAX_CHUNKS_WEEKLY * CRON_TICK_PAGES_FULL * PAGE_SIZE} sekolah per menit (fp_skip tinggi)`
+                ? `~${CRON_TICK_BURST_MAX_CHUNKS_WEEKLY * CRON_TICK_PAGES_FULL * PAGE_SIZE} sekolah/menit (fp_skip tinggi, 20 baris/hal API)`
                 : undefined,
             }),
             { status: 202, headers: jsonHeaders }
