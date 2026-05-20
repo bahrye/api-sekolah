@@ -15,18 +15,19 @@ const KEY_ROW_FP_BACKFILL_ACTIVE = 'row_fp_backfill_active';
 const KEY_ROW_FP_BACKFILL_CRON = 'row_fp_backfill_cron';
 const KEY_ROW_FP_BACKFILL_NOTE = 'row_fp_backfill_note';
 
-/** Cron Trigger: jangan pakai waitUntil — await langsung (batas ~30s) */
-export const CRON_BACKFILL_WALL_MS = 28_000;
-export const CRON_BACKFILL_MAX_BATCHES = 8;
+/** Cron Trigger: await langsung (batas subrequest Worker ~50) */
+export const CRON_BACKFILL_WALL_MS = 26_000;
+/** Maks batch per /tick (tiap batch ≈ 2–4 subrequest Neon) */
+export const CRON_BACKFILL_MAX_BATCHES = 2;
 
 /** Tanpa pembaruan stats selama ini → chain Pages dianggap mati, cron Worker lanjutkan */
 export const BACKFILL_STALE_MS = 5 * 60 * 1000;
 
-/** Baris per batch cron Worker */
-export const WORKER_BACKFILL_BATCH_SIZE = 500;
-/** Burst: banyak batch dalam satu background job cron (~50–85 detik) */
-export const BACKFILL_BURST_MAX_BATCHES = 14;
-export const BACKFILL_BURST_WALL_MS = 88_000;
+/** Baris per batch cron Worker (bulk UPDATE) */
+export const WORKER_BACKFILL_BATCH_SIZE = 120;
+/** Burst Pages (Worker cron pakai CRON_BACKFILL_MAX_BATCHES) */
+export const BACKFILL_BURST_MAX_BATCHES = 3;
+export const BACKFILL_BURST_WALL_MS = 85_000;
 
 export const PAGES_BACKFILL_URL = 'https://api-sekolah-kita.pages.dev/backfill-row-fp.html';
 export const WORKER_SYNC_STATUS_URL =
@@ -119,12 +120,8 @@ export async function runBackfillCronBurst(
   let done = false;
   let lastBatch = { processed: 0, updated: 0, done: true };
 
-  const burstCap =
-    nullRemaining > 300_000
-      ? Math.min(maxBatches + 4, 20)
-      : nullRemaining > 100_000
-        ? Math.min(maxBatches + 2, 18)
-        : maxBatches;
+  /** Tetap di bawah batas subrequest Cloudflare (~50) per invocation */
+  const burstCap = Math.min(maxBatches, 3);
 
   while (batches < burstCap && Date.now() - wallStart < wallMs - 4_000) {
     lastBatch = await backfillRowFpBatchPg(sql, batchSize);

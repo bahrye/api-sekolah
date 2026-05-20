@@ -5,6 +5,52 @@ import {
   rowChanged,
 } from './sekolah-schema.js';
 
+/** Baris per query INSERT/UPSERT (hemat subrequest Worker → Neon) */
+export const PG_UPSERT_BATCH = 40;
+/** Baris per query UPDATE row_fp */
+export const PG_FP_UPDATE_BATCH = 80;
+
+const UPSERT_COLS = [
+  'npsn',
+  'nama',
+  'bentuk_pendidikan',
+  'bentuk_pendidikan_group',
+  'jenis_pendidikan',
+  'status_satuan_pendidikan',
+  'jenjang_pendidikan',
+  'pembina',
+  'jalur_pendidikan',
+  'nama_desa',
+  'nama_kecamatan',
+  'nama_kabupaten',
+  'nama_provinsi',
+  'alamat_jalan',
+  'row_fp',
+];
+
+/**
+ * @param {Record<string, string>} row
+ */
+export function rowToNeonRecord(row) {
+  return {
+    npsn: row.NPSN,
+    nama: row.Nama ?? '',
+    bentuk_pendidikan: row.Bentuk ?? null,
+    bentuk_pendidikan_group: row.BentukGroup || null,
+    jenis_pendidikan: row.Jenis ?? null,
+    status_satuan_pendidikan: row.Status ?? null,
+    jenjang_pendidikan: row.Jenjang ?? null,
+    pembina: row.Pembina || null,
+    jalur_pendidikan: row.Jalur || null,
+    nama_desa: row.Kelurahan || null,
+    nama_kecamatan: row.Kecamatan || null,
+    nama_kabupaten: row.Kabupaten || null,
+    nama_provinsi: row.Provinsi || null,
+    alamat_jalan: row.Alamat || null,
+    row_fp: row[ROW_FP_COLUMN] ?? row.row_fp ?? '',
+  };
+}
+
 /**
  * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
@@ -69,58 +115,94 @@ export async function fetchSekolahByNpsns(sql, npsns) {
 
 /**
  * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
- * @param {Record<string, string>} row
+ * @param {Record<string, string>[]} rows
  */
-export async function upsertSekolahRow(sql, row) {
-  const fp = row[ROW_FP_COLUMN] ?? row.row_fp ?? '';
-  await sql`
-    INSERT INTO sekolah (
-      npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan,
-      status_satuan_pendidikan, jenjang_pendidikan, pembina, jalur_pendidikan,
-      nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan, row_fp
-    ) VALUES (
-      ${row.NPSN}, ${row.Nama}, ${row.Bentuk}, ${row.BentukGroup || null}, ${row.Jenis},
-      ${row.Status}, ${row.Jenjang}, ${row.Pembina || null}, ${row.Jalur || null},
-      ${row.Kelurahan || null}, ${row.Kecamatan || null}, ${row.Kabupaten || null},
-      ${row.Provinsi || null}, ${row.Alamat || null}, ${fp}
-    )
-    ON CONFLICT (npsn) DO UPDATE SET
-      nama = EXCLUDED.nama,
-      bentuk_pendidikan = EXCLUDED.bentuk_pendidikan,
-      bentuk_pendidikan_group = EXCLUDED.bentuk_pendidikan_group,
-      jenis_pendidikan = EXCLUDED.jenis_pendidikan,
-      status_satuan_pendidikan = EXCLUDED.status_satuan_pendidikan,
-      jenjang_pendidikan = EXCLUDED.jenjang_pendidikan,
-      pembina = EXCLUDED.pembina,
-      jalur_pendidikan = EXCLUDED.jalur_pendidikan,
-      nama_desa = EXCLUDED.nama_desa,
-      nama_kecamatan = EXCLUDED.nama_kecamatan,
-      nama_kabupaten = EXCLUDED.nama_kabupaten,
-      nama_provinsi = EXCLUDED.nama_provinsi,
-      alamat_jalan = EXCLUDED.alamat_jalan,
-      row_fp = EXCLUDED.row_fp
-  `;
+export async function upsertSekolahRowsBulk(sql, rows) {
+  if (!rows.length) return;
+
+  for (let i = 0; i < rows.length; i += PG_UPSERT_BATCH) {
+    const slice = rows.slice(i, i + PG_UPSERT_BATCH);
+    const params = [];
+    const tuples = slice.map((row) => {
+      const r = rowToNeonRecord(row);
+      const base = params.length + 1;
+      params.push(
+        r.npsn,
+        r.nama,
+        r.bentuk_pendidikan,
+        r.bentuk_pendidikan_group,
+        r.jenis_pendidikan,
+        r.status_satuan_pendidikan,
+        r.jenjang_pendidikan,
+        r.pembina,
+        r.jalur_pendidikan,
+        r.nama_desa,
+        r.nama_kecamatan,
+        r.nama_kabupaten,
+        r.nama_provinsi,
+        r.alamat_jalan,
+        r.row_fp
+      );
+      const ph = Array.from({ length: 15 }, (_, j) => `$${base + j}`);
+      return `(${ph.join(',')})`;
+    });
+
+    const colList = UPSERT_COLS.join(', ');
+    const updateSet = UPSERT_COLS.filter((c) => c !== 'npsn')
+      .map((c) => `${c} = EXCLUDED.${c}`)
+      .join(', ');
+
+    await sql.query(
+      `INSERT INTO sekolah (${colList}) VALUES ${tuples.join(',')}
+       ON CONFLICT (npsn) DO UPDATE SET ${updateSet}`,
+      params
+    );
+  }
 }
 
-/**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
- * @param {Record<string, string>} row
- */
-export async function updateRowFpOnly(sql, row) {
-  const fp = row[ROW_FP_COLUMN] ?? row.row_fp ?? '';
-  await sql`UPDATE sekolah SET row_fp = ${fp} WHERE npsn = ${row.NPSN}`;
+/** @deprecated gunakan upsertSekolahRowsBulk */
+export async function upsertSekolahRow(sql, row) {
+  await upsertSekolahRowsBulk(sql, [row]);
 }
 
 /**
  * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {Record<string, string>[]} rows
- * @param {'insert' | 'update' | 'fp_only'} mode
  */
-export async function applySekolahWrites(sql, rows, mode) {
-  for (const row of rows) {
-    if (mode === 'fp_only') await updateRowFpOnly(sql, row);
-    else await upsertSekolahRow(sql, row);
+export async function updateRowFpBulk(sql, rows) {
+  if (!rows.length) return;
+
+  for (let i = 0; i < rows.length; i += PG_FP_UPDATE_BATCH) {
+    const slice = rows.slice(i, i + PG_FP_UPDATE_BATCH);
+    const npsns = slice.map((r) => r.NPSN);
+    const fps = slice.map((r) => r[ROW_FP_COLUMN] ?? r.row_fp ?? '');
+    await sql`
+      UPDATE sekolah AS s
+      SET row_fp = u.fp
+      FROM unnest(${npsns}::text[], ${fps}::text[]) AS u(npsn, fp)
+      WHERE s.npsn = u.npsn
+    `;
   }
+}
+
+/** @deprecated */
+export async function updateRowFpOnly(sql, row) {
+  await updateRowFpBulk(sql, [row]);
+}
+
+/**
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {Array<{ row: Record<string, string>, kind: string }>} queue
+ */
+export async function flushSekolahWriteQueue(sql, queue) {
+  const upserts = [];
+  const fpOnly = [];
+  for (const item of queue) {
+    if (item.kind === 'fp_only') fpOnly.push(item.row);
+    else upserts.push(item.row);
+  }
+  if (upserts.length) await upsertSekolahRowsBulk(sql, upserts);
+  if (fpOnly.length) await updateRowFpBulk(sql, fpOnly);
 }
 
 /**
@@ -151,7 +233,7 @@ export async function countNullRowFp(sql) {
 }
 
 /**
- * Proses batch backfill row_fp.
+ * Backfill row_fp — 1 SELECT + ceil(n/batch) UPDATE (bukan 2× per baris).
  * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {number} batchSize
  */
@@ -159,10 +241,12 @@ export async function backfillRowFpBatchPg(sql, batchSize) {
   const rows = await fetchRowsMissingRowFp(sql, batchSize);
   if (!rows.length) return { processed: 0, updated: 0, done: true };
 
-  for (const row of rows) {
-    row[ROW_FP_COLUMN] = await fingerprintRow(row);
-    await updateRowFpOnly(sql, row);
+  const fingerprints = await Promise.all(rows.map((row) => fingerprintRow(row)));
+  for (let i = 0; i < rows.length; i++) {
+    rows[i][ROW_FP_COLUMN] = fingerprints[i];
   }
+  await updateRowFpBulk(sql, rows);
+
   return { processed: rows.length, updated: rows.length, done: false };
 }
 

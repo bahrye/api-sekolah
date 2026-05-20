@@ -111,11 +111,11 @@ async function safeMarkStalled(env) {
 
 /** Chunk per /tick saat beban normal (bukan burst) */
 const CRON_TICK_MAX_CHUNKS = 1;
-/** Burst: banyak chunk ringan (fp_skip tinggi) dalam satu background job */
-const CRON_TICK_BURST_MAX_CHUNKS_IDLE = 10;
-const CRON_TICK_BURST_MAX_CHUNKS_LIGHT = 6;
-/** Sync mingguan / run dari offset 0 — burst agresif sejak menit pertama */
-const CRON_TICK_BURST_MAX_CHUNKS_WEEKLY = 18;
+/** Burst ringan — tiap chunk ≈ 10–25 subrequest (Neon bulk + API) */
+const CRON_TICK_BURST_MAX_CHUNKS_IDLE = 2;
+const CRON_TICK_BURST_MAX_CHUNKS_LIGHT = 1;
+/** Sync mingguan — tetap rendah agar tidak melewati batas subrequest Worker */
+const CRON_TICK_BURST_MAX_CHUNKS_WEEKLY = 2;
 const CRON_TICK_BURST_WALL_MS = 86_000;
 const CRON_TICK_BURST_WALL_WEEKLY_MS = 96_000;
 const CRON_BURST_MAX_WRITES_PER_CHUNK = 12;
@@ -304,16 +304,16 @@ async function getRecentChunkWrites(db) {
  * @param {number} [maxPages]
  * @param {number} [wallMs]
  */
-async function processChunk(env, offset, maxPages, wallMs = chunkWallMsForPages(maxPages)) {
-  const result = await syncSekolahChunk(getSql(env), { offset, maxPages, wallMs });
+async function processChunk(sql, offset, maxPages, wallMs = chunkWallMsForPages(maxPages)) {
+  const result = await syncSekolahChunk(sql, { offset, maxPages, wallMs });
 
-  await recordSyncProgress(getSql(env), {
+  await recordSyncProgress(sql, {
     nextOffset: result.nextOffset,
     done: result.done,
     apiTotal: result.api_total,
   });
 
-  await appendActivityLog(getSql(env), {
+  await appendActivityLog(sql, {
     offsetFrom: offset,
     offsetTo: result.nextOffset,
     stats: {
@@ -333,12 +333,12 @@ async function processChunk(env, offset, maxPages, wallMs = chunkWallMsForPages(
  * @param {{ maxChunks?: number, wallMs?: number }} opts
  */
 async function runCronBatch(
-  env,
+  sql,
   startOffset,
   { maxChunks = 1, wallMs, maxPages, recentWrites } = {}
 ) {
-  const pages = maxPages ?? (await pickCronTickMaxPages(getSql(env)));
-  let writes = recentWrites ?? (await getRecentChunkWrites(getSql(env)));
+  const pages = maxPages ?? (await pickCronTickMaxPages(sql));
+  let writes = recentWrites ?? (await getRecentChunkWrites(sql));
   const totalWall =
     wallMs ??
     (maxChunks > 1
@@ -354,7 +354,7 @@ async function runCronBatch(
     if (remaining < 10_000) break;
 
     const perChunkWall = Math.min(chunkWallMsForWorkload(pages, { writes }), remaining);
-    const result = await processChunk(env, offset, pages, perChunkWall);
+    const result = await processChunk(sql, offset, pages, perChunkWall);
     chunks += 1;
     if (result.timed_out) timedOut = true;
     writes = (result.stats?.updated ?? 0) + (result.stats?.inserted ?? 0);
@@ -423,18 +423,19 @@ async function planResumeCron(env) {
  * @param {boolean} [lockHeld] true jika lock sudah diambil di handler /tick
  */
 async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
+  const sql = getSql(env);
   if (!lockHeld) {
-    await clearStaleChunkLock(getSql(env));
-    const acquired = await tryAcquireChunkLock(getSql(env), offset);
+    await clearStaleChunkLock(sql);
+    const acquired = await tryAcquireChunkLock(sql, offset);
     if (!acquired) {
-      await recordCronTick(getSql(env), `lewati — chunk masih berjalan @ ${offset}`);
+      await recordCronTick(sql, `lewati — chunk masih berjalan @ ${offset}`);
       return { ok: false, skipped: true, reason: 'chunk_in_progress' };
     }
   }
 
-  const prog = await getSyncProgress(getSql(env));
+  const prog = await getSyncProgress(sql);
   const startOffset = prog.currentOffset ?? offset;
-  const plan = await pickCronBatchPlan(getSql(env), opts);
+  const plan = await pickCronBatchPlan(sql, opts);
   const batchOpts = {
     ...opts,
     maxChunks: opts.maxChunks ?? plan.maxChunks,
@@ -450,17 +451,17 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
     : Math.max(CHUNK_EXEC_TIMEOUT_MS, batchOpts.wallMs + 12_000);
   try {
     if (prog.runState === 'stalled') {
-      await markSyncResumeAt(getSql(env), startOffset);
+      await markSyncResumeAt(sql, startOffset);
     }
 
     await recordCronTick(
-      getSql(env),
+      sql,
       burstMode
         ? `mulai burst ${batchOpts.maxChunks}×chunk @ ${startOffset} (${batchOpts.maxPages} hal ≈${batchOpts.maxPages * PAGE_SIZE}, wall ${Math.round(batchOpts.wallMs / 1000)}s)`
         : `mulai chunk @ ${startOffset} (${batchOpts.maxPages} hal, ~${batchOpts.maxPages * PAGE_SIZE}, wall ${Math.round(batchOpts.wallMs / 1000)}s)`
     );
     let batch = await Promise.race([
-      runCronBatch(env, startOffset, batchOpts),
+      runCronBatch(sql, startOffset, batchOpts),
       new Promise((_, reject) => {
         setTimeout(
           () => reject(new Error('Chunk timeout — proses background melebihi batas waktu')),
@@ -474,10 +475,10 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
       const stepDown = lowerChunkPages(tier);
       if (stepDown && stepDown >= CRON_TICK_PAGES_FAST) {
         await recordCronTick(
-          getSql(env),
+          sql,
           `timeout ${batchOpts.maxPages} hal → lanjut ${stepDown} hal (~${recordsForMaxPages(stepDown)}) @ ${batch.lastOffset}`
         );
-        const cont = await runCronBatch(env, batch.lastOffset, {
+        const cont = await runCronBatch(sql, batch.lastOffset, {
           ...batchOpts,
           maxPages: stepDown,
           wallMs: chunkWallMsForWorkload(stepDown, { writes: batchOpts.recentWrites ?? 0 }),
@@ -493,13 +494,13 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
     }
 
     await recordCronTick(
-      getSql(env),
+      sql,
       batch.done
         ? `selesai @ ${batch.lastOffset}`
         : `chunk OK → offset ${batch.lastOffset} (${batch.chunks} chunk, ${batch.pagesUsed ?? batchOpts.maxPages} hal)`
     );
     if (batch.done) {
-      await appendCronJobActivityLog(getSql(env), {
+      await appendCronJobActivityLog(sql, {
         kind: 'cron_tick',
         action: 'selesai',
         detail: `sinkronisasi selesai @ offset ${batch.lastOffset.toLocaleString('id-ID')}`,
@@ -510,8 +511,8 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
     return { ok: true, batch };
   } catch (err) {
     const msg = err?.message || String(err);
-    await recordCronTick(getSql(env), `gagal @ ${offset}: ${msg}`);
-    await appendCronJobActivityLog(getSql(env), {
+    await recordCronTick(sql, `gagal @ ${offset}: ${msg}`);
+    await appendCronJobActivityLog(sql, {
       kind: 'cron_error',
       action: 'tick_chunk',
       detail: `@ offset ${offset}: ${msg}`,
@@ -520,7 +521,7 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
     await safeMarkStalled(env);
     throw err;
   } finally {
-    await releaseChunkLock(getSql(env));
+    await releaseChunkLock(sql);
   }
 }
 
@@ -554,20 +555,21 @@ function skipMessage(plan) {
  * @param {object} env
  */
 async function runBackfillCronIfDue(env) {
-  const meta = await getApiMeta(getSql(env));
-  const rf = await getRowFpStatsForReport(getSql(env), meta.totalSekolah);
+  const sql = getSql(env);
+  const meta = await getApiMeta(sql);
+  const rf = await getRowFpStatsForReport(sql, meta.totalSekolah);
 
   if (rf.selesai) {
     if (rf.backfill_cron || rf.backfill_active) {
-      await recordRowFpStats(getSql(env), 0, { active: false, cronEnabled: false });
-      await recordRowFpBackfillNote(getSql(env), 'selesai');
-      await appendBackfillActivityLog(getSql(env), {
+      await recordRowFpStats(sql, 0, { active: false, cronEnabled: false });
+      await recordRowFpBackfillNote(sql, 'selesai');
+      await appendBackfillActivityLog(sql, {
         action: 'selesai',
         detail: 'semua baris sudah punya row_fp',
         processed: 0,
         null_remaining: 0,
       });
-      await recordCronTick(getSql(env), 'backfill row_fp selesai');
+      await recordCronTick(sql, 'backfill row_fp selesai');
     }
     return { ran: false, reason: 'selesai', logged: true };
   }
@@ -578,7 +580,7 @@ async function runBackfillCronIfDue(env) {
 
   let cronOn = rf.backfill_cron;
   if ((rf.backfill_active && rf.backfill_stale && !cronOn) || (rf.backfill_active && !cronOn)) {
-    await recordRowFpStats(getSql(env), rf.null_count, { active: true, cronEnabled: true });
+    await recordRowFpStats(sql, rf.null_count, { active: true, cronEnabled: true });
     cronOn = true;
   }
 
@@ -586,27 +588,27 @@ async function runBackfillCronIfDue(env) {
     return { ran: false, reason: 'cron_nonaktif' };
   }
 
-  const prog = await getSyncProgress(getSql(env));
+  const prog = await getSyncProgress(sql);
   if (prog.runState === 'running') {
     const detail = 'menunggu — sync mingguan sedang berjalan';
-    await recordRowFpBackfillNote(getSql(env), detail);
+    await recordRowFpBackfillNote(sql, detail);
     return { ran: false, reason: 'sync_running' };
   }
 
-  if (await isChunkLocked(getSql(env))) {
+  if (await isChunkLocked(sql)) {
     const detail = 'menunggu — chunk sync memakai lock';
-    await recordRowFpBackfillNote(getSql(env), detail);
-    await appendBackfillActivityLog(getSql(env), {
+    await recordRowFpBackfillNote(sql, detail);
+    await appendBackfillActivityLog(sql, {
       action: 'lewati',
       detail,
       null_remaining: rf.null_count,
     });
-    await recordCronTick(getSql(env), `backfill row_fp lewati (chunk lock)`);
+    await recordCronTick(sql, `backfill row_fp lewati (chunk lock)`);
     return { ran: false, reason: 'chunk_lock', logged: true };
   }
 
   try {
-    const result = await runBackfillCronBurst(getSql(env), {
+    const result = await runBackfillCronBurst(sql, {
       wallMs: CRON_BACKFILL_WALL_MS,
       maxBatches: CRON_BACKFILL_MAX_BATCHES,
     });
@@ -616,25 +618,25 @@ async function runBackfillCronIfDue(env) {
     const detail = result.done
       ? `selesai (+${result.total_processed.toLocaleString('id-ID')})`
       : `+${result.total_processed.toLocaleString('id-ID')}`;
-    await recordRowFpBackfillNote(getSql(env), `${note}, sisa ~${result.null_remaining.toLocaleString('id-ID')}`);
-    await appendBackfillActivityLog(getSql(env), {
+    await recordRowFpBackfillNote(sql, `${note}, sisa ~${result.null_remaining.toLocaleString('id-ID')}`);
+    await appendBackfillActivityLog(sql, {
       action: result.done ? 'selesai' : 'chunk',
       detail,
       processed: result.total_processed,
       null_remaining: result.null_remaining,
     });
     const cronNote = `backfill row_fp ${detail} (sisa ~${result.null_remaining.toLocaleString('id-ID')})`;
-    await recordCronTick(getSql(env), cronNote);
+    await recordCronTick(sql, cronNote);
     return { ran: true, result, logged: true, cronNote };
   } catch (err) {
     const msg = err?.message || String(err);
-    await recordRowFpBackfillNote(getSql(env), `gagal: ${msg}`);
-    await appendBackfillActivityLog(getSql(env), {
+    await recordRowFpBackfillNote(sql, `gagal: ${msg}`);
+    await appendBackfillActivityLog(sql, {
       action: 'gagal',
       detail: msg,
       null_remaining: rf.null_count,
     });
-    await recordCronTick(getSql(env), `backfill row_fp gagal: ${msg}`);
+    await recordCronTick(sql, `backfill row_fp gagal: ${msg}`);
     return { ran: false, reason: 'error', error: msg, logged: true };
   }
 }
@@ -695,7 +697,7 @@ async function runScheduledWeeklyRun(env, ctx) {
   await appendCronJobActivityLog(getSql(env), {
     kind: 'cron_run',
     action: 'accepted',
-    detail: 'sync mingguan · burst 18×500/hal · /tick tiap menit',
+    detail: 'sync mingguan · burst 2×3 hal · /tick tiap menit',
     offset,
   });
   scheduleResumeInBackground(ctx, env, offset, { assumeLight: true });
@@ -1025,7 +1027,7 @@ export default {
             detail: resume
               ? 'lanjutkan sync'
               : assumeLight
-                ? 'sync mingguan mode cepat (burst 18×500/hal, fp_skip)'
+                ? 'sync mingguan mode cepat (burst 2×3 hal, fp_skip)'
                 : 'sync penuh dimulai',
             offset,
           });
@@ -1034,7 +1036,7 @@ export default {
             JSON.stringify({
               status: 'accepted',
               message: assumeLight
-                ? 'Sync mingguan mode cepat di background (~9.000 sekolah/menit jika data tidak berubah). Pantau dashboard status.'
+                ? 'Sync mingguan mode cepat di background (~1.200 sekolah/menit jika fp_skip tinggi). Pantau dashboard status.'
                 : 'Batch dijadwalkan di background. Pantau dashboard status.',
               offset_dimulai: offset,
               mode: assumeLight ? 'weekly_fast' : 'normal',
@@ -1052,7 +1054,7 @@ export default {
           detail: 'memproses batch (wait=1)',
           offset,
         });
-        const batch = await runCronBatch(env, offset, batchOpts);
+        const batch = await runCronBatch(getSql(env), offset, batchOpts);
         const report = await buildSyncStatusReport(getSql(env));
 
         return new Response(

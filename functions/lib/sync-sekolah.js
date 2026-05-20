@@ -5,11 +5,7 @@ import {
   savePageFingerprint,
 } from './sync-page-fp.js';
 import { mapFromApi, fingerprintRow, rowChanged, ROW_FP_COLUMN } from './sekolah-schema.js';
-import {
-  fetchSekolahByNpsns,
-  upsertSekolahRow,
-  updateRowFpOnly,
-} from './sekolah-pg.js';
+import { fetchSekolahByNpsns, flushSekolahWriteQueue } from './sekolah-pg.js';
 import {
   CHUNK_RECORDS_LADDER,
   CHUNK_PAGES_LADDER,
@@ -101,17 +97,6 @@ async function fetchPageWithMeta(offset) {
   const rows = Array.isArray(raw) ? raw : [];
   const total = Number(json.meta?.total) || ESTIMATED_TOTAL_RECORDS;
   return { rows, total };
-}
-
-/**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
- * @param {Array<{ row: Record<string, string>, kind: 'insert' | 'update' | 'fp_only' }>} queue
- */
-async function flushWriteQueue(sql, queue) {
-  for (const { row, kind } of queue) {
-    if (kind === 'fp_only') await updateRowFpOnly(sql, row);
-    else await upsertSekolahRow(sql, row);
-  }
 }
 
 /**
@@ -208,10 +193,12 @@ export async function syncSekolahChunk(
       const npsns = rows.map((r) => r.NPSN);
       const existing = await fetchSekolahByNpsns(sql, npsns);
       const writes = [];
+      const rowFps = await Promise.all(rows.map((r) => fingerprintRow(r)));
 
-      for (const row of rows) {
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
         stats.scanned += 1;
-        const rowFp = await fingerprintRow(row);
+        const rowFp = rowFps[i];
         row[ROW_FP_COLUMN] = rowFp;
         const old = existing.get(row.NPSN);
 
@@ -230,7 +217,7 @@ export async function syncSekolahChunk(
         }
       }
 
-      if (writes.length > 0) await flushWriteQueue(sql, writes);
+      if (writes.length > 0) await flushSekolahWriteQueue(sql, writes);
 
       await savePageFingerprint(sql, pageIndex, fp);
       fpMap.set(pageIndex, fp);
