@@ -5,7 +5,8 @@ import { fingerprintRow } from './sekolah-schema.js';
  * Naikkan saat skema/mapping berubah agar halaman diproses ulang (backfill kolom baru).
  */
 /** Naikkan saat algoritma fingerprint halaman berubah (sync ulang semua halaman sekali). */
-export const FP_VERSION = '5';
+/** Naik saat PAGE_SIZE berubah (indeks halaman API bergeser). */
+export const FP_VERSION = '6';
 
 /**
  * Hash halaman = gabungan hash baris (sama logika row_fp), bukan JSON mentah API.

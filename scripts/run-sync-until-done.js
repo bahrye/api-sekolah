@@ -7,7 +7,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const BASE = process.env.API_BASE || 'https://api-sekolah-kita.pages.dev';
-const MAX_PAGES_SAFE = 10;
+const MAX_PAGES_SAFE = 1;
 const CHUNK_DELAY_MS = 1200;
 const API_TOTAL = 552578;
 

@@ -44,29 +44,30 @@ export {
 const API_URL =
   'https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/360';
 
-export const PAGE_SIZE = 20;
+/** Jumlah sekolah per request ke API belajar.id (limit query) */
+export const PAGE_SIZE = 200;
 const BATCH_SIZE = 50;
 
 export { mapFromApi };
 
-/** 25 halaman × 20 record = 500 sekolah per chunk (Worker cron) */
-export const DEFAULT_MAX_PAGES = 25;
-export const MAX_PAGES_HARD_CAP = 25;
-/** Pages Functions: default aman (~200 sekolah) */
-export const PAGES_SAFE_MAX_PAGES = 10;
-/** Target saat fingerprint / sedikit perubahan (~400 sekolah) */
+/** 3 halaman × 200 record ≈ 600 sekolah per chunk (Worker cron) */
+export const DEFAULT_MAX_PAGES = 3;
+export const MAX_PAGES_HARD_CAP = 3;
+/** Pages Functions: 1 hal (~200 sekolah) */
+export const PAGES_SAFE_MAX_PAGES = 1;
+/** Target ringan (~400 sekolah = 2 hal) */
 export const PAGES_FAST_MAX_PAGES = CHUNK_PAGES_FLOOR;
-/** Target penuh per chunk (~500 sekolah); fallback bertahap ke 400 */
+/** Target penuh (~600 sekolah = 3 hal) */
 export const PAGES_FULL_MAX_PAGES = CHUNK_PAGES_TOP;
 export const RECORDS_PER_CHUNK = DEFAULT_MAX_PAGES * PAGE_SIZE;
-/** Wall untuk 20 hal (~400) saat hampir semua fp_skip */
-export const CHUNK_WALL_MS = 38_000;
-/** Wall untuk 20 hal bila ada tulis D1 sedang */
-export const CHUNK_WALL_WRITE_MS = 62_000;
-/** Wall untuk 20 hal bila hampir semua baris diubah (~100+ tulis/chunk) */
-export const CHUNK_WALL_WRITE_HEAVY_MS = 68_000;
-/** +2s per hal di atas 20 (25 hal ≈ 48s) */
-export const CHUNK_WALL_MS_PER_PAGE_OVER_FAST = 2_000;
+/** Wall untuk 2 hal (~400) saat hampir semua fp_skip */
+export const CHUNK_WALL_MS = 45_000;
+/** Wall bila ada tulis D1 sedang */
+export const CHUNK_WALL_WRITE_MS = 70_000;
+/** Wall bila hampir semua baris diubah */
+export const CHUNK_WALL_WRITE_HEAVY_MS = 78_000;
+/** +3s per hal di atas 2 hal */
+export const CHUNK_WALL_MS_PER_PAGE_OVER_FAST = 3_000;
 
 /**
  * @param {number} maxPages

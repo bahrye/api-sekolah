@@ -6,7 +6,8 @@ export async function onRequest(context) {
   const keyword = searchParams.get('keyword');
 
   const DEFAULT_LIMIT = 20;
-  const MAX_LIMIT = 50;
+  /** Sementara 250 untuk migrasi ke Neon — kembalikan ke 50 setelah migrasi selesai. */
+  const MAX_LIMIT = 250;
 
   let limit = parseInt(searchParams.get('limit'), 10);
   if (!Number.isFinite(limit) || limit < 1) limit = DEFAULT_LIMIT;

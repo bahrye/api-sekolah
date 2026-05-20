@@ -84,14 +84,14 @@ const CRON_TICK_BURST_WALL_MS = 86_000;
 const CRON_TICK_BURST_WALL_WEEKLY_MS = 96_000;
 const CRON_BURST_MAX_WRITES_PER_CHUNK = 12;
 const CRON_BURST_MIN_FP_RATIO = 0.75;
-/** 25×20 = 500 — zona fp_skip / sync mingguan (fallback 400 jika timeout) */
+/** 3×200 ≈ 600 — zona fp_skip / sync mingguan */
 const CRON_TICK_PAGES_FULL = PAGES_FULL_MAX_PAGES;
-/** 20×20 = 400 — fallback jika 500 tidak muat */
+/** 2×200 = 400 — fallback jika 600 tidak muat */
 const CRON_TICK_PAGES_FAST = PAGES_FAST_MAX_PAGES;
-/** 10×20 = 200 — fallback stabil */
+/** 1×200 — fallback stabil */
 const CRON_TICK_PAGES_SAFE = PAGES_SAFE_MAX_PAGES;
-/** 6×20 = 120 — chunk timeout atau banyak tulis D1 */
-const CRON_TICK_PAGES_HEAVY = 6;
+/** 1 hal — chunk timeout atau banyak tulis D1 */
+const CRON_TICK_PAGES_HEAVY = 1;
 /** Batas CPU background (harus > wall tulis berat ~68s + margin D1) */
 const CHUNK_EXEC_TIMEOUT_MS = 92_000;
 const CHUNK_EXEC_TIMEOUT_BURST_MS = 108_000;
@@ -100,7 +100,7 @@ const MANUAL_MAX_CHUNKS = 3;
 const MANUAL_WALL_MS = 45_000;
 
 /**
- * Coba 500 (25 hal) jika chunk ringan; turun bertahap 480→…→400 lalu 200/120 jika timeout atau berat.
+ * Coba ~600 (3×200/hal) jika chunk ringan; turun bertahap ke 400 lalu 200 jika timeout atau berat.
  * @param {{ kind?: string, offset_from?: number, offset_to?: number, pages?: number, pages_fp_skip?: number, updated?: number, inserted?: number, timed_out?: boolean }} line
  */
 function analyzeChunkLine(line) {
@@ -125,7 +125,7 @@ async function pickCronTickMaxPages(db, { preferFull = false } = {}) {
   const chunks = log.filter((l) => l.kind === 'chunk').slice(0, 4);
   const last = chunks[0];
 
-  /** Target utama cron: 400 sekolah (20 hal) */
+  /** Target utama cron: ~400 sekolah (2 hal × 200) */
   if (!last) return CRON_TICK_PAGES_FAST;
 
   const a = analyzeChunkLine(last);
@@ -140,7 +140,7 @@ async function pickCronTickMaxPages(db, { preferFull = false } = {}) {
     if (lower) return Math.max(lower, CRON_TICK_PAGES_FAST);
   }
 
-  /** Dua chunk berturut timeout di 20 hal dengan hasil <280 → sementara 10 hal */
+  /** Dua chunk berturut timeout di 2 hal dengan hasil <280 sekolah → 1 hal */
   if (chunks.length >= 2) {
     const twoWeakTimeouts = chunks.slice(0, 2).every((c) => {
       const x = analyzeChunkLine(c);
