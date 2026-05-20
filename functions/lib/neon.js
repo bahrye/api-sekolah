@@ -1,17 +1,22 @@
 import { neon } from '@neondatabase/serverless';
 
+export const MISSING_DATABASE_URL_MSG =
+  'DATABASE_URL belum dikonfigurasi. Worker/Pages: set secret DATABASE_URL (connection string Neon).';
+
+/**
+ * @param {{ DATABASE_URL?: string }} env
+ */
+export function hasDatabaseUrl(env) {
+  return Boolean(env?.DATABASE_URL?.trim());
+}
+
 /**
  * Klien SQL Neon (PostgreSQL) — database utama.
- * Set DATABASE_URL di Cloudflare Pages / Worker secrets dan .dev.vars lokal.
  * @param {{ DATABASE_URL?: string }} env
  */
 export function getSql(env) {
-  const url = env.DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      'DATABASE_URL belum dikonfigurasi. Tambahkan di Cloudflare (Pages + Worker) atau .dev.vars'
-    );
-  }
+  const url = env?.DATABASE_URL?.trim();
+  if (!url) throw new Error(MISSING_DATABASE_URL_MSG);
   return neon(url);
 }
 

@@ -50,7 +50,12 @@ import {
   clearStaleChunkLock,
   recordCronTick,
 } from './functions/lib/sync-meta.js';
-import { buildSyncStatusReport } from './functions/lib/sync-status.js';
+import {
+  buildSyncStatusReport,
+  renderSyncStatusHtml,
+  renderWorkerConfigErrorHtml,
+} from './functions/lib/sync-status.js';
+import { getSql, hasDatabaseUrl, MISSING_DATABASE_URL_MSG } from './functions/lib/neon.js';
 import {
   runBackfillCronBurst,
   getRowFpStatsForReport,
@@ -66,13 +71,42 @@ import {
   appendBackfillActivityLog,
 } from './functions/lib/sync-activity-log.js';
 import { assertSyncAuthorized } from './functions/lib/sync-auth.js';
-import { getSql } from './functions/lib/neon.js';
 import { FAVICON_SYNC_SVG, FAVICON_SYNC_HEADERS } from './functions/lib/sync-favicon.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json;charset=UTF-8',
   'Access-Control-Allow-Origin': '*',
 };
+
+/**
+ * @param {object} env
+ * @param {boolean} wantsJson
+ * @param {string} [detail]
+ */
+function databaseConfigErrorResponse(env, wantsJson, detail) {
+  const msg = detail || MISSING_DATABASE_URL_MSG;
+  if (wantsJson) {
+    return new Response(
+      JSON.stringify({ status: 'error', message: msg, setup_required: true }),
+      { status: 503, headers: jsonHeaders }
+    );
+  }
+  return new Response(renderWorkerConfigErrorHtml(msg), {
+    status: 503,
+    headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+  });
+}
+
+/**
+ * @param {object} env
+ */
+async function safeMarkStalled(env) {
+  try {
+    if (hasDatabaseUrl(env)) await markSyncStalled(getSql(env));
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Chunk per /tick saat beban normal (bukan burst) */
 const CRON_TICK_MAX_CHUNKS = 1;
@@ -482,7 +516,7 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
       detail: `@ offset ${offset}: ${msg}`,
       offset,
     });
-    await markSyncStalled(getSql(env));
+    await safeMarkStalled(env);
     throw err;
   } finally {
     await releaseChunkLock(getSql(env));
@@ -669,6 +703,10 @@ async function runScheduledWeeklyRun(env, ctx) {
 
 export default {
   async scheduled(event, env, ctx) {
+    if (!hasDatabaseUrl(env)) {
+      console.error('Cron skipped: DATABASE_URL not set');
+      return;
+    }
     try {
       if (isWeeklyCronExpr(event.cron)) {
         await runScheduledWeeklyRun(env, ctx);
@@ -684,7 +722,7 @@ export default {
         action: 'scheduled',
         detail: msg,
       });
-      await markSyncStalled(getSql(env));
+      await safeMarkStalled(env);
     }
   },
 
@@ -698,6 +736,10 @@ export default {
     try {
       if (pathname === '/favicon-sync.svg' || pathname === '/favicon.svg') {
         return new Response(FAVICON_SYNC_SVG, { headers: FAVICON_SYNC_HEADERS });
+      }
+
+      if (!hasDatabaseUrl(env)) {
+        return databaseConfigErrorResponse(env, wantsJson);
       }
 
       if (pathname === '/pause') {
@@ -907,7 +949,6 @@ export default {
       const report = await buildSyncStatusReport(getSql(env));
 
       if (!wantsJson) {
-        const { renderSyncStatusHtml } = await import('./functions/lib/sync-status.js');
         return new Response(renderSyncStatusHtml(report), {
           headers: { 'Content-Type': 'text/html;charset=UTF-8' },
         });
@@ -915,8 +956,23 @@ export default {
 
       return new Response(JSON.stringify(report), { headers: jsonHeaders });
     } catch (error) {
-      await markSyncStalled(getSql(env));
-      return new Response(JSON.stringify({ status: 'error', message: error.message }), {
+      console.error('Worker fetch error:', error?.message || error);
+      const msg = error?.message || String(error);
+      const schemaHint =
+        /sync_meta|sync_page_fp|does not exist|relation/i.test(msg)
+          ? ' Jalankan sekali: npm run neon:schema'
+          : '';
+      if (!wantsJson && (msg.includes('DATABASE_URL') || schemaHint)) {
+        return databaseConfigErrorResponse(env, wantsJson, msg + schemaHint);
+      }
+      await safeMarkStalled(env);
+      if (!wantsJson) {
+        return new Response(renderWorkerConfigErrorHtml(msg + schemaHint), {
+          status: 500,
+          headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+        });
+      }
+      return new Response(JSON.stringify({ status: 'error', message: msg + schemaHint }), {
         status: 500,
         headers: jsonHeaders,
       });
