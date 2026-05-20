@@ -1,5 +1,6 @@
 import { metaUpsert, metaGetMany, metaGet, metaDelete } from './pg-meta.js';
 import { countSekolah } from './sekolah-pg.js';
+import { recordSinkronisasiSelesai } from './status-sinkronisasi.js';
 
 const KEY_LAST_SYNC = 'last_sync_at';
 const KEY_TOTAL = 'total_sekolah';
@@ -129,6 +130,11 @@ export async function recordSyncProgress(sql, { nextOffset, done, apiTotal }) {
   if (done) {
     state = 'completed';
     await setCronEnabled(sql, false);
+    try {
+      await recordSinkronisasiSelesai(sql);
+    } catch (err) {
+      console.error('recordSinkronisasiSelesai:', err?.message || err);
+    }
   } else if (await isSyncManuallyPaused(sql)) {
     state = 'stalled';
   } else {

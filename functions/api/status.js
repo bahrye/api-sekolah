@@ -1,4 +1,4 @@
-import { buildSyncStatusReport } from '../lib/sync-status.js';
+import { getStatusSinkronisasiPublik } from '../lib/status-sinkronisasi.js';
 import { getSql } from '../lib/neon.js';
 
 const jsonHeaders = {
@@ -7,7 +7,7 @@ const jsonHeaders = {
   'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
 };
 
-/** Metadata dari Neon (sync_meta + count sekolah) */
+/** GET /api/status — metadata publik (tanpa detail proses sync) */
 export async function onRequest(context) {
   if (context.request.method === 'OPTIONS') {
     return new Response(null, { headers: jsonHeaders });
@@ -22,14 +22,13 @@ export async function onRequest(context) {
 
   try {
     const sql = getSql(context.env);
-    const report = await buildSyncStatusReport(sql);
+    const pub = await getStatusSinkronisasiPublik(sql);
     const body = {
       status: 'success',
-      total_data_tersedia: report.database.total_sekolah,
-      waktu_update_data_terakhir: report.database.waktu_update_terakhir,
-      waktu_update_data_terakhir_iso: report.database.waktu_update_terakhir_iso,
-      jadwal_sync: 'Setiap Senin, 01:00 WITA (Cloudflare Cron)',
-      sinkronisasi: report.sinkronisasi,
+      total_data_tersedia: pub.total_sekolah,
+      waktu_update_data_terakhir: pub.waktu_selesai_terakhir,
+      waktu_update_data_terakhir_iso: pub.waktu_selesai_terakhir_iso,
+      jadwal_sync: 'Pembaruan berkala dari portal resmi (Senin 01:00 WITA)',
     };
 
     if (context.request.method === 'HEAD') {

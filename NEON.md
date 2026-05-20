@@ -32,7 +32,7 @@ Setelah migrasi data sekolah, jalankan:
 npm run neon:schema
 ```
 
-Ini membuat `sync_meta`, `sync_page_fp`, dan kolom `row_fp` di tabel `sekolah`.
+Ini membuat `sync_meta`, `sync_page_fp`, kolom `row_fp` di tabel `sekolah`, dan tabel publik `status_sinkronisasi` (`waktu_selesai_terakhir` untuk halaman utama).
 
 ## Deploy
 

@@ -1214,6 +1214,12 @@ export default {
         );
       }
 
+      const dashboardAuth = resolveSyncAuth(request, url, env, { soft: false });
+      if (!dashboardAuth.ok) {
+        if (wantsJson) return dashboardAuth.response;
+        return new Response('Not Found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+      }
+
       const report = await buildSyncStatusReport(getSql(env));
 
       if (!wantsJson) {
