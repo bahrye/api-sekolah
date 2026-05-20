@@ -1,4 +1,5 @@
 import { buildSyncStatusReport } from '../lib/sync-status.js';
+import { getSql } from '../lib/neon.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json;charset=UTF-8',
@@ -6,7 +7,7 @@ const jsonHeaders = {
   'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
 };
 
-/** Hanya baca sync_meta (~2 baris) — untuk halaman depan & monitoring */
+/** Metadata dari Neon (sync_meta + count sekolah) */
 export async function onRequest(context) {
   if (context.request.method === 'OPTIONS') {
     return new Response(null, { headers: jsonHeaders });
@@ -20,7 +21,8 @@ export async function onRequest(context) {
   }
 
   try {
-    const report = await buildSyncStatusReport(context.env.DB);
+    const sql = getSql(context.env);
+    const report = await buildSyncStatusReport(sql);
     const body = {
       status: 'success',
       total_data_tersedia: report.database.total_sekolah,

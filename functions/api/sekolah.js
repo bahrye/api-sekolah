@@ -1,13 +1,14 @@
 import { getApiMeta, formatSyncTimeWib } from '../lib/sync-meta.js';
-import { SELECT_COLS, formatRowResponse } from '../lib/sekolah-schema.js';
+import { formatNeonRowResponse } from '../lib/sekolah-schema.js';
+import { getSql } from '../lib/neon.js';
+import { listSekolah, searchSekolah } from '../lib/sekolah-pg.js';
 
 export async function onRequest(context) {
   const { searchParams } = new URL(context.request.url);
   const keyword = searchParams.get('keyword');
 
   const DEFAULT_LIMIT = 20;
-  /** Sementara 250 untuk migrasi ke Neon — kembalikan ke 50 setelah migrasi selesai. */
-  const MAX_LIMIT = 250;
+  const MAX_LIMIT = 50;
 
   let limit = parseInt(searchParams.get('limit'), 10);
   if (!Number.isFinite(limit) || limit < 1) limit = DEFAULT_LIMIT;
@@ -27,24 +28,13 @@ export async function onRequest(context) {
   }
 
   try {
-    const apiMeta = await getApiMeta(context.env.DB);
-    let results;
+    const sql = getSql(context.env);
+    const apiMeta = await getApiMeta(sql);
+    const rows = keyword
+      ? await searchSekolah(sql, keyword.trim(), limit, offset)
+      : await listSekolah(sql, limit, offset);
 
-    if (keyword) {
-      const stmt = context.env.DB.prepare(
-        `SELECT ${SELECT_COLS} FROM sekolah WHERE NPSN LIKE ? OR Nama LIKE ? LIMIT ? OFFSET ?`
-      ).bind(`%${keyword}%`, `%${keyword}%`, limit, offset);
-      const { results: searchResults } = await stmt.all();
-      results = searchResults;
-    } else {
-      const stmt = context.env.DB.prepare(
-        `SELECT ${SELECT_COLS} FROM sekolah LIMIT ? OFFSET ?`
-      ).bind(limit, offset);
-      const { results: allResults } = await stmt.all();
-      results = allResults;
-    }
-
-    const formattedResults = results.map((row) => formatRowResponse(row));
+    const formattedResults = rows.map((row) => formatNeonRowResponse(row));
 
     const metadata = {
       limit_ditampilkan: limit,

@@ -20,8 +20,33 @@ export const FIELDS = [
 /** Kolom untuk respons API publik (tanpa kolom internal) */
 export const SELECT_COLS = FIELDS.join(', ');
 
-/** Kolom internal — hash isi baris untuk hemat tulis D1 */
+/** Kolom internal — hash isi baris untuk skip UPDATE */
 export const ROW_FP_COLUMN = 'row_fp';
+
+/** Baris dari PostgreSQL (snake_case) → format internal sync */
+export function rowFromNeon(r) {
+  return {
+    NPSN: r.npsn,
+    Nama: r.nama,
+    Bentuk: r.bentuk_pendidikan,
+    BentukGroup: r.bentuk_pendidikan_group,
+    Jenis: r.jenis_pendidikan,
+    Status: r.status_satuan_pendidikan,
+    Jenjang: r.jenjang_pendidikan,
+    Pembina: r.pembina,
+    Jalur: r.jalur_pendidikan,
+    Kelurahan: r.nama_desa,
+    Kecamatan: r.nama_kecamatan,
+    Kabupaten: r.nama_kabupaten,
+    Provinsi: r.nama_provinsi,
+    Alamat: r.alamat_jalan,
+    [ROW_FP_COLUMN]: r.row_fp,
+  };
+}
+
+export function formatNeonRowResponse(r) {
+  return formatRowResponse(rowFromNeon(r));
+}
 export const ROW_FP_VERSION = '1';
 
 const ROW_HASH_FIELDS = FIELDS.filter((k) => k !== 'NPSN');

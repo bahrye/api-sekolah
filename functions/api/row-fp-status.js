@@ -1,5 +1,6 @@
 import { getApiMeta } from '../lib/sync-meta.js';
 import { getRowFpStatsForReport } from '../lib/backfill-row-fp.js';
+import { getSql } from '../lib/neon.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json;charset=UTF-8',
@@ -21,8 +22,9 @@ export async function onRequest(context) {
   }
 
   try {
-    const meta = await getApiMeta(context.env.DB);
-    const row_fp = await getRowFpStatsForReport(context.env.DB, meta.totalSekolah);
+    const sql = getSql(context.env);
+    const meta = await getApiMeta(sql);
+    const row_fp = await getRowFpStatsForReport(sql, meta.totalSekolah);
 
     if (context.request.method === 'HEAD') {
       return new Response(null, { headers: jsonHeaders });

@@ -2,15 +2,11 @@ import { fingerprintRow } from './sekolah-schema.js';
 
 /**
  * Fingerprint per halaman API — skip baca tabel sekolah jika isi halaman sama dengan sync terakhir.
- * Naikkan saat skema/mapping berubah agar halaman diproses ulang (backfill kolom baru).
  */
-/** Naikkan saat algoritma fingerprint halaman berubah (sync ulang semua halaman sekali). */
 /** Naik saat PAGE_SIZE berubah (indeks halaman API bergeser). */
 export const FP_VERSION = '6';
 
 /**
- * Hash halaman = gabungan hash baris (sama logika row_fp), bukan JSON mentah API.
- * Hindari fp_skip gagal padahal row_fp cocok (lewati tanpa baca D1).
  * @param {Record<string, string>[]} rows sudah dinormalisasi (mapFromApi)
  */
 export async function fingerprintRows(rows) {
@@ -22,49 +18,46 @@ export async function fingerprintRows(rows) {
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {number} pageIndex
  */
-export async function getPageFingerprint(db, pageIndex) {
+export async function getPageFingerprint(sql, pageIndex) {
   try {
-    const row = await db
-      .prepare('SELECT fingerprint FROM sync_page_fp WHERE page_index = ?')
-      .bind(pageIndex)
-      .first();
-    return row?.fingerprint ?? null;
+    const rows = await sql`
+      SELECT fingerprint FROM sync_page_fp WHERE page_index = ${pageIndex}
+    `;
+    return rows[0]?.fingerprint ?? null;
   } catch {
     return null;
   }
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {number} pageIndex
  * @param {string} fingerprint
  */
-export async function savePageFingerprint(db, pageIndex, fingerprint) {
-  await db
-    .prepare(
-      `INSERT INTO sync_page_fp (page_index, fingerprint) VALUES (?, ?)
-       ON CONFLICT(page_index) DO UPDATE SET fingerprint = excluded.fingerprint`
-    )
-    .bind(pageIndex, fingerprint)
-    .run();
+export async function savePageFingerprint(sql, pageIndex, fingerprint) {
+  await sql`
+    INSERT INTO sync_page_fp (page_index, fingerprint, updated_at)
+    VALUES (${pageIndex}, ${fingerprint}, NOW())
+    ON CONFLICT (page_index) DO UPDATE SET
+      fingerprint = EXCLUDED.fingerprint,
+      updated_at = NOW()
+  `;
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {number[]} pageIndexes
  */
-export async function getPageFingerprintsBatch(db, pageIndexes) {
+export async function getPageFingerprintsBatch(sql, pageIndexes) {
   if (pageIndexes.length === 0) return new Map();
   try {
-    const placeholders = pageIndexes.map(() => '?').join(',');
-    const { results } = await db
-      .prepare(`SELECT page_index, fingerprint FROM sync_page_fp WHERE page_index IN (${placeholders})`)
-      .bind(...pageIndexes)
-      .all();
-    return new Map((results || []).map((r) => [r.page_index, r.fingerprint]));
+    const rows = await sql`
+      SELECT page_index, fingerprint FROM sync_page_fp WHERE page_index = ANY(${pageIndexes})
+    `;
+    return new Map(rows.map((r) => [r.page_index, r.fingerprint]));
   } catch {
     return new Map();
   }

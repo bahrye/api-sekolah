@@ -1,5 +1,6 @@
 import { formatSyncTimeWib } from './sync-meta.js';
 import { progressPercent } from './sync-sekolah.js';
+import { metaGet, metaUpsert } from './pg-meta.js';
 
 const KEY_ACTIVITY_LOG = 'sync_activity_log';
 const MAX_LINES = 8;
@@ -7,16 +8,13 @@ const MAX_LINES = 8;
 /** @typedef {'chunk' | 'cron_tick' | 'cron_skip' | 'cron_run' | 'cron_error' | 'backfill'} ActivityKind */
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function getActivityLog(db) {
+export async function getActivityLog(sql) {
   try {
-    const row = await db
-      .prepare('SELECT value FROM sync_meta WHERE key = ?')
-      .bind(KEY_ACTIVITY_LOG)
-      .first();
-    if (!row?.value) return [];
-    const parsed = JSON.parse(row.value);
+    const raw = await metaGet(sql, KEY_ACTIVITY_LOG);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -43,29 +41,21 @@ export function formatActivityText({ offsetFrom, offsetTo, stats, note }) {
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {object} line
  */
-async function pushActivityLine(db, line) {
-  const existing = await getActivityLog(db);
+async function pushActivityLine(sql, line) {
+  const existing = await getActivityLog(sql);
   const next = [line, ...existing].slice(0, MAX_LINES);
-
-  await db
-    .prepare(
-      `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-    )
-    .bind(KEY_ACTIVITY_LOG, JSON.stringify(next))
-    .run();
-
+  await metaUpsert(sql, KEY_ACTIVITY_LOG, JSON.stringify(next));
   return next;
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {{ offsetFrom: number, offsetTo: number, stats: object, note?: string }} entry
  */
-export async function appendActivityLog(db, entry) {
+export async function appendActivityLog(sql, entry) {
   const ts = new Date().toISOString();
   const text = formatActivityText(entry);
   const line = {
@@ -86,7 +76,7 @@ export async function appendActivityLog(db, entry) {
     timed_out: entry.stats.timed_out === true,
   };
 
-  const existing = await getActivityLog(db);
+  const existing = await getActivityLog(sql);
   const head = existing[0];
   if (
     head?.kind === 'chunk' &&
@@ -94,17 +84,11 @@ export async function appendActivityLog(db, entry) {
     head.offset_to === entry.offsetTo
   ) {
     const merged = [line, ...existing.slice(1)].slice(0, MAX_LINES);
-    await db
-      .prepare(
-        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-      )
-      .bind(KEY_ACTIVITY_LOG, JSON.stringify(merged))
-      .run();
+    await metaUpsert(sql, KEY_ACTIVITY_LOG, JSON.stringify(merged));
     return merged;
   }
 
-  return pushActivityLine(db, line);
+  return pushActivityLine(sql, line);
 }
 
 const SKIP_LABELS = {
@@ -116,11 +100,10 @@ const SKIP_LABELS = {
 };
 
 /**
- * Log panggilan Cron (/tick lewati, /run mulai, gagal, dll.).
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {{ kind: ActivityKind, action: string, detail?: string, offset?: number, apiTotal?: number }} opts
  */
-export async function appendCronJobActivityLog(db, { kind, action, detail, offset, apiTotal }) {
+export async function appendCronJobActivityLog(sql, { kind, action, detail, offset, apiTotal }) {
   const ts = new Date().toISOString();
   let text = detail ?? action;
 
@@ -150,15 +133,14 @@ export async function appendCronJobActivityLog(db, { kind, action, detail, offse
     offset: offset ?? null,
   };
 
-  return pushActivityLine(db, line);
+  return pushActivityLine(sql, line);
 }
 
 /**
- * Log backfill row_fp di daftar aktivitas (sama dengan log Cron).
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {{ action: string, detail: string, processed?: number, null_remaining?: number | null }} opts
  */
-export async function appendBackfillActivityLog(db, { action, detail, processed, null_remaining }) {
+export async function appendBackfillActivityLog(sql, { action, detail, processed, null_remaining }) {
   const ts = new Date().toISOString();
   const parts = [detail];
   if (processed != null && processed > 0) {
@@ -178,7 +160,7 @@ export async function appendBackfillActivityLog(db, { action, detail, processed,
     null_remaining: null_remaining ?? null,
   };
 
-  return pushActivityLine(db, line);
+  return pushActivityLine(sql, line);
 }
 
 /**

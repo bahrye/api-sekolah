@@ -4,19 +4,12 @@ import {
   getPageFingerprintsBatch,
   savePageFingerprint,
 } from './sync-page-fp.js';
+import { mapFromApi, fingerprintRow, rowChanged, ROW_FP_COLUMN } from './sekolah-schema.js';
 import {
-  mapFromApi,
-  fingerprintRow,
-  rowChanged,
-  ROW_FP_COLUMN,
-  SELECT_COLS,
-  INSERT_COLUMNS,
-  INSERT_PLACEHOLDERS,
-  insertBindValues,
-  UPDATE_SET_CLAUSE,
-  updateBindValues,
-  buildRowFpOnlyStatement,
-} from './sekolah-schema.js';
+  fetchSekolahByNpsns,
+  upsertSekolahRow,
+  updateRowFpOnly,
+} from './sekolah-pg.js';
 import {
   CHUNK_RECORDS_LADDER,
   CHUNK_PAGES_LADDER,
@@ -46,7 +39,6 @@ const API_URL =
 
 /** Jumlah sekolah per request ke API belajar.id (limit query) */
 export const PAGE_SIZE = 200;
-const BATCH_SIZE = 50;
 
 export { mapFromApi };
 
@@ -112,49 +104,13 @@ async function fetchPageWithMeta(offset) {
 }
 
 /**
- * Baca baris lengkap + row_fp (1 baris = 1 kuota baca; kolom tambahan tidak menambah kuota).
- * @param {import('@cloudflare/workers-types').D1Database} db
- * @param {string[]} npsns
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {Array<{ row: Record<string, string>, kind: 'insert' | 'update' | 'fp_only' }>} queue
  */
-async function fetchExistingRowsByNpsn(db, npsns) {
-  if (npsns.length === 0) return new Map();
-
-  const placeholders = npsns.map(() => '?').join(',');
-  const { results } = await db
-    .prepare(`SELECT ${SELECT_COLS}, ${ROW_FP_COLUMN} FROM sekolah WHERE NPSN IN (${placeholders})`)
-    .bind(...npsns)
-    .all();
-
-  return new Map((results || []).map((row) => [row.NPSN, row]));
-}
-
-/**
- * @param {import('@cloudflare/workers-types').D1Database} db
- * @param {Record<string, string>} row
- */
-function buildInsertStatement(db, row) {
-  return db
-    .prepare(`INSERT INTO sekolah (${INSERT_COLUMNS}) VALUES (${INSERT_PLACEHOLDERS})`)
-    .bind(...insertBindValues(row));
-}
-
-/**
- * @param {import('@cloudflare/workers-types').D1Database} db
- * @param {Record<string, string>} row
- */
-function buildUpdateStatement(db, row) {
-  return db
-    .prepare(`UPDATE sekolah SET ${UPDATE_SET_CLAUSE} WHERE NPSN = ?`)
-    .bind(...updateBindValues(row));
-}
-
-/**
- * @param {import('@cloudflare/workers-types').D1Database} db
- * @param {import('@cloudflare/workers-types').D1PreparedStatement[]} statements
- */
-async function runBatch(db, statements) {
-  for (let i = 0; i < statements.length; i += BATCH_SIZE) {
-    await db.batch(statements.slice(i, i + BATCH_SIZE));
+async function flushWriteQueue(sql, queue) {
+  for (const { row, kind } of queue) {
+    if (kind === 'fp_only') await updateRowFpOnly(sql, row);
+    else await upsertSekolahRow(sql, row);
   }
 }
 
@@ -168,11 +124,11 @@ export function progressPercent(offset) {
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {{ offset?: number, maxPages?: number, bootstrapOnly?: boolean }} options
  */
 export async function syncSekolahChunk(
-  db,
+  sql,
   { offset = 0, maxPages = DEFAULT_MAX_PAGES, bootstrapOnly = false, wallMs = CHUNK_WALL_MS } = {}
 ) {
   const stats = {
@@ -195,7 +151,7 @@ export async function syncSekolahChunk(
   const pageIndexes = Array.from({ length: maxPages }, (_, i) =>
     Math.floor((offset + i * PAGE_SIZE) / PAGE_SIZE)
   );
-  const fpMap = bootstrapOnly ? new Map() : await getPageFingerprintsBatch(db, pageIndexes);
+  const fpMap = bootstrapOnly ? new Map() : await getPageFingerprintsBatch(sql, pageIndexes);
 
   while (pagesProcessed < maxPages) {
     if (Date.now() - wallStart >= wallMs) {
@@ -207,7 +163,7 @@ export async function syncSekolahChunk(
     apiTotal = total;
 
     if (rawPage.length === 0) {
-      await maybeRecordLastSync(db, stats, true);
+      await maybeRecordLastSync(sql, stats, true);
       return {
         done: true,
         nextOffset: currentOffset,
@@ -225,12 +181,12 @@ export async function syncSekolahChunk(
     const fp = await fingerprintRows(rows);
 
     if (bootstrapOnly) {
-      await savePageFingerprint(db, pageIndex, fp);
+      await savePageFingerprint(sql, pageIndex, fp);
       stats.scanned += rows.length;
       stats.pages_fp_saved += 1;
       currentOffset += PAGE_SIZE;
       if (currentOffset >= apiTotal) {
-        await maybeRecordLastSync(db, stats, true);
+        await maybeRecordLastSync(sql, stats, true);
         return {
           done: true,
           nextOffset: currentOffset,
@@ -250,7 +206,7 @@ export async function syncSekolahChunk(
       stats.pages_fp_skip += 1;
     } else {
       const npsns = rows.map((r) => r.NPSN);
-      const existing = await fetchExistingRowsByNpsn(db, npsns);
+      const existing = await fetchSekolahByNpsns(sql, npsns);
       const writes = [];
 
       for (const row of rows) {
@@ -260,32 +216,30 @@ export async function syncSekolahChunk(
         const old = existing.get(row.NPSN);
 
         if (!old) {
-          writes.push(buildInsertStatement(db, row));
+          writes.push({ row, kind: 'insert' });
           stats.inserted += 1;
         } else if ((old[ROW_FP_COLUMN] ?? '') === rowFp) {
           stats.skipped += 1;
         } else if (!old[ROW_FP_COLUMN] && !rowChanged(old, row)) {
-          writes.push(buildRowFpOnlyStatement(db, row));
+          writes.push({ row, kind: 'fp_only' });
           stats.row_fp_backfill += 1;
           stats.skipped += 1;
         } else {
-          writes.push(buildUpdateStatement(db, row));
+          writes.push({ row, kind: 'update' });
           stats.updated += 1;
         }
       }
 
-      if (writes.length > 0) {
-        await runBatch(db, writes);
-      }
+      if (writes.length > 0) await flushWriteQueue(sql, writes);
 
-      await savePageFingerprint(db, pageIndex, fp);
+      await savePageFingerprint(sql, pageIndex, fp);
       fpMap.set(pageIndex, fp);
     }
 
     currentOffset += PAGE_SIZE;
 
     if (currentOffset >= apiTotal) {
-      await maybeRecordLastSync(db, stats, true);
+      await maybeRecordLastSync(sql, stats, true);
       return {
         done: true,
         nextOffset: currentOffset,
@@ -297,7 +251,7 @@ export async function syncSekolahChunk(
     }
   }
 
-  await maybeRecordLastSync(db, stats, false);
+  await maybeRecordLastSync(sql, stats, false);
 
   return {
     done: false,

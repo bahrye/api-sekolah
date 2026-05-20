@@ -5,11 +5,7 @@ compatibility_date = "2024-01-01"
 [vars]
 WORKER_BASE = "https://api-sekolah-cron.syamsulbahri-agro27b.workers.dev"
 
-[[d1_databases]]
-binding = "DB"
-database_name = "nama-database-anda"
-database_id = "313936c9-fefa-4f1a-87e3-59a63fd605e5"
-
+# DATABASE_URL: npx wrangler secret put DATABASE_URL -c wrangler.cron.toml
 # SYNC_SECRET: npx wrangler secret put SYNC_SECRET -c wrangler.cron.toml
 #
 # Jadwal otomatis — Cloudflare Cron Triggers (UTC):

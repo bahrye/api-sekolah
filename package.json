@@ -7,7 +7,11 @@
     "deploy": "npm run deploy:cf",
     "ship": "node scripts/ship.js",
     "ship:all": "node scripts/ship.js && npm run deploy:cf",
-    "migrate:neon": "node scripts/migrate-to-neon.js"
+    "migrate:neon": "node scripts/migrate-to-neon.js",
+    "neon:schema": "node scripts/apply-neon-sync-schema.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0"
   },
   "devDependencies": {
     "pg": "^8.16.0",

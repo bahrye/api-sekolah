@@ -1,0 +1,3 @@
+# Salin ke .dev.vars untuk `wrangler pages dev` / uji lokal
+DATABASE_URL=postgresql://USER:PASSWORD@HOST/neondb?sslmode=require
+SYNC_SECRET=your-sync-secret

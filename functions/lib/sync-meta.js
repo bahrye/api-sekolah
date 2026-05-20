@@ -1,3 +1,6 @@
+import { metaUpsert, metaGetMany, metaGet, metaDelete } from './pg-meta.js';
+import { countSekolah } from './sekolah-pg.js';
+
 const KEY_LAST_SYNC = 'last_sync_at';
 const KEY_TOTAL = 'total_sekolah';
 const KEY_SYNC_OFFSET = 'sync_current_offset';
@@ -17,18 +20,15 @@ export const STALE_SYNC_MS = 4 * 60 * 1000;
 export const CHUNK_LOCK_TTL_MS = 120_000;
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function getApiMeta(db) {
+export async function getApiMeta(sql) {
   try {
-    const { results } = await db
-      .prepare(`SELECT key, value FROM sync_meta WHERE key IN (?, ?)`)
-      .bind(KEY_LAST_SYNC, KEY_TOTAL)
-      .all();
-
-    const map = Object.fromEntries((results || []).map((r) => [r.key, r.value]));
-    const total = map[KEY_TOTAL] != null ? parseInt(map[KEY_TOTAL], 10) : null;
-
+    const map = await metaGetMany(sql, [KEY_LAST_SYNC, KEY_TOTAL]);
+    let total = map[KEY_TOTAL] != null ? parseInt(map[KEY_TOTAL], 10) : null;
+    if (!Number.isFinite(total)) {
+      total = await countSekolah(sql);
+    }
     return {
       lastSyncIso: map[KEY_LAST_SYNC] ?? null,
       totalSekolah: Number.isFinite(total) ? total : null,
@@ -39,10 +39,10 @@ export async function getApiMeta(db) {
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function getLastSyncAt(db) {
-  const meta = await getApiMeta(db);
+export async function getLastSyncAt(sql) {
+  const meta = await getApiMeta(sql);
   return meta.lastSyncIso;
 }
 
@@ -60,66 +60,51 @@ export function formatSyncTimeWib(iso) {
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function recordLastSyncAt(db) {
-  const now = new Date().toISOString();
-  await db
-    .prepare(
-      `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-    )
-    .bind(KEY_LAST_SYNC, now)
-    .run();
+export async function recordLastSyncAt(sql) {
+  await metaUpsert(sql, KEY_LAST_SYNC, new Date().toISOString());
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {number} delta
  */
-export async function incrementTotalSekolah(db, delta) {
+export async function incrementTotalSekolah(sql, delta) {
   if (delta <= 0) return;
-  await db
-    .prepare(
-      `UPDATE sync_meta SET value = CAST((CAST(value AS INTEGER) + ?) AS TEXT) WHERE key = ?`
-    )
-    .bind(delta, KEY_TOTAL)
-    .run();
+  const current = await metaGet(sql, KEY_TOTAL);
+  const n = (parseInt(current || '0', 10) || 0) + delta;
+  await metaUpsert(sql, KEY_TOTAL, n);
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {{ inserted: number, updated: number }} stats
  * @param {boolean} finished
  */
-export async function maybeRecordLastSync(db, stats, finished) {
+export async function maybeRecordLastSync(sql, stats, finished) {
   const hadWrites = stats.inserted + stats.updated > 0;
-
-  if (stats.inserted > 0) {
-    await incrementTotalSekolah(db, stats.inserted);
-  }
-
-  if (hadWrites || finished) {
-    await recordLastSyncAt(db);
+  if (stats.inserted > 0) await incrementTotalSekolah(sql, stats.inserted);
+  if (hadWrites || finished) await recordLastSyncAt(sql);
+  if (finished) {
+    const total = await countSekolah(sql);
+    await metaUpsert(sql, KEY_TOTAL, total);
   }
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function getSyncProgress(db) {
+export async function getSyncProgress(sql) {
   try {
-    const { results } = await db
-      .prepare(
-        `SELECT key, value FROM sync_meta WHERE key IN (?, ?, ?, ?)`
-      )
-      .bind(KEY_SYNC_OFFSET, KEY_SYNC_STATE, KEY_SYNC_API_TOTAL, KEY_SYNC_CHUNK_AT)
-      .all();
-
-    const map = Object.fromEntries((results || []).map((r) => [r.key, r.value]));
+    const map = await metaGetMany(sql, [
+      KEY_SYNC_OFFSET,
+      KEY_SYNC_STATE,
+      KEY_SYNC_API_TOTAL,
+      KEY_SYNC_CHUNK_AT,
+    ]);
     const offset = map[KEY_SYNC_OFFSET] != null ? parseInt(map[KEY_SYNC_OFFSET], 10) : 0;
     const apiTotal = map[KEY_SYNC_API_TOTAL] != null ? parseInt(map[KEY_SYNC_API_TOTAL], 10) : null;
-
     return {
       currentOffset: Number.isFinite(offset) ? offset : 0,
       runState: map[KEY_SYNC_STATE] ?? 'idle',
@@ -132,53 +117,24 @@ export async function getSyncProgress(db) {
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {{ nextOffset: number, done: boolean, apiTotal?: number }} opts
  */
-export async function recordSyncProgress(db, { nextOffset, done, apiTotal }) {
+export async function recordSyncProgress(sql, { nextOffset, done, apiTotal }) {
   let state;
   if (done) {
     state = 'completed';
-    await setCronEnabled(db, false);
-  } else if (await isSyncManuallyPaused(db)) {
+    await setCronEnabled(sql, false);
+  } else if (await isSyncManuallyPaused(sql)) {
     state = 'stalled';
   } else {
     state = 'running';
   }
   const now = new Date().toISOString();
-  const statements = [
-    db
-      .prepare(
-        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-      )
-      .bind(KEY_SYNC_OFFSET, String(nextOffset)),
-    db
-      .prepare(
-        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-      )
-      .bind(KEY_SYNC_STATE, state),
-    db
-      .prepare(
-        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-      )
-      .bind(KEY_SYNC_CHUNK_AT, now),
-  ];
-
-  if (apiTotal != null) {
-    statements.push(
-      db
-        .prepare(
-          `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-           ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-        )
-        .bind(KEY_SYNC_API_TOTAL, String(apiTotal))
-    );
-  }
-
-  await db.batch(statements);
+  await metaUpsert(sql, KEY_SYNC_OFFSET, nextOffset);
+  await metaUpsert(sql, KEY_SYNC_STATE, state);
+  await metaUpsert(sql, KEY_SYNC_CHUNK_AT, now);
+  if (apiTotal != null) await metaUpsert(sql, KEY_SYNC_API_TOTAL, apiTotal);
 }
 
 /**
@@ -241,93 +197,68 @@ export function resolveSyncRunState(prog, apiTotal, cron = null, opts = null) {
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function markSyncStalled(db) {
-  await db
-    .prepare(
-      `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-    )
-    .bind(KEY_SYNC_STATE, 'stalled')
-    .run();
+export async function markSyncStalled(sql) {
+  await metaUpsert(sql, KEY_SYNC_STATE, 'stalled');
 }
 
 /**
- * Hentikan sync sementara — cron off + status terhenti (offset tetap).
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function markSyncPaused(db) {
-  await setCronEnabled(db, false);
-  await markSyncStalled(db);
+export async function markSyncPaused(sql) {
+  await setCronEnabled(sql, false);
+  await markSyncStalled(sql);
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
- */
-/**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {number} offset
  */
-export async function markSyncResumeAt(db, offset) {
-  await recordSyncProgress(db, { nextOffset: offset, done: false });
-  await setCronEnabled(db, true);
+export async function markSyncResumeAt(sql, offset) {
+  await recordSyncProgress(sql, { nextOffset: offset, done: false });
+  await setCronEnabled(sql, true);
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {boolean} enabled
  */
-export async function setCronEnabled(db, enabled) {
-  await db
-    .prepare(
-      `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-    )
-    .bind(KEY_SYNC_CRON_ENABLED, enabled ? '1' : '0')
-    .run();
+export async function setCronEnabled(sql, enabled) {
+  await metaUpsert(sql, KEY_SYNC_CRON_ENABLED, enabled ? '1' : '0');
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function isCronEnabled(db) {
+export async function isCronEnabled(sql) {
   try {
-    const row = await db
-      .prepare('SELECT value FROM sync_meta WHERE key = ?')
-      .bind(KEY_SYNC_CRON_ENABLED)
-      .first();
-    return row?.value === '1';
+    return (await metaGet(sql, KEY_SYNC_CRON_ENABLED)) === '1';
   } catch {
     return false;
   }
 }
 
 /**
- * Sync dijeda manual (cron off + state stalled, belum selesai).
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function isSyncManuallyPaused(db) {
-  if (await isCronEnabled(db)) return false;
-  const prog = await getSyncProgress(db);
+export async function isSyncManuallyPaused(sql) {
+  if (await isCronEnabled(sql)) return false;
+  const prog = await getSyncProgress(sql);
   if (prog.runState !== 'stalled') return false;
-  const meta = await getApiMeta(db);
+  const meta = await getApiMeta(sql);
   const total = prog.apiTotal ?? meta.totalSekolah ?? 0;
   return (prog.currentOffset ?? 0) < total;
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
- * @returns {Promise<number | null>}
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-async function getChunkLockTimestamp(db) {
+async function getChunkLockTimestamp(sql) {
   try {
-    const row = await db
-      .prepare('SELECT value FROM sync_meta WHERE key = ?')
-      .bind(KEY_CHUNK_LOCK)
-      .first();
-    if (!row?.value) return null;
-    const t = new Date(row.value).getTime();
+    const v = await metaGet(sql, KEY_CHUNK_LOCK);
+    if (!v) return null;
+    const t = new Date(v).getTime();
     return Number.isFinite(t) ? t : null;
   } catch {
     return null;
@@ -335,28 +266,24 @@ async function getChunkLockTimestamp(db) {
 }
 
 /**
- * Lepas lock zombie (Worker kill / chunk hang) agar /tick tidak terblokir selamanya.
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function clearStaleChunkLock(db) {
-  const lockAt = await getChunkLockTimestamp(db);
+export async function clearStaleChunkLock(sql) {
+  const lockAt = await getChunkLockTimestamp(sql);
   if (lockAt == null) return false;
-
-  const age = Date.now() - lockAt;
-  if (age >= CHUNK_LOCK_TTL_MS) {
-    await releaseChunkLock(db);
+  if (Date.now() - lockAt >= CHUNK_LOCK_TTL_MS) {
+    await releaseChunkLock(sql);
     return true;
   }
-
   return false;
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function isChunkLocked(db) {
+export async function isChunkLocked(sql) {
   try {
-    const lockAt = await getChunkLockTimestamp(db);
+    const lockAt = await getChunkLockTimestamp(sql);
     if (lockAt == null) return false;
     const age = Date.now() - lockAt;
     return age >= 0 && age < CHUNK_LOCK_TTL_MS;
@@ -366,17 +293,13 @@ export async function isChunkLocked(db) {
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
- * @returns {Promise<number | null>}
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function getChunkLockOffset(db) {
+export async function getChunkLockOffset(sql) {
   try {
-    const row = await db
-      .prepare('SELECT value FROM sync_meta WHERE key = ?')
-      .bind(KEY_CHUNK_LOCK_OFFSET)
-      .first();
-    if (row?.value == null) return null;
-    const n = parseInt(row.value, 10);
+    const v = await metaGet(sql, KEY_CHUNK_LOCK_OFFSET);
+    if (v == null) return null;
+    const n = parseInt(v, 10);
     return Number.isFinite(n) ? n : null;
   } catch {
     return null;
@@ -384,81 +307,51 @@ export async function getChunkLockOffset(db) {
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
- * @param {number} [offset] offset yang sedang diproses (cegah /tick dobel)
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {number} [offset]
  */
-export async function tryAcquireChunkLock(db, offset) {
-  await clearStaleChunkLock(db);
-  if (await isChunkLocked(db)) return false;
-  const now = new Date().toISOString();
-  const statements = [
-    db
-      .prepare(
-        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-      )
-      .bind(KEY_CHUNK_LOCK, now),
-  ];
+export async function tryAcquireChunkLock(sql, offset) {
+  await clearStaleChunkLock(sql);
+  if (await isChunkLocked(sql)) return false;
+  await metaUpsert(sql, KEY_CHUNK_LOCK, new Date().toISOString());
   if (offset != null && Number.isFinite(offset)) {
-    statements.push(
-      db
-        .prepare(
-          `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-           ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-        )
-        .bind(KEY_CHUNK_LOCK_OFFSET, String(offset))
-    );
+    await metaUpsert(sql, KEY_CHUNK_LOCK_OFFSET, offset);
   }
-  await db.batch(statements);
   return true;
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function releaseChunkLock(db) {
+export async function releaseChunkLock(sql) {
   try {
-    await db.batch([
-      db.prepare('DELETE FROM sync_meta WHERE key = ?').bind(KEY_CHUNK_LOCK),
-      db.prepare('DELETE FROM sync_meta WHERE key = ?').bind(KEY_CHUNK_LOCK_OFFSET),
-    ]);
+    await metaDelete(sql, KEY_CHUNK_LOCK);
+    await metaDelete(sql, KEY_CHUNK_LOCK_OFFSET);
   } catch {
     /* ignore */
   }
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {string} note
  */
-export async function recordCronTick(db, note) {
+export async function recordCronTick(sql, note) {
   const now = new Date().toISOString();
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-      )
-      .bind(KEY_SYNC_CRON_TICK, now),
-    db
-      .prepare(
-        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-      )
-      .bind(KEY_SYNC_CRON_NOTE, note),
-  ]);
+  await metaUpsert(sql, KEY_SYNC_CRON_TICK, now);
+  await metaUpsert(sql, KEY_SYNC_CRON_NOTE, note);
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function getCronHeartbeat(db) {
+export async function getCronHeartbeat(sql) {
   try {
-    const { results } = await db
-      .prepare(`SELECT key, value FROM sync_meta WHERE key IN (?, ?, ?)`)
-      .bind(KEY_SYNC_CRON_TICK, KEY_SYNC_CRON_NOTE, KEY_SYNC_CRON_ENABLED)
-      .all();
-    const map = Object.fromEntries((results || []).map((r) => [r.key, r.value]));
+    const map = await metaGetMany(sql, [
+      KEY_SYNC_CRON_TICK,
+      KEY_SYNC_CRON_NOTE,
+      KEY_SYNC_CRON_ENABLED,
+    ]);
     return {
       lastTick: map[KEY_SYNC_CRON_TICK] ?? null,
       lastNote: map[KEY_SYNC_CRON_NOTE] ?? null,
@@ -470,29 +363,12 @@ export async function getCronHeartbeat(db) {
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  */
-export async function markSyncRunStarted(db) {
+export async function markSyncRunStarted(sql) {
   const now = new Date().toISOString();
-  await setCronEnabled(db, true);
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-      )
-      .bind(KEY_SYNC_OFFSET, '0'),
-    db
-      .prepare(
-        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-      )
-      .bind(KEY_SYNC_STATE, 'running'),
-    db
-      .prepare(
-        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-      )
-      .bind(KEY_SYNC_CHUNK_AT, now),
-  ]);
+  await setCronEnabled(sql, true);
+  await metaUpsert(sql, KEY_SYNC_OFFSET, '0');
+  await metaUpsert(sql, KEY_SYNC_STATE, 'running');
+  await metaUpsert(sql, KEY_SYNC_CHUNK_AT, now);
 }

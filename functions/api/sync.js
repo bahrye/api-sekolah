@@ -15,6 +15,7 @@ import {
 } from '../lib/sync-meta.js';
 import { assertSyncAuthorized } from '../lib/sync-auth.js';
 import { appendActivityLog } from '../lib/sync-activity-log.js';
+import { getSql } from '../lib/neon.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json;charset=UTF-8',
@@ -59,7 +60,8 @@ export async function onRequest(context) {
   const noChain = requestUrl.searchParams.get('no_chain') === '1';
 
   try {
-    if (await isSyncManuallyPaused(context.env.DB)) {
+    const sql = getSql(context.env);
+    if (await isSyncManuallyPaused(sql)) {
       return new Response(
         JSON.stringify({
           status: 'paused',
@@ -71,10 +73,10 @@ export async function onRequest(context) {
     }
 
     if (offset === 0 && !bootstrapOnly) {
-      await markSyncRunStarted(context.env.DB);
+      await markSyncRunStarted(sql);
     }
 
-    const result = await syncSekolahChunk(context.env.DB, {
+    const result = await syncSekolahChunk(sql, {
       offset,
       maxPages,
       bootstrapOnly,
@@ -82,12 +84,12 @@ export async function onRequest(context) {
     });
 
     if (!bootstrapOnly) {
-      await recordSyncProgress(context.env.DB, {
+      await recordSyncProgress(sql, {
         nextOffset: result.nextOffset,
         done: result.done,
         apiTotal: result.api_total,
       });
-      await appendActivityLog(context.env.DB, {
+      await appendActivityLog(sql, {
         offsetFrom: offset,
         offsetTo: result.nextOffset,
         stats: { ...result.stats, max_pages: maxPages },
@@ -101,7 +103,7 @@ export async function onRequest(context) {
         context.waitUntil(
           chainSyncRequest(continueUrl, secret).catch(async (err) => {
             console.error('Chain sync Pages gagal:', err?.message || err);
-            await markSyncStalled(context.env.DB);
+            await markSyncStalled(getSql(context.env));
           })
         );
       }

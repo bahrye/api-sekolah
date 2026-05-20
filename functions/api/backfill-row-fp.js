@@ -10,6 +10,7 @@ import {
   getRowFpStatsForReport,
   BACKFILL_BATCH_SIZE,
 } from '../lib/backfill-row-fp.js';
+import { getSql } from '../lib/neon.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json;charset=UTF-8',
@@ -53,15 +54,15 @@ export async function onRequest(context) {
     : BACKFILL_BATCH_SIZE;
 
   try {
-    const meta = await getApiMeta(context.env.DB);
-    const remainingBefore = await countNullRowFp(context.env.DB);
-    await recordRowFpStats(context.env.DB, remainingBefore, {
+    const meta = await getApiMeta(getSql(context.env));
+    const remainingBefore = await countNullRowFp(getSql(context.env));
+    await recordRowFpStats(getSql(context.env), remainingBefore, {
       active: statsOnly ? false : remainingBefore > 0,
       cronEnabled: statsOnly ? false : remainingBefore > 0,
     });
 
     if (statsOnly) {
-      const row_fp = await getRowFpStatsForReport(context.env.DB, meta.totalSekolah);
+      const row_fp = await getRowFpStatsForReport(getSql(context.env), meta.totalSekolah);
       return new Response(
         JSON.stringify({
           status: 'success',
@@ -78,8 +79,8 @@ export async function onRequest(context) {
     }
 
     if (remainingBefore === 0) {
-      await recordRowFpStats(context.env.DB, 0, { active: false });
-      const row_fp = await getRowFpStatsForReport(context.env.DB, meta.totalSekolah);
+      await recordRowFpStats(getSql(context.env), 0, { active: false });
+      const row_fp = await getRowFpStatsForReport(getSql(context.env), meta.totalSekolah);
       return new Response(
         JSON.stringify({
           status: 'success',
@@ -93,14 +94,14 @@ export async function onRequest(context) {
       );
     }
 
-    await recordRowFpStats(context.env.DB, remainingBefore, {
+    await recordRowFpStats(getSql(context.env), remainingBefore, {
       active: true,
       cronEnabled: true,
     });
-    const batch = await backfillRowFpBatch(context.env.DB, batchSize);
-    const remainingAfter = await countNullRowFp(context.env.DB);
+    const batch = await backfillRowFpBatch(getSql(context.env), batchSize);
+    const remainingAfter = await countNullRowFp(getSql(context.env));
     const done = batch.done || remainingAfter === 0;
-    await recordRowFpStats(context.env.DB, remainingAfter, {
+    await recordRowFpStats(getSql(context.env), remainingAfter, {
       active: !done,
       cronEnabled: !done,
     });
@@ -115,7 +116,7 @@ export async function onRequest(context) {
     }
 
     if (batch.processed > 0 || done) {
-      await appendBackfillActivityLog(context.env.DB, {
+      await appendBackfillActivityLog(getSql(context.env), {
         action: done ? 'selesai' : 'chunk',
         detail: done
           ? `Pages batch (+${batch.processed})`
@@ -125,7 +126,7 @@ export async function onRequest(context) {
       });
     }
 
-    const row_fp = await getRowFpStatsForReport(context.env.DB, meta.totalSekolah);
+    const row_fp = await getRowFpStatsForReport(getSql(context.env), meta.totalSekolah);
     const body = {
       status: done ? 'success' : 'in_progress',
       message: done

@@ -12,21 +12,21 @@ import { getActivityLog, activityKindLabel } from './sync-activity-log.js';
 import { getRowFpStatsForReport, PAGES_BACKFILL_URL } from './backfill-row-fp.js';
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {{ lastChunk?: object }} [opts]
  */
-export async function buildSyncStatusReport(db, { lastChunk } = {}) {
-  const meta = await getApiMeta(db);
-  const prog = await getSyncProgress(db);
-  const cron = await getCronHeartbeat(db);
-  const chunkLocked = await isChunkLocked(db);
-  const activity_log = await getActivityLog(db);
+export async function buildSyncStatusReport(sql, { lastChunk } = {}) {
+  const meta = await getApiMeta(sql);
+  const prog = await getSyncProgress(sql);
+  const cron = await getCronHeartbeat(sql);
+  const chunkLocked = await isChunkLocked(sql);
+  const activity_log = await getActivityLog(sql);
   const apiTotal = prog.apiTotal ?? meta.totalSekolah ?? ESTIMATED_TOTAL_RECORDS;
-  const row_fp = await getRowFpStatsForReport(db, meta.totalSekolah ?? apiTotal);
+  const row_fp = await getRowFpStatsForReport(sql, meta.totalSekolah ?? apiTotal);
   const currentOffset = prog.currentOffset ?? 0;
   let resolved = resolveSyncRunState(prog, apiTotal, cron, { chunkLocked });
   if (resolved.stale && prog.runState === 'running') {
-    await markSyncStalled(db);
+    await markSyncStalled(sql);
   }
   const runState = resolved.runState;
   const pct = progressPercent(currentOffset);

@@ -1,17 +1,14 @@
-import {
-  fingerprintRow,
-  buildRowFpOnlyStatement,
-  SELECT_COLS,
-  ROW_FP_COLUMN,
-} from './sekolah-schema.js';
-import { getApiMeta } from './sync-meta.js';
+import { getApiMeta, formatSyncTimeWib } from './sync-meta.js';
+import { metaUpsert, metaGetMany } from './pg-meta.js';
+import { countNullRowFp, backfillRowFpBatchPg } from './sekolah-pg.js';
+
+export { countNullRowFp };
+export const backfillRowFpBatch = backfillRowFpBatchPg;
 
 /** Baris per request Pages (batch pertama; sisanya cron Worker) */
 export const BACKFILL_BATCH_SIZE = 400;
 /** Maks per query D1 */
 export const BACKFILL_BATCH_MAX = 500;
-const WRITE_BATCH = 100;
-
 const KEY_ROW_FP_NULL = 'row_fp_null_count';
 const KEY_ROW_FP_STATS_AT = 'row_fp_stats_at';
 const KEY_ROW_FP_BACKFILL_ACTIVE = 'row_fp_backfill_active';
@@ -36,54 +33,6 @@ export const WORKER_SYNC_STATUS_URL =
   'https://api-sekolah-cron.syamsulbahri-agro27b.workers.dev/';
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
- */
-export async function countNullRowFp(db) {
-  try {
-    const row = await db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM sekolah WHERE ${ROW_FP_COLUMN} IS NULL OR ${ROW_FP_COLUMN} = ''`
-      )
-      .first();
-    return Number(row?.n) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-/**
- * Isi row_fp dari kolom data yang sudah ada di D1 (tanpa panggil API belajar.id).
- * @param {import('@cloudflare/workers-types').D1Database} db
- * @param {number} [batchSize]
- */
-export async function backfillRowFpBatch(db, batchSize = BACKFILL_BATCH_SIZE) {
-  const limit = Math.max(1, Math.min(BACKFILL_BATCH_MAX, batchSize));
-  const { results } = await db
-    .prepare(
-      `SELECT ${SELECT_COLS} FROM sekolah WHERE ${ROW_FP_COLUMN} IS NULL OR ${ROW_FP_COLUMN} = '' LIMIT ?`
-    )
-    .bind(limit)
-    .all();
-
-  const rows = results || [];
-  if (rows.length === 0) {
-    return { processed: 0, updated: 0, done: true };
-  }
-
-  const fingerprints = await Promise.all(rows.map((row) => fingerprintRow(row)));
-  const statements = rows.map((row, i) => {
-    row[ROW_FP_COLUMN] = fingerprints[i];
-    return buildRowFpOnlyStatement(db, row);
-  });
-
-  for (let i = 0; i < statements.length; i += WRITE_BATCH) {
-    await db.batch(statements.slice(i, i + WRITE_BATCH));
-  }
-
-  return { processed: rows.length, updated: rows.length, done: false };
-}
-
-/**
  * @param {string} continueUrl
  * @param {string} [secret]
  */
@@ -106,75 +55,55 @@ export function buildBackfillContinueUrl(requestUrl, secret) {
 }
 
 /**
- * Simpan perkiraan sisa NULL ke sync_meta (hemat — hindari COUNT(*) tiap polling status).
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {number} nullCount
- * @param {{ active?: boolean }} [opts]
+ * @param {{ active?: boolean, cronEnabled?: boolean }} [opts]
  */
 export async function recordRowFpStats(
-  db,
+  sql,
   nullCount,
   { active = false, cronEnabled = false } = {}
 ) {
   const now = new Date().toISOString();
-  const upsert = (key, value) =>
-    db
-      .prepare(
-        `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-      )
-      .bind(key, value);
-
-  const statements = [
-    upsert(KEY_ROW_FP_NULL, String(Math.max(0, nullCount))),
-    upsert(KEY_ROW_FP_STATS_AT, now),
-    upsert(KEY_ROW_FP_BACKFILL_ACTIVE, active ? '1' : '0'),
-    upsert(KEY_ROW_FP_BACKFILL_CRON, cronEnabled ? '1' : '0'),
-  ];
-  await db.batch(statements);
+  await metaUpsert(sql, KEY_ROW_FP_NULL, Math.max(0, nullCount));
+  await metaUpsert(sql, KEY_ROW_FP_STATS_AT, now);
+  await metaUpsert(sql, KEY_ROW_FP_BACKFILL_ACTIVE, active ? '1' : '0');
+  await metaUpsert(sql, KEY_ROW_FP_BACKFILL_CRON, cronEnabled ? '1' : '0');
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ */
+export async function pauseBackfillForSync(sql) {
+  const meta = await getApiMeta(sql);
+  const rf = await getRowFpStatsForReport(sql, meta.totalSekolah);
+  if (rf.selesai || !rf.backfill_cron) return;
+  await recordRowFpStats(sql, rf.null_count ?? 0, { active: false, cronEnabled: false });
+  await recordRowFpBackfillNote(sql, 'dijeda — sync mingguan berjalan');
+}
+
+/**
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {string} note
  */
-/**
- * Jeda backfill saat sync mingguan agar D1 tidak berebut.
- * @param {import('@cloudflare/workers-types').D1Database} db
- */
-export async function pauseBackfillForSync(db) {
-  const meta = await getApiMeta(db);
-  const rf = await getRowFpStatsForReport(db, meta.totalSekolah);
-  if (rf.selesai || !rf.backfill_cron) return;
-  await recordRowFpStats(db, rf.null_count ?? 0, { active: false, cronEnabled: false });
-  await recordRowFpBackfillNote(db, 'dijeda — sync mingguan berjalan');
-}
-
-export async function recordRowFpBackfillNote(db, note) {
-  await db
-    .prepare(
-      `INSERT INTO sync_meta (key, value) VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-    )
-    .bind(KEY_ROW_FP_BACKFILL_NOTE, note)
-    .run();
+export async function recordRowFpBackfillNote(sql, note) {
+  await metaUpsert(sql, KEY_ROW_FP_BACKFILL_NOTE, note);
 }
 
 /**
- * Burst backfill — banyak batch per tick cron (jauh lebih cepat dari 1×/menit).
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {{ batchSize?: number, maxBatches?: number, wallMs?: number }} [opts]
  */
 export async function runBackfillCronBurst(
-  db,
+  sql,
   { batchSize = WORKER_BACKFILL_BATCH_SIZE, maxBatches = BACKFILL_BURST_MAX_BATCHES, wallMs = BACKFILL_BURST_WALL_MS } = {}
 ) {
-  const meta = await getApiMeta(db);
-  const before = await getRowFpStatsForReport(db, meta.totalSekolah);
+  const meta = await getApiMeta(sql);
+  const before = await getRowFpStatsForReport(sql, meta.totalSekolah);
   let nullRemaining = before.null_count ?? 0;
 
   if (nullRemaining <= 0) {
-    await recordRowFpStats(db, 0, { active: false, cronEnabled: false });
+    await recordRowFpStats(sql, 0, { active: false, cronEnabled: false });
     return {
       total_processed: 0,
       batches: 0,
@@ -198,7 +127,7 @@ export async function runBackfillCronBurst(
         : maxBatches;
 
   while (batches < burstCap && Date.now() - wallStart < wallMs - 4_000) {
-    lastBatch = await backfillRowFpBatch(db, batchSize);
+    lastBatch = await backfillRowFpBatchPg(sql, batchSize);
     batches += 1;
     totalProcessed += lastBatch.processed;
 
@@ -216,7 +145,7 @@ export async function runBackfillCronBurst(
   }
 
   done = done || nullRemaining === 0;
-  await recordRowFpStats(db, nullRemaining, {
+  await recordRowFpStats(sql, nullRemaining, {
     active: !done,
     cronEnabled: !done,
   });
@@ -231,8 +160,8 @@ export async function runBackfillCronBurst(
 }
 
 /** @deprecated gunakan runBackfillCronBurst — satu batch saja */
-export async function runBackfillCronStep(db, batchSize = WORKER_BACKFILL_BATCH_SIZE) {
-  const r = await runBackfillCronBurst(db, { batchSize, maxBatches: 1, wallMs: 60_000 });
+export async function runBackfillCronStep(sql, batchSize = WORKER_BACKFILL_BATCH_SIZE) {
+  const r = await runBackfillCronBurst(sql, { batchSize, maxBatches: 1, wallMs: 60_000 });
   return {
     batch: {
       processed: r.total_processed,
@@ -245,23 +174,18 @@ export async function runBackfillCronStep(db, batchSize = WORKER_BACKFILL_BATCH_
 }
 
 /**
- * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
  * @param {number | null} [totalSekolah]
  */
-export async function getRowFpStatsForReport(db, totalSekolah = null) {
+export async function getRowFpStatsForReport(sql, totalSekolah = null) {
   try {
-    const { results } = await db
-      .prepare(`SELECT key, value FROM sync_meta WHERE key IN (?, ?, ?, ?, ?)`)
-      .bind(
-        KEY_ROW_FP_NULL,
-        KEY_ROW_FP_STATS_AT,
-        KEY_ROW_FP_BACKFILL_ACTIVE,
-        KEY_ROW_FP_BACKFILL_CRON,
-        KEY_ROW_FP_BACKFILL_NOTE
-      )
-      .all();
-
-    const map = Object.fromEntries((results || []).map((r) => [r.key, r.value]));
+    const map = await metaGetMany(sql, [
+      KEY_ROW_FP_NULL,
+      KEY_ROW_FP_STATS_AT,
+      KEY_ROW_FP_BACKFILL_ACTIVE,
+      KEY_ROW_FP_BACKFILL_CRON,
+      KEY_ROW_FP_BACKFILL_NOTE,
+    ]);
     const nullRaw = map[KEY_ROW_FP_NULL];
     const nullCount = nullRaw != null ? parseInt(nullRaw, 10) : null;
     const total = Number.isFinite(totalSekolah) && totalSekolah > 0 ? totalSekolah : null;
