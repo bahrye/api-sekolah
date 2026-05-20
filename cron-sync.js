@@ -381,11 +381,39 @@ async function runCronBatch(
 const STEP_WALL_MS = 28_000;
 
 /**
+ * Aktifkan sync di offset terakhir (driver GitHub) bila sempat dijeda.
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ */
+async function ensureGithubSyncRunning(sql) {
+  const prog = await getSyncProgress(sql);
+  const meta = await getApiMeta(sql);
+  const apiTotal = prog.apiTotal ?? meta.totalSekolah ?? ESTIMATED_TOTAL_RECORDS;
+  const offset = prog.currentOffset ?? 0;
+
+  if (offset >= apiTotal) {
+    return { resumed: false, offset, api_total: apiTotal, status: 'completed' };
+  }
+
+  if (!(await isCronEnabled(sql))) {
+    await setSyncDriver(sql, SYNC_DRIVER_GITHUB);
+    await markSyncResumeAt(sql, offset);
+    return { resumed: true, offset, api_total: apiTotal, status: 'running' };
+  }
+
+  if ((await getSyncDriver(sql)) !== SYNC_DRIVER_GITHUB) {
+    await setSyncDriver(sql, SYNC_DRIVER_GITHUB);
+  }
+
+  return { resumed: false, offset, api_total: apiTotal, status: prog.runState ?? 'running' };
+}
+
+/**
  * Satu langkah sync: 1×PAGE_SIZE (20) sekolah, await penuh.
  * @param {object} env
  */
 async function executeSyncStep(env) {
   const sql = getSql(env);
+  await ensureGithubSyncRunning(sql);
   const prog = await getSyncProgress(sql);
   const meta = await getApiMeta(sql);
   const apiTotal = prog.apiTotal ?? meta.totalSekolah ?? ESTIMATED_TOTAL_RECORDS;
@@ -397,7 +425,7 @@ async function executeSyncStep(env) {
       status: 'paused',
       offset,
       api_total: apiTotal,
-      message: 'Sync dijeda — aktifkan lewat /run?resume=1&driver=github',
+      message: 'Sync tidak dapat dilanjutkan — cek DATABASE_URL / status Worker',
     };
   }
 
@@ -979,14 +1007,26 @@ export default {
         );
       }
 
+      if (pathname === '/resume') {
+        const auth = resolveSyncAuth(request, url, env, { soft: false });
+        if (!auth.ok) return auth.response;
+        const sql = getSql(env);
+        const info = await ensureGithubSyncRunning(sql);
+        return new Response(JSON.stringify({ status: 'ok', ...info }), {
+          headers: jsonHeaders,
+        });
+      }
+
       if (pathname === '/step') {
         const auth = resolveSyncAuth(request, url, env, { soft: false });
         if (!auth.ok) return auth.response;
 
         try {
           const body = await executeSyncStep(env);
+          const httpStatus =
+            body.ok || body.status === 'completed' || body.status === 'paused' ? 200 : 409;
           return new Response(JSON.stringify(body), {
-            status: body.ok ? 200 : 409,
+            status: httpStatus,
             headers: jsonHeaders,
           });
         } catch (err) {

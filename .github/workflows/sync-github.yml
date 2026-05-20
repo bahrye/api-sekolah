@@ -34,7 +34,7 @@ jobs:
           curl -fsS -H "X-Sync-Secret: ${SYNC_SECRET}" \
             "${WORKER_BASE}/run?offset=0&resume=1&driver=github"
 
-      - name: 12 langkah × 20 baris (≈240/menit)
+      - name: Pastikan sync aktif (offset terakhir)
         env:
           SYNC_SECRET: ${{ secrets.SYNC_SECRET }}
         run: |
@@ -43,15 +43,29 @@ jobs:
             echo "SYNC_SECRET belum di-set di GitHub Actions secrets."
             exit 1
           fi
+          curl -fsS -H "X-Sync-Secret: ${SYNC_SECRET}" \
+            "${WORKER_BASE}/resume?driver=github"
+          echo ""
+
+      - name: 12 langkah × 20 baris (≈240/menit)
+        env:
+          SYNC_SECRET: ${{ secrets.SYNC_SECRET }}
+        run: |
+          set -euo pipefail
           for i in $(seq 1 12); do
-            body=$(curl -fsS -H "X-Sync-Secret: ${SYNC_SECRET}" \
+            code=$(curl -sS -o /tmp/step-body.json -w "%{http_code}" \
+              -H "X-Sync-Secret: ${SYNC_SECRET}" \
               -H "Accept: application/json" \
-              "${WORKER_BASE}/step" || echo '{"status":"error"}')
-            echo "step ${i}/12: ${body}"
+              "${WORKER_BASE}/step")
+            body=$(cat /tmp/step-body.json)
+            echo "step ${i}/12 (HTTP ${code}): ${body}"
             case "${body}" in
               *'"status":"completed"'*) echo "Selesai."; exit 0 ;;
-              *'"status":"paused"'*) echo "Sync dijeda."; exit 0 ;;
-              *'"status":"error"'*) exit 1 ;;
+              *'"status":"paused"'*) echo "Sync dijeda — cek dashboard Worker."; exit 0 ;;
             esac
+            if [ "${code}" -ge 400 ]; then
+              echo "Step gagal HTTP ${code}"
+              exit 1
+            fi
             [ "${i}" -lt 12 ] && sleep 5
           done

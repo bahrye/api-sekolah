@@ -13,6 +13,11 @@ GitHub Actions menjalankan **12× `/step`** per menit (jeda 5 detik) → **~240 
 ## Mulai sync
 
 ```bash
+# Lanjut dari offset terakhir (disarankan untuk GHA)
+curl -H "X-Sync-Secret: ..." \
+  "https://api-sekolah-cron..../resume?driver=github"
+
+# Atau mulai dari nol
 curl -H "X-Sync-Secret: ..." \
   "https://api-sekolah-cron..../run?offset=0&resume=1&driver=github"
 ```
