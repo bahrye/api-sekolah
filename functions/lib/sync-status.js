@@ -6,6 +6,7 @@ import {
   resolveSyncRunState,
   markSyncStalled,
   isChunkLocked,
+  getSyncDriver,
 } from './sync-meta.js';
 import { ESTIMATED_TOTAL_RECORDS, progressPercent } from './sync-sekolah.js';
 import { getActivityLog, activityKindLabel } from './sync-activity-log.js';
@@ -20,6 +21,7 @@ export async function buildSyncStatusReport(sql, { lastChunk } = {}) {
   const prog = await getSyncProgress(sql);
   const cron = await getCronHeartbeat(sql);
   const chunkLocked = await isChunkLocked(sql);
+  const sync_driver = await getSyncDriver(sql);
   const activity_log = await getActivityLog(sql);
   const apiTotal = prog.apiTotal ?? meta.totalSekolah ?? ESTIMATED_TOTAL_RECORDS;
   const row_fp = await getRowFpStatsForReport(sql, meta.totalSekolah ?? apiTotal);
@@ -47,6 +49,7 @@ export async function buildSyncStatusReport(sql, { lastChunk } = {}) {
   return {
     status: 'success',
     sinkronisasi: {
+      sync_driver,
       run_state: runState,
       status_label: statusLabel,
       current_offset: currentOffset,
@@ -65,9 +68,11 @@ export async function buildSyncStatusReport(sql, { lastChunk } = {}) {
           : runState === 'stalled'
           ? 'Cron /tick tiap menit akan melanjutkan otomatis dari offset terakhir (status kembali running). Opsional: GET /run?offset=...&secret=...'
           : runState === 'running'
-            ? cron.enabled
-              ? 'Sync mingguan: burst ~2×10 hal × 20 sekolah/hal ≈ 400/menit bila fp_skip tinggi. API belajar.id maks 20 baris/request.'
-              : 'Panggil /run sekali (atau tunggu jadwal mingguan) untuk mengaktifkan /tick otomatis.'
+            ? sync_driver === 'github'
+              ? 'Driver: GitHub Actions — /step 20 baris tiap 5 detik (~240/menit). Cloudflare Cron tidak memproses chunk sync.'
+              : cron.enabled
+                ? 'Sync mingguan: burst ~2×10 hal × 20 sekolah/hal ≈ 400/menit bila fp_skip tinggi. API belajar.id maks 20 baris/request.'
+                : 'Panggil /run sekali (atau tunggu jadwal mingguan) untuk mengaktifkan /tick otomatis.'
             : null,
     },
     database: {

@@ -1,6 +1,7 @@
 # Push ke branch main → deploy otomatis ke Cloudflare (Worker cron + Pages).
 # Sekali setup di GitHub: Settings → Secrets → Actions
 #   CLOUDFLARE_API_TOKEN  — token dengan Workers Scripts + Cloudflare Pages (edit)
+#   SYNC_SECRET           — untuk workflow sync-github.yml (sama dengan Worker)
 #   DATABASE_URL          — opsional jika diset lewat dashboard Pages/Worker (bukan secret Actions)
 #   CLOUDFLARE_ACCOUNT_ID — ID akun Cloudflare (dashboard kanan bawah)
 

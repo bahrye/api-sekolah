@@ -12,6 +12,10 @@ const KEY_SYNC_CRON_NOTE = 'sync_last_cron_note';
 const KEY_SYNC_CRON_ENABLED = 'sync_cron_enabled';
 const KEY_CHUNK_LOCK = 'sync_chunk_lock_at';
 const KEY_CHUNK_LOCK_OFFSET = 'sync_chunk_lock_offset';
+const KEY_SYNC_DRIVER = 'sync_driver';
+
+export const SYNC_DRIVER_CRON = 'cron';
+export const SYNC_DRIVER_GITHUB = 'github';
 
 /** Tanpa chunk baru selama ini → dianggap terhenti (cron setiap menit) */
 export const STALE_SYNC_MS = 4 * 60 * 1000;
@@ -371,4 +375,26 @@ export async function markSyncRunStarted(sql) {
   await metaUpsert(sql, KEY_SYNC_OFFSET, '0');
   await metaUpsert(sql, KEY_SYNC_STATE, 'running');
   await metaUpsert(sql, KEY_SYNC_CHUNK_AT, now);
+}
+
+/**
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ */
+export async function getSyncDriver(sql) {
+  try {
+    const v = await metaGet(sql, KEY_SYNC_DRIVER);
+    return v === SYNC_DRIVER_GITHUB ? SYNC_DRIVER_GITHUB : SYNC_DRIVER_CRON;
+  } catch {
+    return SYNC_DRIVER_CRON;
+  }
+}
+
+/**
+ * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {string} driver
+ */
+export async function setSyncDriver(sql, driver) {
+  const v =
+    driver === SYNC_DRIVER_GITHUB ? SYNC_DRIVER_GITHUB : SYNC_DRIVER_CRON;
+  await metaUpsert(sql, KEY_SYNC_DRIVER, v);
 }

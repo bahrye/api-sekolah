@@ -21,6 +21,7 @@ function isWeeklyCronExpr(cron) {
 }
 import {
   syncSekolahChunk,
+  progressPercent,
   PAGE_SIZE,
   chunkWallMsForPages,
   chunkWallMsForWorkload,
@@ -49,6 +50,10 @@ import {
   releaseChunkLock,
   clearStaleChunkLock,
   recordCronTick,
+  getSyncDriver,
+  setSyncDriver,
+  SYNC_DRIVER_GITHUB,
+  SYNC_DRIVER_CRON,
 } from './functions/lib/sync-meta.js';
 import {
   buildSyncStatusReport,
@@ -372,6 +377,73 @@ async function runCronBatch(
   return { done: false, lastOffset: offset, chunks, timedOut, pagesUsed: pages };
 }
 
+/** 1 hal API (20 sekolah) — untuk GitHub Actions /step (tanpa chunk lock) */
+const STEP_WALL_MS = 28_000;
+
+/**
+ * Satu langkah sync: 1×PAGE_SIZE (20) sekolah, await penuh.
+ * @param {object} env
+ */
+async function executeSyncStep(env) {
+  const sql = getSql(env);
+  const prog = await getSyncProgress(sql);
+  const meta = await getApiMeta(sql);
+  const apiTotal = prog.apiTotal ?? meta.totalSekolah ?? ESTIMATED_TOTAL_RECORDS;
+  const offset = prog.currentOffset ?? 0;
+
+  if (!await isCronEnabled(sql)) {
+    return {
+      ok: false,
+      status: 'paused',
+      offset,
+      api_total: apiTotal,
+      message: 'Sync dijeda — aktifkan lewat /run?resume=1&driver=github',
+    };
+  }
+
+  if (offset >= apiTotal) {
+    if (prog.runState !== 'completed') {
+      await recordSyncProgress(sql, { nextOffset: offset, done: true, apiTotal });
+    }
+    return {
+      ok: true,
+      status: 'completed',
+      offset,
+      api_total: apiTotal,
+      progress_percent: 100,
+    };
+  }
+
+  const result = await syncSekolahChunk(sql, {
+    offset,
+    maxPages: 1,
+    wallMs: STEP_WALL_MS,
+  });
+
+  await recordSyncProgress(sql, {
+    nextOffset: result.nextOffset,
+    done: result.done,
+    apiTotal: result.api_total,
+  });
+
+  await appendActivityLog(sql, {
+    offsetFrom: offset,
+    offsetTo: result.nextOffset,
+    stats: { ...result.stats, max_pages: 1 },
+    note: 'GHA step (1 hal)',
+  });
+
+  return {
+    ok: true,
+    status: result.done ? 'completed' : 'running',
+    offset: result.nextOffset,
+    api_total: result.api_total,
+    progress_percent: progressPercent(result.nextOffset),
+    stats: result.stats,
+    scanned: result.stats?.scanned ?? 0,
+  };
+}
+
 /**
  * @param {object} env
  */
@@ -392,6 +464,10 @@ async function planResumeCron(env) {
 
   if (!enabled) {
     return { action: 'skip', reason: 'cron_disabled', offset, apiTotal };
+  }
+
+  if ((await getSyncDriver(getSql(env))) === SYNC_DRIVER_GITHUB) {
+    return { action: 'skip', reason: 'github_actions', offset, apiTotal };
   }
 
   if (state === 'idle') {
@@ -547,6 +623,7 @@ function skipMessage(plan) {
   if (plan.reason === 'cron_disabled') return 'Cron tidak aktif — panggil /run sekali untuk mengaktifkan.';
   if (plan.reason === 'idle') return 'Status idle — panggil /run?offset=... untuk melanjutkan.';
   if (plan.reason === 'chunk_in_progress') return 'Chunk sebelumnya masih berjalan — menunggu selesai.';
+  if (plan.reason === 'github_actions') return 'Sync dijalankan GitHub Actions (/step) — Cloudflare Cron hanya backfill row_fp.';
   return 'Tidak ada proses.';
 }
 
@@ -902,6 +979,26 @@ export default {
         );
       }
 
+      if (pathname === '/step') {
+        const auth = resolveSyncAuth(request, url, env, { soft: false });
+        if (!auth.ok) return auth.response;
+
+        try {
+          const body = await executeSyncStep(env);
+          return new Response(JSON.stringify(body), {
+            status: body.ok ? 200 : 409,
+            headers: jsonHeaders,
+          });
+        } catch (err) {
+          const msg = err?.message || String(err);
+          await safeMarkStalled(env);
+          return new Response(
+            JSON.stringify({ ok: false, status: 'error', message: msg }),
+            { status: 500, headers: jsonHeaders }
+          );
+        }
+      }
+
       if (pathname === '/run' || pathname === '/tick') {
         const softRun = pathname === '/run';
         const auth = resolveSyncAuth(request, url, env, { soft: softRun });
@@ -999,12 +1096,18 @@ export default {
 
         const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
         const resume = url.searchParams.get('resume') === '1';
+        const sqlRun = getSql(env);
+        const driver =
+          url.searchParams.get('driver') === 'github'
+            ? SYNC_DRIVER_GITHUB
+            : SYNC_DRIVER_CRON;
+        await setSyncDriver(sqlRun, driver);
 
         if (offset === 0 && !resume) {
-          await markSyncRunStarted(getSql(env));
-          await pauseBackfillForSync(getSql(env));
+          await markSyncRunStarted(sqlRun);
+          await pauseBackfillForSync(sqlRun);
         } else {
-          await markSyncResumeAt(getSql(env), offset);
+          await markSyncResumeAt(sqlRun, offset);
         }
 
         const weeklyStart = offset === 0 && !resume;
