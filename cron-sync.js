@@ -811,27 +811,13 @@ async function runScheduledWeeklyRun(env, ctx) {
 
 export default {
   async scheduled(event, env, ctx) {
-    if (!hasDatabaseUrl(env)) {
-      console.error('Cron skipped: DATABASE_URL not set');
-      return;
-    }
-    try {
-      if (isWeeklyCronExpr(event.cron)) {
-        await runScheduledWeeklyRun(env, ctx);
-      } else {
-        await runScheduledTick(env, ctx);
-      }
-    } catch (err) {
-      const msg = err?.message || String(err);
-      console.error('Cloudflare Cron scheduled error:', msg);
-      await recordCronTick(getSql(env), `CF Cron gagal: ${msg}`);
-      await appendCronJobActivityLog(getSql(env), {
-        kind: 'cron_error',
-        action: 'scheduled',
-        detail: msg,
-      });
-      await safeMarkStalled(env);
-    }
+    /** Cron Trigger dinonaktifkan di wrangler.cron.toml — sync otomatis via GitHub Actions */
+    console.log(
+      'Cloudflare Cron diabaikan (nonaktif di wrangler). Jadwal:',
+      event.cron,
+      '— gunakan GHA sync-github.yml atau HTTP /step manual.'
+    );
+    return;
   },
 
   async fetch(request, env, ctx) {

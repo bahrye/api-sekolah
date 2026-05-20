@@ -8,11 +8,9 @@ WORKER_BASE = "https://api-sekolah-cron.syamsulbahri-agro27b.workers.dev"
 # DATABASE_URL: npx wrangler secret put DATABASE_URL -c wrangler.cron.toml
 # SYNC_SECRET: npx wrangler secret put SYNC_SECRET -c wrangler.cron.toml
 #
-# Jadwal otomatis — Cloudflare Cron Triggers (UTC):
-#   * * * * *       → /tick tiap menit (lanjutkan sync saat "running")
-#   0 17 * * SUN    → /run mingguan = Senin 01:00 WITA (Minggu 17:00 UTC)
+# Cron Trigger OTOMATIS dinonaktifkan — sinkron lewat GitHub Actions (sync-github.yml).
+# Worker tetap dipakai untuk HTTP: /step, /resume, /run (manual + secret).
 #
-# Manual (opsional): GET WORKER_BASE/tick atau /run?offset=0 + header X-Sync-Secret
-
-[triggers]
-crons = ["* * * * *", "0 17 * * SUN"]
+# Untuk mengaktifkan lagi Cloudflare Cron (tidak disarankan jika pakai GHA):
+# [triggers]
+# crons = ["* * * * *", "0 17 * * SUN"]

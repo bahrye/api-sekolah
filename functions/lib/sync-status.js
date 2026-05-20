@@ -81,7 +81,7 @@ export async function buildSyncStatusReport(sql, { lastChunk } = {}) {
       waktu_update_terakhir_iso: meta.lastSyncIso,
     },
     jadwal:
-      'Cloudflare Cron · /tick * * * * * (tiap menit) · /run 0 17 * * SUN (= Senin 01:00 WITA, UTC)',
+      'Sinkron otomatis: GitHub Actions (sync-github.yml, tiap menit). Cloudflare Cron nonaktif.',
     cron_job: {
       enabled: cron.enabled,
       last_call_at: cron.lastTick,
@@ -100,8 +100,8 @@ export async function buildSyncStatusReport(sql, { lastChunk } = {}) {
       status_json: '/?format=json',
     },
     cloudflare_cron: {
-      tick: { cron: '* * * * *', keterangan: 'Lanjutkan sync saat status running' },
-      run: { cron: '0 17 * * SUN', keterangan: 'Sync penuh — Senin 01:00 WITA' },
+      enabled: false,
+      keterangan: 'Cron Trigger dinonaktifkan — pakai GitHub Actions atau HTTP /step + secret',
     },
     http_manual: {
       tick: 'GET WORKER_BASE/tick',

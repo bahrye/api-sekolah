@@ -26,7 +26,8 @@ Atau: **Actions → Sync sekolah (GitHub Actions) → Run workflow** → centang
 
 ## Perilaku
 
-- `driver=github` → Cloudflare Cron **tidak** memproses chunk sync (hanya backfill `row_fp` saat idle).
+- **Cloudflare Cron Trigger dinonaktifkan** di `wrangler.cron.toml` (tidak ada `/tick` otomatis atau sync mingguan Senin 01:00 WITA dari CF).
+- `driver=github` → jika Cron diaktifkan lagi, CF tidak memproses chunk sync (hanya backfill).
 - Setiap `/step` = **1 hal API** (20 sekolah), tanpa chunk lock.
 - Workflow `sync-github.yml` jalan **tiap menit** (schedule `* * * * *`).
 
