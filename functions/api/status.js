@@ -25,10 +25,11 @@ export async function onRequest(context) {
     const pub = await getStatusSinkronisasiPublik(sql);
     const body = {
       status: 'success',
+      developer: 'Syamsul Bahri',
       total_data_tersedia: pub.total_sekolah,
       waktu_update_data_terakhir: pub.waktu_selesai_terakhir,
       waktu_update_data_terakhir_iso: pub.waktu_selesai_terakhir_iso,
-      jadwal_sync: 'Pembaruan berkala dari portal resmi (Senin 01:00 WITA)',
+      jadwal_sync: 'Pembaruan berkala dari portal resmi (GitHub Actions)',
     };
 
     if (context.request.method === 'HEAD') {

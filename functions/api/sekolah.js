@@ -1,7 +1,10 @@
-import { getApiMeta, formatSyncTimeWib } from '../lib/sync-meta.js';
+import { getApiMeta } from '../lib/sync-meta.js';
+import { getStatusSinkronisasiPublik } from '../lib/status-sinkronisasi.js';
 import { formatNeonRowResponse } from '../lib/sekolah-schema.js';
 import { getSql } from '../lib/neon.js';
 import { listSekolah, searchSekolah } from '../lib/sekolah-pg.js';
+
+const DEVELOPER = 'Syamsul Bahri';
 
 export async function onRequest(context) {
   const { searchParams } = new URL(context.request.url);
@@ -29,7 +32,11 @@ export async function onRequest(context) {
 
   try {
     const sql = getSql(context.env);
-    const apiMeta = await getApiMeta(sql);
+    const [sinkron, apiMeta] = await Promise.all([
+      getStatusSinkronisasiPublik(sql),
+      getApiMeta(sql),
+    ]);
+    const totalSekolah = sinkron.total_sekolah ?? apiMeta.totalSekolah;
     const rows = keyword
       ? await searchSekolah(sql, keyword.trim(), limit, offset)
       : await listSekolah(sql, limit, offset);
@@ -39,8 +46,9 @@ export async function onRequest(context) {
     const metadata = {
       limit_ditampilkan: limit,
       offset_saat_ini: offset,
-      waktu_update_data_terakhir: apiMeta.lastSyncIso ? formatSyncTimeWib(apiMeta.lastSyncIso) : null,
-      waktu_update_data_terakhir_iso: apiMeta.lastSyncIso,
+      waktu_update_data_terakhir: sinkron.waktu_selesai_terakhir,
+      waktu_update_data_terakhir_iso: sinkron.waktu_selesai_terakhir_iso,
+      developer: DEVELOPER,
     };
 
     if (keyword) {
@@ -49,10 +57,10 @@ export async function onRequest(context) {
         'Total hasil pencarian tidak dihitung agar kuota baca database tetap hemat.';
       metadata.has_more = formattedResults.length === limit;
     } else {
-      metadata.total_data_tersedia = apiMeta.totalSekolah;
+      metadata.total_data_tersedia = totalSekolah;
       metadata.has_more =
-        apiMeta.totalSekolah != null
-          ? offset + formattedResults.length < apiMeta.totalSekolah
+        totalSekolah != null
+          ? offset + formattedResults.length < totalSekolah
           : formattedResults.length === limit;
     }
 
@@ -60,6 +68,7 @@ export async function onRequest(context) {
       JSON.stringify({
         status: 'success',
         source: 'API Sekolah Mandiri',
+        developer: DEVELOPER,
         metadata,
         data: formattedResults,
       }),
