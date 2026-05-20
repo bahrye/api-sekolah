@@ -21,13 +21,34 @@ export function isSyncAuthorized(env, provided) {
 }
 
 /**
+ * Permintaan dari dashboard status (secret salah → abaikan, jangan hentikan sync).
+ * @param {Request} request
+ * @param {URL} url
+ */
+export function isSoftControlRequest(request, url) {
+  return request.headers.get('X-Sync-Soft') === '1' || url.searchParams.get('soft') === '1';
+}
+
+/**
  * @param {Request} request
  * @param {URL} url
  * @param {{ SYNC_SECRET?: string }} env
+ * @param {{ soft?: boolean }} [opts]
  */
-export function assertSyncAuthorized(request, url, env) {
+export function resolveSyncAuth(request, url, env, opts = {}) {
   const provided = getProvidedSyncSecret(request, url);
-  if (!isSyncAuthorized(env, provided)) {
+  const authorized = isSyncAuthorized(env, provided);
+  const soft = opts.soft === true || isSoftControlRequest(request, url);
+
+  if (!authorized) {
+    if (soft) {
+      return {
+        ok: false,
+        soft: true,
+        ignored: true,
+        message: 'SYNC_SECRET tidak valid — tidak ada perubahan.',
+      };
+    }
     return {
       ok: false,
       response: new Response(
@@ -39,5 +60,14 @@ export function assertSyncAuthorized(request, url, env) {
       ),
     };
   }
-  return { ok: true };
+  return { ok: true, provided };
+}
+
+/**
+ * @param {Request} request
+ * @param {URL} url
+ * @param {{ SYNC_SECRET?: string }} env
+ */
+export function assertSyncAuthorized(request, url, env) {
+  return resolveSyncAuth(request, url, env, { soft: false });
 }

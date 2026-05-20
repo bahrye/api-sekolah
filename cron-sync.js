@@ -62,6 +62,7 @@ import {
   recordRowFpStats,
   recordRowFpBackfillNote,
   pauseBackfillForSync,
+  countNullRowFp,
   CRON_BACKFILL_WALL_MS,
   CRON_BACKFILL_MAX_BATCHES,
 } from './functions/lib/backfill-row-fp.js';
@@ -70,7 +71,7 @@ import {
   appendCronJobActivityLog,
   appendBackfillActivityLog,
 } from './functions/lib/sync-activity-log.js';
-import { assertSyncAuthorized } from './functions/lib/sync-auth.js';
+import { assertSyncAuthorized, resolveSyncAuth } from './functions/lib/sync-auth.js';
 import { FAVICON_SYNC_SVG, FAVICON_SYNC_HEADERS } from './functions/lib/sync-favicon.js';
 
 const jsonHeaders = {
@@ -743,8 +744,21 @@ export default {
       }
 
       if (pathname === '/pause') {
-        const auth = assertSyncAuthorized(request, url, env);
-        if (!auth.ok) return auth.response;
+        const auth = resolveSyncAuth(request, url, env, { soft: true });
+        if (!auth.ok) {
+          if (auth.ignored) {
+            const report = await buildSyncStatusReport(getSql(env));
+            return new Response(
+              JSON.stringify({
+                status: 'ignored',
+                message: auth.message,
+                report,
+              }),
+              { headers: jsonHeaders }
+            );
+          }
+          return auth.response;
+        }
 
         const prog = await getSyncProgress(getSql(env));
         const offset = prog.currentOffset ?? 0;
@@ -765,6 +779,101 @@ export default {
             message: 'Sync dijeda. Cron /tick tidak akan melanjutkan sampai /run?resume=1.',
             offset,
             report,
+          }),
+          { headers: jsonHeaders }
+        );
+      }
+
+      if (pathname === '/backfill-measure' || pathname === '/backfill-start' || pathname === '/backfill-stop') {
+        const auth = resolveSyncAuth(request, url, env, { soft: true });
+        const sql = getSql(env);
+        const metaBf = await getApiMeta(sql);
+
+        if (!auth.ok) {
+          if (auth.ignored) {
+            const report = await buildSyncStatusReport(sql);
+            return new Response(
+              JSON.stringify({
+                status: 'ignored',
+                message: auth.message,
+                row_fp: report.row_fp,
+              }),
+              { headers: jsonHeaders }
+            );
+          }
+          return auth.response;
+        }
+
+        if (pathname === '/backfill-measure') {
+          const remaining = await countNullRowFp(sql);
+          await recordRowFpStats(sql, remaining, {
+            active: false,
+            cronEnabled: false,
+          });
+          const row_fp = await getRowFpStatsForReport(sql, metaBf.totalSekolah);
+          return new Response(
+            JSON.stringify({
+              status: 'success',
+              message: 'Pengukuran selesai.',
+              row_fp,
+              row_fp_null: remaining,
+            }),
+            { headers: jsonHeaders }
+          );
+        }
+
+        if (pathname === '/backfill-start') {
+          const remaining = await countNullRowFp(sql);
+          if (remaining <= 0) {
+            await recordRowFpStats(sql, 0, { active: false, cronEnabled: false });
+            await recordRowFpBackfillNote(sql, 'sudah 100%');
+            const row_fp = await getRowFpStatsForReport(sql, metaBf.totalSekolah);
+            return new Response(
+              JSON.stringify({
+                status: 'success',
+                message: 'Semua baris sudah punya row_fp.',
+                row_fp,
+              }),
+              { headers: jsonHeaders }
+            );
+          }
+          await recordRowFpStats(sql, remaining, { active: true, cronEnabled: true });
+          await recordRowFpBackfillNote(sql, 'dimulai dari dashboard');
+          await appendBackfillActivityLog(sql, {
+            action: 'mulai',
+            detail: 'backfill row_fp dari dashboard',
+            null_remaining: remaining,
+          });
+          const backfill = await runBackfillCronIfDue(env);
+          const report = await buildSyncStatusReport(sql);
+          return new Response(
+            JSON.stringify({
+              status: 'success',
+              message: 'Backfill diaktifkan (cron /tick melanjutkan).',
+              backfill,
+              row_fp: report.row_fp,
+            }),
+            { headers: jsonHeaders }
+          );
+        }
+
+        const rfStop = await getRowFpStatsForReport(sql, metaBf.totalSekolah);
+        await recordRowFpStats(sql, rfStop.null_count ?? 0, {
+          active: false,
+          cronEnabled: false,
+        });
+        await recordRowFpBackfillNote(sql, 'dihentikan dari dashboard');
+        await appendBackfillActivityLog(sql, {
+          action: 'henti',
+          detail: 'backfill row_fp dihentikan manual',
+          null_remaining: rfStop.null_count,
+        });
+        const report = await buildSyncStatusReport(sql);
+        return new Response(
+          JSON.stringify({
+            status: 'success',
+            message: 'Backfill row_fp dihentikan.',
+            row_fp: report.row_fp,
           }),
           { headers: jsonHeaders }
         );
@@ -792,8 +901,22 @@ export default {
       }
 
       if (pathname === '/run' || pathname === '/tick') {
-        const auth = assertSyncAuthorized(request, url, env);
-        if (!auth.ok) return auth.response;
+        const softRun = pathname === '/run';
+        const auth = resolveSyncAuth(request, url, env, { soft: softRun });
+        if (!auth.ok) {
+          if (auth.ignored) {
+            const report = await buildSyncStatusReport(getSql(env));
+            return new Response(
+              JSON.stringify({
+                status: 'ignored',
+                message: auth.message,
+                report,
+              }),
+              { headers: jsonHeaders }
+            );
+          }
+          return auth.response;
+        }
 
         const waitForResult = url.searchParams.get('wait') === '1';
 

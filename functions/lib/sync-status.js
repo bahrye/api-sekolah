@@ -233,8 +233,6 @@ export function renderSyncStatusHtml(report) {
   const homeUrl = 'https://api-sekolah-kita.pages.dev';
   const rf = report.row_fp || {};
   const rowFpPct = rf.percent_filled != null ? Math.min(100, rf.percent_filled) : 0;
-  const backfillUrl = report.row_fp_halaman || PAGES_BACKFILL_URL;
-
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -271,6 +269,24 @@ export function renderSyncStatusHtml(report) {
       <p id="sync-progress-pct" class="text-2xl font-bold text-slate-900">${esc(s.progress_percent)}%</p>
       <p id="sync-progress-label" class="text-sm text-slate-600 mt-1">${esc(s.progress_label)}</p>
       <p id="sync-progress-offset" class="text-xs text-slate-400 mt-2">Offset saat ini: ${esc(s.current_offset)} · Sisa ~${esc(s.records_remaining.toLocaleString('id-ID'))}</p>
+
+      <div class="mt-4 pt-4 border-t border-slate-100">
+        <p class="text-xs font-semibold text-slate-600 mb-2">Kontrol update data</p>
+        <label for="sync-secret-input" class="block text-[11px] text-slate-500 mb-1">SYNC_SECRET</label>
+        <input type="password" id="sync-secret-input" autocomplete="off" placeholder="Masukkan secret…"
+          class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <div class="flex gap-2">
+          <button type="button" id="btn-sync-start"
+            class="flex-1 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg px-3 py-2.5 transition-colors">
+            Mulai
+          </button>
+          <button type="button" id="btn-sync-stop"
+            class="flex-1 text-sm font-semibold text-slate-800 bg-slate-100 border border-slate-200 hover:bg-slate-200 disabled:opacity-50 rounded-lg px-3 py-2.5 transition-colors">
+            Berhenti
+          </button>
+        </div>
+        <p id="control-msg" class="text-xs mt-2 min-h-[1.25rem] text-slate-500"></p>
+      </div>
     </div>
 
     <div class="bg-white rounded-xl border border-slate-200 p-5 mb-4 shadow-sm text-sm space-y-2">
@@ -295,13 +311,24 @@ export function renderSyncStatusHtml(report) {
         <div id="row-fp-progress-bar" class="h-full bg-violet-600 rounded-full transition-all duration-500" style="width:${rowFpPct}%"></div>
       </div>
       <p id="row-fp-percent" class="text-xl font-bold text-slate-900">${rf.percent_filled != null ? esc(rf.percent_filled) + '% terisi' : '—'}</p>
-      <p id="row-fp-counts" class="text-sm text-slate-600 mt-1">${rf.measured ? `Kosong: ${Number(rf.null_count).toLocaleString('id-ID')} · Terisi: ${Number(rf.filled_count).toLocaleString('id-ID')}${rf.total ? ' / ' + Number(rf.total).toLocaleString('id-ID') : ''}` : 'Klik tombol di bawah untuk mengukur sisa NULL (butuh secret).'}</p>
+      <p id="row-fp-counts" class="text-sm text-slate-600 mt-1">${rf.measured ? `Kosong: ${Number(rf.null_count).toLocaleString('id-ID')} · Terisi: ${Number(rf.filled_count).toLocaleString('id-ID')}${rf.total ? ' / ' + Number(rf.total).toLocaleString('id-ID') : ''}` : 'Gunakan SYNC_SECRET di atas, lalu Ukur ulang.'}</p>
       <p id="row-fp-stats-at" class="text-xs text-slate-400 mt-2">Terakhir diukur: ${esc(rf.stats_at_wib || 'belum pernah')}</p>
       <p id="row-fp-note" class="text-xs text-violet-700 mt-1${rf.backfill_note ? '' : ' hidden'}">${esc(rf.backfill_note || '')}</p>
-      <a id="row-fp-cta" href="${esc(backfillUrl)}" class="mt-4 inline-flex w-full items-center justify-center gap-2 bg-violet-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-violet-700 transition-colors shadow-sm">
-        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-        Cek &amp; backfill row_fp
-      </a>
+      <p id="row-fp-msg" class="text-xs mt-2 min-h-[1.25rem] text-violet-600"></p>
+      <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <button type="button" id="btn-rowfp-measure"
+          class="text-xs font-semibold text-violet-800 bg-violet-50 border border-violet-200 hover:bg-violet-100 rounded-lg px-2 py-2 transition-colors">
+          Ukur ulang
+        </button>
+        <button type="button" id="btn-rowfp-start"
+          class="text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 rounded-lg px-2 py-2 transition-colors">
+          Mulai backfill
+        </button>
+        <button type="button" id="btn-rowfp-stop"
+          class="text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-lg px-2 py-2 transition-colors">
+          Berhenti
+        </button>
+      </div>
     </div>
 
     <div class="bg-white rounded-xl border border-slate-200 p-5 mb-4 shadow-sm">
@@ -315,7 +342,7 @@ export function renderSyncStatusHtml(report) {
     </div>
 
     <p class="text-xs text-slate-500 bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 mb-4 text-center leading-relaxed">
-      Hanya pemilik API yang dapat memulai sinkron (endpoint <code class="bg-white px-1 rounded">/run</code> dilindungi <code class="bg-white px-1 rounded">SYNC_SECRET</code>).
+      Secret salah → perintah <strong>diabaikan</strong> (sync yang sedang jalan tidak dihentikan). Secret benar → Mulai/Berhenti update data &amp; backfill <code class="bg-white px-1 rounded">row_fp</code> dari halaman ini.
     </p>
 
     <p class="text-xs text-slate-400 text-center">JSON: <a class="text-blue-600 underline" href="?format=json">?format=json</a> · Progres &amp; log diperbarui otomatis tanpa reload halaman</p>
@@ -450,7 +477,7 @@ export function renderSyncStatusHtml(report) {
               ' · Terisi: ' +
               Number(rf.filled_count).toLocaleString('id-ID') +
               (rf.total ? ' / ' + Number(rf.total).toLocaleString('id-ID') : '')
-            : 'Klik tombol di bawah untuk mengukur sisa NULL (butuh secret).';
+            : 'Gunakan SYNC_SECRET di atas, lalu Ukur ulang.';
         }
         var at = document.getElementById('row-fp-stats-at');
         if (at) at.textContent = 'Terakhir diukur: ' + (rf.stats_at_wib || 'belum pernah');
@@ -463,8 +490,6 @@ export function renderSyncStatusHtml(report) {
             noteEl.classList.add('hidden');
           }
         }
-        var cta = document.getElementById('row-fp-cta');
-        if (cta && rf.halaman_backfill) cta.href = rf.halaman_backfill;
       }
 
       function reportSnapshot(r) {
@@ -490,10 +515,191 @@ export function renderSyncStatusHtml(report) {
         ].join('|');
       }
 
+      var SECRET_KEY = 'eduapi_sync_secret';
+      var currentOffset = ${Number(s.current_offset) || 0};
+      var controlMsg = document.getElementById('control-msg');
+      var rowFpMsg = document.getElementById('row-fp-msg');
+      var secretInput = document.getElementById('sync-secret-input');
+
+      if (secretInput) {
+        try {
+          var savedSecret = sessionStorage.getItem(SECRET_KEY);
+          if (savedSecret) secretInput.value = savedSecret;
+        } catch (e1) {}
+        secretInput.addEventListener('change', function () {
+          try {
+            sessionStorage.setItem(SECRET_KEY, secretInput.value.trim());
+          } catch (e2) {}
+        });
+      }
+
+      function getSecret() {
+        var el = document.getElementById('sync-secret-input');
+        return el && el.value ? el.value.trim() : '';
+      }
+
+      function controlHeaders() {
+        var h = { 'X-Sync-Soft': '1', Accept: 'application/json' };
+        var sec = getSecret();
+        if (sec) h['X-Sync-Secret'] = sec;
+        return h;
+      }
+
+      function setControlMsg(text, isErr) {
+        if (!controlMsg) return;
+        controlMsg.textContent = text || '';
+        controlMsg.className =
+          'text-xs mt-2 min-h-[1.25rem] ' + (isErr ? 'text-red-600' : 'text-emerald-700');
+      }
+
+      function setRowFpMsg(text, isErr) {
+        if (!rowFpMsg) return;
+        rowFpMsg.textContent = text || '';
+        rowFpMsg.className =
+          'text-xs mt-2 min-h-[1.25rem] ' + (isErr ? 'text-red-600' : 'text-violet-700');
+      }
+
+      function handleControlJson(data, msgEl) {
+        var setMsg = msgEl === rowFpMsg ? setRowFpMsg : setControlMsg;
+        if (data.status === 'ignored') {
+          setMsg(data.message || 'Secret salah — tidak ada perubahan.', true);
+          return;
+        }
+        if (data.report) {
+          lastSnapshot = '';
+          applyReport(data.report);
+        }
+        if (data.row_fp) {
+          applyRowFp(data.row_fp);
+        }
+        setMsg(data.message || 'Berhasil.');
+        fetchStatus();
+      }
+
+      function apiControl(path) {
+        return fetch(path, { headers: controlHeaders() }).then(function (res) {
+          return res.json();
+        });
+      }
+
+      var btnStart = document.getElementById('btn-sync-start');
+      if (btnStart) {
+        btnStart.addEventListener('click', function () {
+          if (!getSecret()) {
+            setControlMsg('Masukkan SYNC_SECRET terlebih dahulu.', true);
+            return;
+          }
+          try {
+            sessionStorage.setItem(SECRET_KEY, getSecret());
+          } catch (e3) {}
+          setControlMsg('Memulai sync…');
+          btnStart.disabled = true;
+          apiControl('/run?resume=1&offset=' + (currentOffset || 0) + '&soft=1')
+            .then(function (d) {
+              handleControlJson(d, controlMsg);
+            })
+            .catch(function () {
+              setControlMsg('Gagal menghubungi server.', true);
+            })
+            .finally(function () {
+              btnStart.disabled = false;
+            });
+        });
+      }
+
+      var btnStop = document.getElementById('btn-sync-stop');
+      if (btnStop) {
+        btnStop.addEventListener('click', function () {
+          if (!getSecret()) {
+            setControlMsg('Masukkan SYNC_SECRET untuk menghentikan.', true);
+            return;
+          }
+          setControlMsg('Menghentikan sync…');
+          btnStop.disabled = true;
+          apiControl('/pause?soft=1')
+            .then(function (d) {
+              handleControlJson(d, controlMsg);
+            })
+            .catch(function () {
+              setControlMsg('Gagal menghubungi server.', true);
+            })
+            .finally(function () {
+              btnStop.disabled = false;
+            });
+        });
+      }
+
+      var btnRfMeasure = document.getElementById('btn-rowfp-measure');
+      if (btnRfMeasure) {
+        btnRfMeasure.addEventListener('click', function () {
+          if (!getSecret()) {
+            setRowFpMsg('Masukkan SYNC_SECRET terlebih dahulu.', true);
+            return;
+          }
+          setRowFpMsg('Mengukur…');
+          btnRfMeasure.disabled = true;
+          apiControl('/backfill-measure?soft=1')
+            .then(function (d) {
+              handleControlJson(d, rowFpMsg);
+            })
+            .catch(function () {
+              setRowFpMsg('Gagal mengukur.', true);
+            })
+            .finally(function () {
+              btnRfMeasure.disabled = false;
+            });
+        });
+      }
+
+      var btnRfStart = document.getElementById('btn-rowfp-start');
+      if (btnRfStart) {
+        btnRfStart.addEventListener('click', function () {
+          if (!getSecret()) {
+            setRowFpMsg('Masukkan SYNC_SECRET terlebih dahulu.', true);
+            return;
+          }
+          setRowFpMsg('Memulai backfill…');
+          btnRfStart.disabled = true;
+          apiControl('/backfill-start?soft=1')
+            .then(function (d) {
+              handleControlJson(d, rowFpMsg);
+            })
+            .catch(function () {
+              setRowFpMsg('Gagal memulai backfill.', true);
+            })
+            .finally(function () {
+              btnRfStart.disabled = false;
+            });
+        });
+      }
+
+      var btnRfStop = document.getElementById('btn-rowfp-stop');
+      if (btnRfStop) {
+        btnRfStop.addEventListener('click', function () {
+          if (!getSecret()) {
+            setRowFpMsg('Masukkan SYNC_SECRET untuk menghentikan backfill.', true);
+            return;
+          }
+          setRowFpMsg('Menghentikan backfill…');
+          btnRfStop.disabled = true;
+          apiControl('/backfill-stop?soft=1')
+            .then(function (d) {
+              handleControlJson(d, rowFpMsg);
+            })
+            .catch(function () {
+              setRowFpMsg('Gagal menghentikan.', true);
+            })
+            .finally(function () {
+              btnRfStop.disabled = false;
+            });
+        });
+      }
+
       function applyReport(r) {
         var s = r.sinkronisasi || {};
         var d = r.database || {};
         var cj = r.cron_job || r.cron || {};
+        if (s.current_offset != null) currentOffset = s.current_offset;
         var pct = Math.min(100, s.progress_percent || 0);
 
         var badge = document.getElementById('sync-status-badge');
