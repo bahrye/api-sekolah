@@ -4,5 +4,4 @@ pages_build_output_dir = "./"
 # Database utama: Neon PostgreSQL
 # Set DATABASE_URL di Cloudflare Pages → Settings → Environment variables
 # Lokal: salin ke .dev.vars (lihat .dev.vars.example)
-
-# Cron Worker: npx wrangler deploy -c wrangler.cron.toml
+

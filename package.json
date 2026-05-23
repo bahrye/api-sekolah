@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy:cf": "wrangler deploy -c wrangler.cron.toml && wrangler pages deploy . --project-name=api-sekolah-kita --branch production --commit-dirty=true",
+    "deploy:cf": "wrangler pages deploy . --project-name=api-sekolah-kita --branch production --commit-dirty=true",
     "deploy": "npm run deploy:cf",
     "ship": "node scripts/ship.js",
     "ship:all": "node scripts/ship.js && npm run deploy:cf",

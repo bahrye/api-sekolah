@@ -30,12 +30,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Deploy cron Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy -c wrangler.cron.toml
+
 
       - name: Deploy Pages
         uses: cloudflare/wrangler-action@v3

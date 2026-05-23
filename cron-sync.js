@@ -5,18 +5,17 @@
 
 /** Tiap menit — lanjutkan sync */
 const CF_CRON_TICK = '* * * * *';
-/** Senin 01:00 WITA = Minggu 17:00 UTC (cron Cloudflare memakai UTC) */
-const CF_CRON_WEEKLY_WITA = '0 17 * * SUN';
+/** Tanggal 1 01:00 WITA = Tanggal 1 17:00 UTC (cron Cloudflare memakai UTC) */
+const CF_CRON_MONTHLY_WITA = '0 17 1 * *';
 
 /**
  * @param {string} cron
  */
-function isWeeklyCronExpr(cron) {
+function isMonthlyCronExpr(cron) {
   return (
-    cron === CF_CRON_WEEKLY_WITA ||
-    cron === '0 17 * * 1' ||
-    cron === '0 1 * * 1' ||
-    cron === '0 1 * * MON'
+    cron === CF_CRON_MONTHLY_WITA ||
+    cron === '0 17 1 * *' ||
+    cron === '0 1 1 * *'
   );
 }
 import {
@@ -119,13 +118,13 @@ const CRON_TICK_MAX_CHUNKS = 1;
 /** Burst ringan — tiap chunk ≈ 10–25 subrequest (Neon bulk + API) */
 const CRON_TICK_BURST_MAX_CHUNKS_IDLE = 2;
 const CRON_TICK_BURST_MAX_CHUNKS_LIGHT = 1;
-/** Sync mingguan — tetap rendah agar tidak melewati batas subrequest Worker */
-const CRON_TICK_BURST_MAX_CHUNKS_WEEKLY = 2;
+/** Sync bulanan — tetap rendah agar tidak melewati batas subrequest Worker */
+const CRON_TICK_BURST_MAX_CHUNKS_MONTHLY = 2;
 const CRON_TICK_BURST_WALL_MS = 86_000;
-const CRON_TICK_BURST_WALL_WEEKLY_MS = 96_000;
+const CRON_TICK_BURST_WALL_MONTHLY_MS = 96_000;
 const CRON_BURST_MAX_WRITES_PER_CHUNK = 12;
 const CRON_BURST_MIN_FP_RATIO = 0.75;
-/** 10×20 ≈ 200 — zona fp_skip / sync mingguan */
+/** 10×20 ≈ 200 — zona fp_skip / sync bulanan */
 const CRON_TICK_PAGES_FULL = PAGES_FULL_MAX_PAGES;
 /** 6×20 = 120 — fallback */
 const CRON_TICK_PAGES_FAST = PAGES_FAST_MAX_PAGES;
@@ -136,7 +135,7 @@ const CRON_TICK_PAGES_HEAVY = 1;
 /** Batas CPU background (harus > wall tulis berat ~68s + margin D1) */
 const CHUNK_EXEC_TIMEOUT_MS = 92_000;
 const CHUNK_EXEC_TIMEOUT_BURST_MS = 108_000;
-const CHUNK_EXEC_TIMEOUT_WEEKLY_MS = 118_000;
+const CHUNK_EXEC_TIMEOUT_MONTHLY_MS = 118_000;
 const MANUAL_MAX_CHUNKS = 3;
 const MANUAL_WALL_MS = 45_000;
 
@@ -267,11 +266,11 @@ async function pickCronBatchPlan(db, opts = {}) {
 
   if (opts.assumeLight) {
     return {
-      maxChunks: CRON_TICK_BURST_MAX_CHUNKS_WEEKLY,
+      maxChunks: CRON_TICK_BURST_MAX_CHUNKS_MONTHLY,
       maxPages: opts.maxPages ?? CRON_TICK_PAGES_FULL,
-      wallMs: CRON_TICK_BURST_WALL_WEEKLY_MS,
+      wallMs: CRON_TICK_BURST_WALL_MONTHLY_MS,
       recentWrites: 0,
-      weeklyFast: true,
+      monthlyFast: true,
     };
   }
 
@@ -549,8 +548,8 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
   };
   const burstMode = batchOpts.maxChunks > 1;
   const execTimeout = burstMode
-    ? batchOpts.weeklyFast
-      ? CHUNK_EXEC_TIMEOUT_WEEKLY_MS
+    ? batchOpts.monthlyFast
+      ? CHUNK_EXEC_TIMEOUT_MONTHLY_MS
       : CHUNK_EXEC_TIMEOUT_BURST_MS
     : Math.max(CHUNK_EXEC_TIMEOUT_MS, batchOpts.wallMs + 12_000);
   try {
@@ -695,7 +694,7 @@ async function runBackfillCronIfDue(env) {
 
   const prog = await getSyncProgress(sql);
   if (prog.runState === 'running') {
-    const detail = 'menunggu — sync mingguan sedang berjalan';
+    const detail = 'menunggu — sync bulanan sedang berjalan';
     await recordRowFpBackfillNote(sql, detail);
     return { ran: false, reason: 'sync_running' };
   }
@@ -790,23 +789,23 @@ async function runScheduledTick(env, ctx) {
 }
 
 /**
- * Cloudflare Cron — mingguan Senin 01:00 WITA (setara GET /run?offset=0).
+ * Cloudflare Cron — bulanan Tanggal 1 01:00 WITA (setara GET /run?offset=0).
  * @param {object} env
  * @param {ExecutionContext} ctx
  */
-async function runScheduledWeeklyRun(env, ctx) {
+async function runScheduledMonthlyRun(env, ctx) {
   const offset = 0;
   await markSyncRunStarted(getSql(env));
   await pauseBackfillForSync(getSql(env));
-  await recordCronTick(getSql(env), 'CF Cron run — sync mingguan (mode cepat, fp_skip)');
+  await recordCronTick(getSql(env), 'CF Cron run — sync bulanan (mode cepat, fp_skip)');
   await appendCronJobActivityLog(getSql(env), {
     kind: 'cron_run',
     action: 'accepted',
-    detail: 'sync mingguan · burst 2×3 hal · /tick tiap menit',
+    detail: 'sync bulanan · burst 2×3 hal · /tick tiap menit',
     offset,
   });
   scheduleResumeInBackground(ctx, env, offset, { assumeLight: true });
-  return { status: 'accepted', offset, mode: 'weekly_fast' };
+  return { status: 'accepted', offset, mode: 'monthly_fast' };
 }
 
 export default {
@@ -1136,15 +1135,15 @@ export default {
           await markSyncResumeAt(sqlRun, offset);
         }
 
-        const weeklyStart = offset === 0 && !resume;
+        const monthlyStart = offset === 0 && !resume;
         const fastOff = url.searchParams.get('fast') === '0';
         const burstOn = url.searchParams.get('burst') === '1';
-        const assumeLight = weeklyStart ? !fastOff : burstOn;
+        const assumeLight = monthlyStart ? !fastOff : burstOn;
 
         const batchOpts = await pickCronBatchPlan(getSql(env), {
           maxChunks: waitForResult ? MANUAL_MAX_CHUNKS : undefined,
           wallMs: waitForResult ? MANUAL_WALL_MS : undefined,
-          maxPages: weeklyStart ? CRON_TICK_PAGES_FULL : undefined,
+          maxPages: monthlyStart ? CRON_TICK_PAGES_FULL : undefined,
           assumeLight,
         });
 
@@ -1156,7 +1155,7 @@ export default {
             detail: resume
               ? 'lanjutkan sync'
               : assumeLight
-                ? 'sync mingguan mode cepat (burst 2×3 hal, fp_skip)'
+                ? 'sync bulanan mode cepat (burst 2×3 hal, fp_skip)'
                 : 'sync penuh dimulai',
             offset,
           });
@@ -1165,12 +1164,12 @@ export default {
             JSON.stringify({
               status: 'accepted',
               message: assumeLight
-                ? 'Sync mingguan mode cepat di background (~1.200 sekolah/menit jika fp_skip tinggi). Pantau dashboard status.'
+                ? 'Sync bulanan mode cepat di background (~1.200 sekolah/menit jika fp_skip tinggi). Pantau dashboard status.'
                 : 'Batch dijadwalkan di background. Pantau dashboard status.',
               offset_dimulai: offset,
-              mode: assumeLight ? 'weekly_fast' : 'normal',
+              mode: assumeLight ? 'monthly_fast' : 'normal',
               perkiraan: assumeLight
-                ? `~${CRON_TICK_BURST_MAX_CHUNKS_WEEKLY * CRON_TICK_PAGES_FULL * PAGE_SIZE} sekolah/menit (fp_skip tinggi, 20 baris/hal API)`
+                ? `~${CRON_TICK_BURST_MAX_CHUNKS_MONTHLY * CRON_TICK_PAGES_FULL * PAGE_SIZE} sekolah/menit (fp_skip tinggi, 20 baris/hal API)`
                 : undefined,
             }),
             { status: 202, headers: jsonHeaders }

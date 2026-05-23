@@ -71,8 +71,8 @@ export async function buildSyncStatusReport(sql, { lastChunk } = {}) {
             ? sync_driver === 'github'
               ? 'Driver: GitHub Actions — /step 20 baris tiap 5 detik (~240/menit). Cloudflare Cron tidak memproses chunk sync.'
               : cron.enabled
-                ? 'Sync mingguan: burst ~2×10 hal × 20 sekolah/hal ≈ 400/menit bila fp_skip tinggi. API belajar.id maks 20 baris/request.'
-                : 'Panggil /run sekali (atau tunggu jadwal mingguan) untuk mengaktifkan /tick otomatis.'
+                ? 'Sync bulanan: burst ~2×10 hal × 20 sekolah/hal ≈ 400/menit bila fp_skip tinggi. API belajar.id maks 20 baris/request.'
+                : 'Panggil /run sekali (atau tunggu jadwal bulanan) untuk mengaktifkan /tick otomatis.'
             : null,
     },
     database: {

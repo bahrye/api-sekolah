@@ -1,6 +1,6 @@
 /**
  * Isi tabel sync_page_fp dari API belajar.id tanpa membaca tabel sekolah.
- * Jalankan sekali setelah data awal ada di D1, sebelum sync mingguan penuh.
+ * Jalankan sekali setelah data awal ada di D1, sebelum sync bulanan penuh.
  *
  * Usage: node scripts/bootstrap-page-fp.js [startOffset]
  */

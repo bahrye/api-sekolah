@@ -80,7 +80,7 @@ export async function pauseBackfillForSync(sql) {
   const rf = await getRowFpStatsForReport(sql, meta.totalSekolah);
   if (rf.selesai || !rf.backfill_cron) return;
   await recordRowFpStats(sql, rf.null_count ?? 0, { active: false, cronEnabled: false });
-  await recordRowFpBackfillNote(sql, 'dijeda — sync mingguan berjalan');
+  await recordRowFpBackfillNote(sql, 'dijeda — sync bulanan berjalan');
 }
 
 /**
