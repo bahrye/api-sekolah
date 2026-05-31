@@ -12,7 +12,7 @@ export async function recordSinkronisasiSelesai(sql) {
   const now = new Date().toISOString();
   await sql`
     INSERT INTO status_sinkronisasi (id, waktu_selesai_terakhir, total_sekolah, updated_at)
-    VALUES (1, ${now}, ${total}, NOW())
+    VALUES (2, ${now}, ${total}, NOW())
     ON CONFLICT (id) DO UPDATE SET
       waktu_selesai_terakhir = EXCLUDED.waktu_selesai_terakhir,
       total_sekolah = EXCLUDED.total_sekolah,
@@ -32,7 +32,7 @@ export async function getStatusSinkronisasiPublik(sql) {
     const rows = await sql`
       SELECT waktu_selesai_terakhir, total_sekolah
       FROM status_sinkronisasi
-      WHERE id = 1
+      WHERE id = 2
     `;
     const row = rows[0];
     if (row?.waktu_selesai_terakhir) {
