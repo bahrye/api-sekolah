@@ -5,17 +5,16 @@
 
 /** Tiap menit — lanjutkan sync */
 const CF_CRON_TICK = '* * * * *';
-/** Tanggal 1 01:00 WITA = Tanggal 1 17:00 UTC (cron Cloudflare memakai UTC) */
-const CF_CRON_MONTHLY_WITA = '0 17 1 * *';
+/** Tanggal 8 dan 23 setiap bulan (UTC) */
+const CF_CRON_BIWEEKLY = '0 0 8,23 * *';
 
 /**
  * @param {string} cron
  */
-function isMonthlyCronExpr(cron) {
+function isScheduledSyncExpr(cron) {
   return (
-    cron === CF_CRON_MONTHLY_WITA ||
-    cron === '0 17 1 * *' ||
-    cron === '0 1 1 * *'
+    cron === CF_CRON_BIWEEKLY ||
+    cron === '0 0 8,23 * *'
   );
 }
 import {
@@ -797,26 +796,24 @@ async function runScheduledMonthlyRun(env, ctx) {
   const offset = 0;
   await markSyncRunStarted(getDb(env));
   await pauseBackfillForSync(getDb(env));
-  await recordCronTick(getDb(env), 'CF Cron run — sync bulanan (mode cepat, fp_skip)');
+  await recordCronTick(getDb(env), 'CF Cron run — sync terjadwal (mode cepat, fp_skip)');
   await appendCronJobActivityLog(getDb(env), {
     kind: 'cron_run',
     action: 'accepted',
-    detail: 'sync bulanan · burst 2×3 hal · /tick tiap menit',
+    detail: 'sync terjadwal 15 hari · burst 2×3 hal',
     offset,
   });
   scheduleResumeInBackground(ctx, env, offset, { assumeLight: true });
-  return { status: 'accepted', offset, mode: 'monthly_fast' };
+  return { status: 'accepted', offset, mode: 'biweekly_fast' };
 }
 
 export default {
   async scheduled(event, env, ctx) {
-    /** Cron Trigger dinonaktifkan di wrangler.cron.toml — sync otomatis via GitHub Actions */
-    console.log(
-      'Cloudflare Cron diabaikan (nonaktif di wrangler). Jadwal:',
-      event.cron,
-      '— gunakan GHA sync-github.yml atau HTTP /step manual.'
-    );
-    return;
+    if (isScheduledSyncExpr(event.cron)) {
+       return runScheduledMonthlyRun(env, ctx);
+    }
+    // Jika ada trigger lain, jalankan tick reguler
+    return runScheduledTick(env, ctx);
   },
 
   async fetch(request, env, ctx) {

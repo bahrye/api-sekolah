@@ -1,9 +1,9 @@
 import { getApiMeta, formatSyncTimeWib } from './sync-meta.js';
 import { metaUpsert, metaGetMany } from './db-meta.js';
-import { countNullRowFp, backfillRowFpBatchPg as backfillRowFpBatchDb } from './sekolah-db.js';
+import { countNullRowFp, backfillRowFpBatchDb } from './sekolah-db.js';
 
 export { countNullRowFp };
-export const backfillRowFpBatch = backfillRowFpBatchPg;
+export const backfillRowFpBatch = backfillRowFpBatchDb;
 
 /** Baris per request Pages (batch pertama; sisanya cron Worker) */
 export const BACKFILL_BATCH_SIZE = 400;

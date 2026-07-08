@@ -225,7 +225,7 @@ export async function countNullRowFp(db) {
  * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {number} batchSize
  */
-export async function backfillRowFpBatchPg(db, batchSize) {
+export async function backfillRowFpBatchDb(db, batchSize) {
   const rows = await fetchRowsMissingRowFp(db, batchSize);
   if (!rows.length) return { processed: 0, updated: 0, done: true };
 
