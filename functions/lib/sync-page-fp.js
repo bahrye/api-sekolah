@@ -18,46 +18,45 @@ export async function fingerprintRows(rows) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {number} pageIndex
  */
-export async function getPageFingerprint(sql, pageIndex) {
+export async function getPageFingerprint(db, pageIndex) {
   try {
-    const rows = await sql`
-      SELECT fingerprint FROM sync_page_fp WHERE page_index = ${pageIndex}
-    `;
-    return rows[0]?.fingerprint ?? null;
+    const row = await db.prepare(`SELECT fingerprint FROM sync_page_fp WHERE page_index = ?`).bind(pageIndex).first();
+    return row?.fingerprint ?? null;
   } catch {
     return null;
   }
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {number} pageIndex
  * @param {string} fingerprint
  */
-export async function savePageFingerprint(sql, pageIndex, fingerprint) {
-  await sql`
+export async function savePageFingerprint(db, pageIndex, fingerprint) {
+  await db.prepare(`
     INSERT INTO sync_page_fp (page_index, fingerprint, updated_at)
-    VALUES (${pageIndex}, ${fingerprint}, NOW())
+    VALUES (?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT (page_index) DO UPDATE SET
-      fingerprint = EXCLUDED.fingerprint,
-      updated_at = NOW()
-  `;
+      fingerprint = excluded.fingerprint,
+      updated_at = CURRENT_TIMESTAMP
+  `).bind(pageIndex, fingerprint).run();
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {number[]} pageIndexes
  */
-export async function getPageFingerprintsBatch(sql, pageIndexes) {
+export async function getPageFingerprintsBatch(db, pageIndexes) {
   if (pageIndexes.length === 0) return new Map();
   try {
-    const rows = await sql`
-      SELECT page_index, fingerprint FROM sync_page_fp WHERE page_index = ANY(${pageIndexes})
-    `;
-    return new Map(rows.map((r) => [r.page_index, r.fingerprint]));
+    const placeholders = pageIndexes.map(() => '?').join(',');
+    const { results } = await db.prepare(`
+      SELECT page_index, fingerprint FROM sync_page_fp WHERE page_index IN (${placeholders})
+    `).bind(...pageIndexes).all();
+    return new Map((results || []).map((r) => [r.page_index, r.fingerprint]));
   } catch {
     return new Map();
   }

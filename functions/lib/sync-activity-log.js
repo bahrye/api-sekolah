@@ -1,6 +1,6 @@
 import { formatSyncTimeWib } from './sync-meta.js';
 import { progressPercent } from './sync-sekolah.js';
-import { metaGet, metaUpsert } from './pg-meta.js';
+import { metaGet, metaUpsert } from './db-meta.js';
 
 const KEY_ACTIVITY_LOG = 'sync_activity_log';
 const MAX_LINES = 8;
@@ -8,11 +8,11 @@ const MAX_LINES = 8;
 /** @typedef {'chunk' | 'cron_tick' | 'cron_skip' | 'cron_run' | 'cron_error' | 'backfill'} ActivityKind */
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function getActivityLog(sql) {
+export async function getActivityLog(db) {
   try {
-    const raw = await metaGet(sql, KEY_ACTIVITY_LOG);
+    const raw = await metaGet(db, KEY_ACTIVITY_LOG);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -41,21 +41,21 @@ export function formatActivityText({ offsetFrom, offsetTo, stats, note }) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {object} line
  */
-async function pushActivityLine(sql, line) {
-  const existing = await getActivityLog(sql);
+async function pushActivityLine(db, line) {
+  const existing = await getActivityLog(db);
   const next = [line, ...existing].slice(0, MAX_LINES);
-  await metaUpsert(sql, KEY_ACTIVITY_LOG, JSON.stringify(next));
+  await metaUpsert(db, KEY_ACTIVITY_LOG, JSON.stringify(next));
   return next;
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {{ offsetFrom: number, offsetTo: number, stats: object, note?: string }} entry
  */
-export async function appendActivityLog(sql, entry) {
+export async function appendActivityLog(db, entry) {
   const ts = new Date().toISOString();
   const text = formatActivityText(entry);
   const line = {
@@ -76,7 +76,7 @@ export async function appendActivityLog(sql, entry) {
     timed_out: entry.stats.timed_out === true,
   };
 
-  const existing = await getActivityLog(sql);
+  const existing = await getActivityLog(db);
   const head = existing[0];
   if (
     head?.kind === 'chunk' &&
@@ -84,11 +84,11 @@ export async function appendActivityLog(sql, entry) {
     head.offset_to === entry.offsetTo
   ) {
     const merged = [line, ...existing.slice(1)].slice(0, MAX_LINES);
-    await metaUpsert(sql, KEY_ACTIVITY_LOG, JSON.stringify(merged));
+    await metaUpsert(db, KEY_ACTIVITY_LOG, JSON.stringify(merged));
     return merged;
   }
 
-  return pushActivityLine(sql, line);
+  return pushActivityLine(db, line);
 }
 
 const SKIP_LABELS = {
@@ -100,10 +100,10 @@ const SKIP_LABELS = {
 };
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {{ kind: ActivityKind, action: string, detail?: string, offset?: number, apiTotal?: number }} opts
  */
-export async function appendCronJobActivityLog(sql, { kind, action, detail, offset, apiTotal }) {
+export async function appendCronJobActivityLog(db, { kind, action, detail, offset, apiTotal }) {
   const ts = new Date().toISOString();
   let text = detail ?? action;
 
@@ -133,14 +133,14 @@ export async function appendCronJobActivityLog(sql, { kind, action, detail, offs
     offset: offset ?? null,
   };
 
-  return pushActivityLine(sql, line);
+  return pushActivityLine(db, line);
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {{ action: string, detail: string, processed?: number, null_remaining?: number | null }} opts
  */
-export async function appendBackfillActivityLog(sql, { action, detail, processed, null_remaining }) {
+export async function appendBackfillActivityLog(db, { action, detail, processed, null_remaining }) {
   const ts = new Date().toISOString();
   const parts = [detail];
   if (processed != null && processed > 0) {
@@ -160,7 +160,7 @@ export async function appendBackfillActivityLog(sql, { action, detail, processed
     null_remaining: null_remaining ?? null,
   };
 
-  return pushActivityLine(sql, line);
+  return pushActivityLine(db, line);
 }
 
 /**

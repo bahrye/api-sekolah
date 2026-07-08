@@ -1,6 +1,6 @@
 import { getApiMeta, formatSyncTimeWib } from './sync-meta.js';
-import { metaUpsert, metaGetMany } from './pg-meta.js';
-import { countNullRowFp, backfillRowFpBatchPg } from './sekolah-pg.js';
+import { metaUpsert, metaGetMany } from './db-meta.js';
+import { countNullRowFp, backfillRowFpBatchPg as backfillRowFpBatchDb } from './sekolah-db.js';
 
 export { countNullRowFp };
 export const backfillRowFpBatch = backfillRowFpBatchPg;
@@ -56,55 +56,52 @@ export function buildBackfillContinueUrl(requestUrl, secret) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {number} nullCount
  * @param {{ active?: boolean, cronEnabled?: boolean }} [opts]
  */
-export async function recordRowFpStats(
-  sql,
-  nullCount,
-  { active = false, cronEnabled = false } = {}
-) {
+export async function recordRowFpStats(db, nullCount, opts = {}) {
+  const { active = false, cronEnabled = false } = opts;
   const now = new Date().toISOString();
-  await metaUpsert(sql, KEY_ROW_FP_NULL, Math.max(0, nullCount));
-  await metaUpsert(sql, KEY_ROW_FP_STATS_AT, now);
-  await metaUpsert(sql, KEY_ROW_FP_BACKFILL_ACTIVE, active ? '1' : '0');
-  await metaUpsert(sql, KEY_ROW_FP_BACKFILL_CRON, cronEnabled ? '1' : '0');
+  const stats = { null_count: Math.max(0, nullCount), stats_at: now };
+  await metaUpsert(db, KEY_ROW_FP_STATS, JSON.stringify(stats));
+  await metaUpsert(db, KEY_ROW_FP_BACKFILL_ACTIVE, active ? '1' : '0');
+  await metaUpsert(db, KEY_ROW_FP_BACKFILL_CRON, cronEnabled ? '1' : '0');
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} db
  */
-export async function pauseBackfillForSync(sql) {
-  const meta = await getApiMeta(sql);
-  const rf = await getRowFpStatsForReport(sql, meta.totalSekolah);
+export async function pauseBackfillForSync(db) {
+  const meta = await getApiMeta(db);
+  const rf = await getRowFpStatsForReport(db, meta.totalSekolah);
   if (rf.selesai || !rf.backfill_cron) return;
-  await recordRowFpStats(sql, rf.null_count ?? 0, { active: false, cronEnabled: false });
-  await recordRowFpBackfillNote(sql, 'dijeda — sync bulanan berjalan');
+  await recordRowFpStats(db, rf.null_count ?? 0, { active: false, cronEnabled: false });
+  await recordRowFpBackfillNote(db, 'dijeda — sync bulanan berjalan');
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {string} note
  */
-export async function recordRowFpBackfillNote(sql, note) {
-  await metaUpsert(sql, KEY_ROW_FP_BACKFILL_NOTE, note);
+export async function recordRowFpBackfillNote(db, note) {
+  await metaUpsert(db, KEY_ROW_FP_BACKFILL_NOTE, note);
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {{ batchSize?: number, maxBatches?: number, wallMs?: number }} [opts]
  */
 export async function runBackfillCronBurst(
-  sql,
+  db,
   { batchSize = WORKER_BACKFILL_BATCH_SIZE, maxBatches = BACKFILL_BURST_MAX_BATCHES, wallMs = BACKFILL_BURST_WALL_MS } = {}
 ) {
-  const meta = await getApiMeta(sql);
-  const before = await getRowFpStatsForReport(sql, meta.totalSekolah);
+  const meta = await getApiMeta(db);
+  const before = await getRowFpStatsForReport(db, meta.totalSekolah);
   let nullRemaining = before.null_count ?? 0;
 
   if (nullRemaining <= 0) {
-    await recordRowFpStats(sql, 0, { active: false, cronEnabled: false });
+    await recordRowFpStats(db, 0, { active: false, cronEnabled: false });
     return {
       total_processed: 0,
       batches: 0,
@@ -124,7 +121,7 @@ export async function runBackfillCronBurst(
   const burstCap = Math.min(maxBatches, 3);
 
   while (batches < burstCap && Date.now() - wallStart < wallMs - 4_000) {
-    lastBatch = await backfillRowFpBatchPg(sql, batchSize);
+    lastBatch = await backfillRowFpBatchDb(db, batchSize);
     batches += 1;
     totalProcessed += lastBatch.processed;
 
@@ -142,7 +139,7 @@ export async function runBackfillCronBurst(
   }
 
   done = done || nullRemaining === 0;
-  await recordRowFpStats(sql, nullRemaining, {
+  await recordRowFpStats(db, nullRemaining, {
     active: !done,
     cronEnabled: !done,
   });
@@ -157,8 +154,8 @@ export async function runBackfillCronBurst(
 }
 
 /** @deprecated gunakan runBackfillCronBurst — satu batch saja */
-export async function runBackfillCronStep(sql, batchSize = WORKER_BACKFILL_BATCH_SIZE) {
-  const r = await runBackfillCronBurst(sql, { batchSize, maxBatches: 1, wallMs: 60_000 });
+export async function runBackfillCronStep(db, batchSize = WORKER_BACKFILL_BATCH_SIZE) {
+  const r = await runBackfillCronBurst(db, { batchSize, maxBatches: 1, wallMs: 60_000 });
   return {
     batch: {
       processed: r.total_processed,
@@ -171,26 +168,26 @@ export async function runBackfillCronStep(sql, batchSize = WORKER_BACKFILL_BATCH
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} db
  * @param {number | null} [totalSekolah]
  */
-export async function getRowFpStatsForReport(sql, totalSekolah = null) {
+export async function getRowFpStatsForReport(db, totalSekolah = null) {
   try {
-    const map = await metaGetMany(sql, [
-      KEY_ROW_FP_NULL,
-      KEY_ROW_FP_STATS_AT,
+    const map = await metaGetMany(db, [
+      KEY_ROW_FP_STATS,
       KEY_ROW_FP_BACKFILL_ACTIVE,
       KEY_ROW_FP_BACKFILL_CRON,
       KEY_ROW_FP_BACKFILL_NOTE,
     ]);
-    const nullRaw = map[KEY_ROW_FP_NULL];
-    const nullCount = nullRaw != null ? parseInt(nullRaw, 10) : null;
+    const statsRaw = map[KEY_ROW_FP_STATS];
+    const stats = statsRaw ? JSON.parse(statsRaw) : {};
+    const nullCount = stats.null_count ?? await countNullRowFp(db);
     const total = Number.isFinite(totalSekolah) && totalSekolah > 0 ? totalSekolah : null;
     const filled =
       nullCount != null && total != null ? Math.max(0, total - nullCount) : null;
     const percentFilled =
       filled != null && total != null ? Math.round((filled / total) * 1000) / 10 : null;
-    const statsAt = map[KEY_ROW_FP_STATS_AT] ?? null;
+    const statsAt = stats.stats_at ?? null;
     const statsAge = statsAt ? Date.now() - new Date(statsAt).getTime() : BACKFILL_STALE_MS + 1;
     const backfill_active = map[KEY_ROW_FP_BACKFILL_ACTIVE] === '1';
     const backfill_cron = map[KEY_ROW_FP_BACKFILL_CRON] === '1';
@@ -209,7 +206,7 @@ export async function getRowFpStatsForReport(sql, totalSekolah = null) {
       backfill_note,
       stats_at: statsAt,
       stats_at_wib: statsAt ? formatStatsWib(statsAt) : null,
-      measured: nullRaw != null,
+      measured: statsRaw != null,
       halaman_backfill: PAGES_BACKFILL_URL,
     };
   } catch {

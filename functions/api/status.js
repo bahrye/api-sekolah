@@ -1,5 +1,5 @@
 import { getStatusSinkronisasiPublik } from '../lib/status-sinkronisasi.js';
-import { getSql } from '../lib/neon.js';
+import { getDb } from '../lib/db.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json;charset=UTF-8',
@@ -21,8 +21,8 @@ export async function onRequest(context) {
   }
 
   try {
-    const sql = getSql(context.env);
-    const pub = await getStatusSinkronisasiPublik(sql);
+    const db = getDb(context.env);
+    const pub = await getStatusSinkronisasiPublik(db);
     const body = {
       status: 'success',
       developer: 'Syamsul Bahri',

@@ -5,7 +5,7 @@ import {
   savePageFingerprint,
 } from './sync-page-fp.js';
 import { mapFromApi, fingerprintRow, rowChanged, ROW_FP_COLUMN } from './sekolah-schema.js';
-import { fetchSekolahByNpsns, flushSekolahWriteQueue } from './sekolah-pg.js';
+import { fetchSekolahByNpsns, flushSekolahWriteQueue } from './sekolah-db.js';
 import {
   CHUNK_RECORDS_LADDER,
   CHUNK_PAGES_LADDER,
@@ -110,7 +110,7 @@ export function progressPercent(offset) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {{ offset?: number, maxPages?: number, bootstrapOnly?: boolean }} options
  */
 export async function syncSekolahChunk(
@@ -137,7 +137,7 @@ export async function syncSekolahChunk(
   const pageIndexes = Array.from({ length: maxPages }, (_, i) =>
     Math.floor((offset + i * PAGE_SIZE) / PAGE_SIZE)
   );
-  const fpMap = bootstrapOnly ? new Map() : await getPageFingerprintsBatch(sql, pageIndexes);
+  const fpMap = bootstrapOnly ? new Map() : await getPageFingerprintsBatch(db, pageIndexes);
 
   while (pagesProcessed < maxPages) {
     if (Date.now() - wallStart >= wallMs) {
@@ -149,7 +149,7 @@ export async function syncSekolahChunk(
     apiTotal = total;
 
     if (rawPage.length === 0) {
-      await maybeRecordLastSync(sql, stats, true);
+      await maybeRecordLastSync(db, stats, true);
       return {
         done: true,
         nextOffset: currentOffset,
@@ -167,12 +167,12 @@ export async function syncSekolahChunk(
     const fp = await fingerprintRows(rows);
 
     if (bootstrapOnly) {
-      await savePageFingerprint(sql, pageIndex, fp);
+      await savePageFingerprint(db, pageIndex, fp);
       stats.scanned += rows.length;
       stats.pages_fp_saved += 1;
       currentOffset += PAGE_SIZE;
       if (currentOffset >= apiTotal) {
-        await maybeRecordLastSync(sql, stats, true);
+        await maybeRecordLastSync(db, stats, true);
         return {
           done: true,
           nextOffset: currentOffset,
@@ -192,7 +192,7 @@ export async function syncSekolahChunk(
       stats.pages_fp_skip += 1;
     } else {
       const npsns = rows.map((r) => r.NPSN);
-      const existing = await fetchSekolahByNpsns(sql, npsns);
+      const existing = await fetchSekolahByNpsns(db, npsns);
       const writes = [];
       const rowFps = await Promise.all(rows.map((r) => fingerprintRow(r)));
 
@@ -218,16 +218,16 @@ export async function syncSekolahChunk(
         }
       }
 
-      if (writes.length > 0) await flushSekolahWriteQueue(sql, writes);
+      if (writes.length > 0) await flushSekolahWriteQueue(db, writes);
 
-      await savePageFingerprint(sql, pageIndex, fp);
+      await savePageFingerprint(db, pageIndex, fp);
       fpMap.set(pageIndex, fp);
     }
 
     currentOffset += PAGE_SIZE;
 
     if (currentOffset >= apiTotal) {
-      await maybeRecordLastSync(sql, stats, true);
+      await maybeRecordLastSync(db, stats, true);
       return {
         done: true,
         nextOffset: currentOffset,
@@ -239,7 +239,7 @@ export async function syncSekolahChunk(
     }
   }
 
-  await maybeRecordLastSync(sql, stats, false);
+  await maybeRecordLastSync(db, stats, false);
 
   return {
     done: false,

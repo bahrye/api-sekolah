@@ -59,7 +59,7 @@ import {
   renderSyncStatusHtml,
   renderWorkerConfigErrorHtml,
 } from './functions/lib/sync-status.js';
-import { getSql, hasDatabaseUrl, MISSING_DATABASE_URL_MSG } from './functions/lib/neon.js';
+import { getDb, hasDatabaseUrl, MISSING_DATABASE_URL_MSG } from './functions/lib/db.js';
 import {
   runBackfillCronBurst,
   getRowFpStatsForReport,
@@ -107,7 +107,7 @@ function databaseConfigErrorResponse(env, wantsJson, detail) {
  */
 async function safeMarkStalled(env) {
   try {
-    if (hasDatabaseUrl(env)) await markSyncStalled(getSql(env));
+    if (hasDatabaseUrl(env)) await markSyncStalled(getDb(env));
   } catch {
     /* ignore */
   }
@@ -308,16 +308,16 @@ async function getRecentChunkWrites(db) {
  * @param {number} [maxPages]
  * @param {number} [wallMs]
  */
-async function processChunk(sql, offset, maxPages, wallMs = chunkWallMsForPages(maxPages)) {
-  const result = await syncSekolahChunk(sql, { offset, maxPages, wallMs });
+async function processChunk(db, offset, maxPages, wallMs = chunkWallMsForPages(maxPages)) {
+  const result = await syncSekolahChunk(db, { offset, maxPages, wallMs });
 
-  await recordSyncProgress(sql, {
+  await recordSyncProgress(db, {
     nextOffset: result.nextOffset,
     done: result.done,
     apiTotal: result.api_total,
   });
 
-  await appendActivityLog(sql, {
+  await appendActivityLog(db, {
     offsetFrom: offset,
     offsetTo: result.nextOffset,
     stats: {
@@ -341,8 +341,8 @@ async function runCronBatch(
   startOffset,
   { maxChunks = 1, wallMs, maxPages, recentWrites } = {}
 ) {
-  const pages = maxPages ?? (await pickCronTickMaxPages(sql));
-  let writes = recentWrites ?? (await getRecentChunkWrites(sql));
+  const pages = maxPages ?? (await pickCronTickMaxPages(db));
+  let writes = recentWrites ?? (await getRecentChunkWrites(db));
   const totalWall =
     wallMs ??
     (maxChunks > 1
@@ -358,7 +358,7 @@ async function runCronBatch(
     if (remaining < 10_000) break;
 
     const perChunkWall = Math.min(chunkWallMsForWorkload(pages, { writes }), remaining);
-    const result = await processChunk(sql, offset, pages, perChunkWall);
+    const result = await processChunk(db, offset, pages, perChunkWall);
     chunks += 1;
     if (result.timed_out) timedOut = true;
     writes = (result.stats?.updated ?? 0) + (result.stats?.inserted ?? 0);
@@ -381,11 +381,11 @@ const STEP_WALL_MS = 28_000;
 
 /**
  * Aktifkan sync di offset terakhir (driver GitHub) bila sempat dijeda.
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-async function ensureGithubSyncRunning(sql) {
-  const prog = await getSyncProgress(sql);
-  const meta = await getApiMeta(sql);
+async function ensureGithubSyncRunning(db) {
+  const prog = await getSyncProgress(db);
+  const meta = await getApiMeta(db);
   const apiTotal = prog.apiTotal ?? meta.totalSekolah ?? ESTIMATED_TOTAL_RECORDS;
   const offset = prog.currentOffset ?? 0;
 
@@ -393,14 +393,14 @@ async function ensureGithubSyncRunning(sql) {
     return { resumed: false, offset, api_total: apiTotal, status: 'completed' };
   }
 
-  if (!(await isCronEnabled(sql))) {
-    await setSyncDriver(sql, SYNC_DRIVER_GITHUB);
-    await markSyncResumeAt(sql, offset);
+  if (!(await isCronEnabled(db))) {
+    await setSyncDriver(db, SYNC_DRIVER_GITHUB);
+    await markSyncResumeAt(db, offset);
     return { resumed: true, offset, api_total: apiTotal, status: 'running' };
   }
 
-  if ((await getSyncDriver(sql)) !== SYNC_DRIVER_GITHUB) {
-    await setSyncDriver(sql, SYNC_DRIVER_GITHUB);
+  if ((await getSyncDriver(db)) !== SYNC_DRIVER_GITHUB) {
+    await setSyncDriver(db, SYNC_DRIVER_GITHUB);
   }
 
   return { resumed: false, offset, api_total: apiTotal, status: prog.runState ?? 'running' };
@@ -411,14 +411,14 @@ async function ensureGithubSyncRunning(sql) {
  * @param {object} env
  */
 async function executeSyncStep(env) {
-  const sql = getSql(env);
-  await ensureGithubSyncRunning(sql);
-  const prog = await getSyncProgress(sql);
-  const meta = await getApiMeta(sql);
+  const db = getDb(env);
+  await ensureGithubSyncRunning(db);
+  const prog = await getSyncProgress(db);
+  const meta = await getApiMeta(db);
   const apiTotal = prog.apiTotal ?? meta.totalSekolah ?? ESTIMATED_TOTAL_RECORDS;
   const offset = prog.currentOffset ?? 0;
 
-  if (!await isCronEnabled(sql)) {
+  if (!await isCronEnabled(db)) {
     return {
       ok: false,
       status: 'paused',
@@ -430,7 +430,7 @@ async function executeSyncStep(env) {
 
   if (offset >= apiTotal) {
     if (prog.runState !== 'completed') {
-      await recordSyncProgress(sql, { nextOffset: offset, done: true, apiTotal });
+      await recordSyncProgress(db, { nextOffset: offset, done: true, apiTotal });
     }
     return {
       ok: true,
@@ -441,19 +441,19 @@ async function executeSyncStep(env) {
     };
   }
 
-  const result = await syncSekolahChunk(sql, {
+  const result = await syncSekolahChunk(db, {
     offset,
     maxPages: 1,
     wallMs: STEP_WALL_MS,
   });
 
-  await recordSyncProgress(sql, {
+  await recordSyncProgress(db, {
     nextOffset: result.nextOffset,
     done: result.done,
     apiTotal: result.api_total,
   });
 
-  await appendActivityLog(sql, {
+  await appendActivityLog(db, {
     offsetFrom: offset,
     offsetTo: result.nextOffset,
     stats: { ...result.stats, max_pages: 1 },
@@ -475,16 +475,16 @@ async function executeSyncStep(env) {
  * @param {object} env
  */
 async function planResumeCron(env) {
-  const prog = await getSyncProgress(getSql(env));
-  const meta = await getApiMeta(getSql(env));
+  const prog = await getSyncProgress(getDb(env));
+  const meta = await getApiMeta(getDb(env));
   const apiTotal = prog.apiTotal ?? meta.totalSekolah ?? ESTIMATED_TOTAL_RECORDS;
   const offset = prog.currentOffset ?? 0;
   const state = prog.runState ?? 'idle';
-  const enabled = await isCronEnabled(getSql(env));
+  const enabled = await isCronEnabled(getDb(env));
 
   if (offset >= apiTotal) {
     if (state !== 'completed') {
-      await recordSyncProgress(getSql(env), { nextOffset: offset, done: true, apiTotal });
+      await recordSyncProgress(getDb(env), { nextOffset: offset, done: true, apiTotal });
     }
     return { action: 'skip', reason: 'completed', offset, apiTotal };
   }
@@ -493,7 +493,7 @@ async function planResumeCron(env) {
     return { action: 'skip', reason: 'cron_disabled', offset, apiTotal };
   }
 
-  if ((await getSyncDriver(getSql(env))) === SYNC_DRIVER_GITHUB) {
+  if ((await getSyncDriver(getDb(env))) === SYNC_DRIVER_GITHUB) {
     return { action: 'skip', reason: 'github_actions', offset, apiTotal };
   }
 
@@ -501,8 +501,8 @@ async function planResumeCron(env) {
     return { action: 'skip', reason: 'idle', offset, apiTotal };
   }
 
-  if (await isChunkLocked(getSql(env))) {
-    const lockOffset = await getChunkLockOffset(getSql(env));
+  if (await isChunkLocked(getDb(env))) {
+    const lockOffset = await getChunkLockOffset(getDb(env));
     return {
       action: 'skip',
       reason: 'chunk_in_progress',
@@ -526,19 +526,19 @@ async function planResumeCron(env) {
  * @param {boolean} [lockHeld] true jika lock sudah diambil di handler /tick
  */
 async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
-  const sql = getSql(env);
+  const db = getDb(env);
   if (!lockHeld) {
-    await clearStaleChunkLock(sql);
-    const acquired = await tryAcquireChunkLock(sql, offset);
+    await clearStaleChunkLock(db);
+    const acquired = await tryAcquireChunkLock(db, offset);
     if (!acquired) {
-      await recordCronTick(sql, `lewati — chunk masih berjalan @ ${offset}`);
+      await recordCronTick(db, `lewati — chunk masih berjalan @ ${offset}`);
       return { ok: false, skipped: true, reason: 'chunk_in_progress' };
     }
   }
 
-  const prog = await getSyncProgress(sql);
+  const prog = await getSyncProgress(db);
   const startOffset = prog.currentOffset ?? offset;
-  const plan = await pickCronBatchPlan(sql, opts);
+  const plan = await pickCronBatchPlan(db, opts);
   const batchOpts = {
     ...opts,
     maxChunks: opts.maxChunks ?? plan.maxChunks,
@@ -554,7 +554,7 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
     : Math.max(CHUNK_EXEC_TIMEOUT_MS, batchOpts.wallMs + 12_000);
   try {
     if (prog.runState === 'stalled') {
-      await markSyncResumeAt(sql, startOffset);
+      await markSyncResumeAt(db, startOffset);
     }
 
     await recordCronTick(
@@ -564,7 +564,7 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
         : `mulai chunk @ ${startOffset} (${batchOpts.maxPages} hal, ~${batchOpts.maxPages * PAGE_SIZE}, wall ${Math.round(batchOpts.wallMs / 1000)}s)`
     );
     let batch = await Promise.race([
-      runCronBatch(sql, startOffset, batchOpts),
+      runCronBatch(db, startOffset, batchOpts),
       new Promise((_, reject) => {
         setTimeout(
           () => reject(new Error('Chunk timeout — proses background melebihi batas waktu')),
@@ -581,7 +581,7 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
           sql,
           `timeout ${batchOpts.maxPages} hal → lanjut ${stepDown} hal (~${recordsForMaxPages(stepDown)}) @ ${batch.lastOffset}`
         );
-        const cont = await runCronBatch(sql, batch.lastOffset, {
+        const cont = await runCronBatch(db, batch.lastOffset, {
           ...batchOpts,
           maxPages: stepDown,
           wallMs: chunkWallMsForWorkload(stepDown, { writes: batchOpts.recentWrites ?? 0 }),
@@ -603,7 +603,7 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
         : `chunk OK → offset ${batch.lastOffset} (${batch.chunks} chunk, ${batch.pagesUsed ?? batchOpts.maxPages} hal)`
     );
     if (batch.done) {
-      await appendCronJobActivityLog(sql, {
+      await appendCronJobActivityLog(db, {
         kind: 'cron_tick',
         action: 'selesai',
         detail: `sinkronisasi selesai @ offset ${batch.lastOffset.toLocaleString('id-ID')}`,
@@ -614,8 +614,8 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
     return { ok: true, batch };
   } catch (err) {
     const msg = err?.message || String(err);
-    await recordCronTick(sql, `gagal @ ${offset}: ${msg}`);
-    await appendCronJobActivityLog(sql, {
+    await recordCronTick(db, `gagal @ ${offset}: ${msg}`);
+    await appendCronJobActivityLog(db, {
       kind: 'cron_error',
       action: 'tick_chunk',
       detail: `@ offset ${offset}: ${msg}`,
@@ -624,7 +624,7 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
     await safeMarkStalled(env);
     throw err;
   } finally {
-    await releaseChunkLock(sql);
+    await releaseChunkLock(db);
   }
 }
 
@@ -659,21 +659,21 @@ function skipMessage(plan) {
  * @param {object} env
  */
 async function runBackfillCronIfDue(env) {
-  const sql = getSql(env);
-  const meta = await getApiMeta(sql);
-  const rf = await getRowFpStatsForReport(sql, meta.totalSekolah);
+  const db = getDb(env);
+  const meta = await getApiMeta(db);
+  const rf = await getRowFpStatsForReport(db, meta.totalSekolah);
 
   if (rf.selesai) {
     if (rf.backfill_cron || rf.backfill_active) {
-      await recordRowFpStats(sql, 0, { active: false, cronEnabled: false });
-      await recordRowFpBackfillNote(sql, 'selesai');
-      await appendBackfillActivityLog(sql, {
+      await recordRowFpStats(db, 0, { active: false, cronEnabled: false });
+      await recordRowFpBackfillNote(db, 'selesai');
+      await appendBackfillActivityLog(db, {
         action: 'selesai',
         detail: 'semua baris sudah punya row_fp',
         processed: 0,
         null_remaining: 0,
       });
-      await recordCronTick(sql, 'backfill row_fp selesai');
+      await recordCronTick(db, 'backfill row_fp selesai');
     }
     return { ran: false, reason: 'selesai', logged: true };
   }
@@ -684,7 +684,7 @@ async function runBackfillCronIfDue(env) {
 
   let cronOn = rf.backfill_cron;
   if ((rf.backfill_active && rf.backfill_stale && !cronOn) || (rf.backfill_active && !cronOn)) {
-    await recordRowFpStats(sql, rf.null_count, { active: true, cronEnabled: true });
+    await recordRowFpStats(db, rf.null_count, { active: true, cronEnabled: true });
     cronOn = true;
   }
 
@@ -692,27 +692,27 @@ async function runBackfillCronIfDue(env) {
     return { ran: false, reason: 'cron_nonaktif' };
   }
 
-  const prog = await getSyncProgress(sql);
+  const prog = await getSyncProgress(db);
   if (prog.runState === 'running') {
     const detail = 'menunggu — sync bulanan sedang berjalan';
-    await recordRowFpBackfillNote(sql, detail);
+    await recordRowFpBackfillNote(db, detail);
     return { ran: false, reason: 'sync_running' };
   }
 
-  if (await isChunkLocked(sql)) {
+  if (await isChunkLocked(db)) {
     const detail = 'menunggu — chunk sync memakai lock';
-    await recordRowFpBackfillNote(sql, detail);
-    await appendBackfillActivityLog(sql, {
+    await recordRowFpBackfillNote(db, detail);
+    await appendBackfillActivityLog(db, {
       action: 'lewati',
       detail,
       null_remaining: rf.null_count,
     });
-    await recordCronTick(sql, `backfill row_fp lewati (chunk lock)`);
+    await recordCronTick(db, `backfill row_fp lewati (chunk lock)`);
     return { ran: false, reason: 'chunk_lock', logged: true };
   }
 
   try {
-    const result = await runBackfillCronBurst(sql, {
+    const result = await runBackfillCronBurst(db, {
       wallMs: CRON_BACKFILL_WALL_MS,
       maxBatches: CRON_BACKFILL_MAX_BATCHES,
     });
@@ -722,25 +722,25 @@ async function runBackfillCronIfDue(env) {
     const detail = result.done
       ? `selesai (+${result.total_processed.toLocaleString('id-ID')})`
       : `+${result.total_processed.toLocaleString('id-ID')}`;
-    await recordRowFpBackfillNote(sql, `${note}, sisa ~${result.null_remaining.toLocaleString('id-ID')}`);
-    await appendBackfillActivityLog(sql, {
+    await recordRowFpBackfillNote(db, `${note}, sisa ~${result.null_remaining.toLocaleString('id-ID')}`);
+    await appendBackfillActivityLog(db, {
       action: result.done ? 'selesai' : 'chunk',
       detail,
       processed: result.total_processed,
       null_remaining: result.null_remaining,
     });
     const cronNote = `backfill row_fp ${detail} (sisa ~${result.null_remaining.toLocaleString('id-ID')})`;
-    await recordCronTick(sql, cronNote);
+    await recordCronTick(db, cronNote);
     return { ran: true, result, logged: true, cronNote };
   } catch (err) {
     const msg = err?.message || String(err);
-    await recordRowFpBackfillNote(sql, `gagal: ${msg}`);
-    await appendBackfillActivityLog(sql, {
+    await recordRowFpBackfillNote(db, `gagal: ${msg}`);
+    await appendBackfillActivityLog(db, {
       action: 'gagal',
       detail: msg,
       null_remaining: rf.null_count,
     });
-    await recordCronTick(sql, `backfill row_fp gagal: ${msg}`);
+    await recordCronTick(db, `backfill row_fp gagal: ${msg}`);
     return { ran: false, reason: 'error', error: msg, logged: true };
   }
 }
@@ -757,10 +757,10 @@ async function runScheduledTick(env, ctx) {
 
   if (plan.action === 'skip') {
     if (!backfill.logged) {
-      await recordCronTick(getSql(env), `CF Cron lewati — ${plan.reason}`);
+      await recordCronTick(getDb(env), `CF Cron lewati — ${plan.reason}`);
     }
     if (plan.reason !== 'completed') {
-      await appendCronJobActivityLog(getSql(env), {
+      await appendCronJobActivityLog(getDb(env), {
         kind: 'cron_skip',
         action: plan.reason,
         offset: plan.offset,
@@ -770,12 +770,12 @@ async function runScheduledTick(env, ctx) {
     return { status: 'skipped', plan, backfill };
   }
 
-  await recordCronTick(getSql(env), `CF Cron tick @ ${plan.offset}`);
+  await recordCronTick(getDb(env), `CF Cron tick @ ${plan.offset}`);
 
-  const acquired = await tryAcquireChunkLock(getSql(env), plan.offset);
+  const acquired = await tryAcquireChunkLock(getDb(env), plan.offset);
   if (!acquired) {
-    await recordCronTick(getSql(env), `CF Cron lewati — chunk masih berjalan @ ${plan.offset}`);
-    await appendCronJobActivityLog(getSql(env), {
+    await recordCronTick(getDb(env), `CF Cron lewati — chunk masih berjalan @ ${plan.offset}`);
+    await appendCronJobActivityLog(getDb(env), {
       kind: 'cron_skip',
       action: 'chunk_in_progress',
       offset: plan.offset,
@@ -795,10 +795,10 @@ async function runScheduledTick(env, ctx) {
  */
 async function runScheduledMonthlyRun(env, ctx) {
   const offset = 0;
-  await markSyncRunStarted(getSql(env));
-  await pauseBackfillForSync(getSql(env));
-  await recordCronTick(getSql(env), 'CF Cron run — sync bulanan (mode cepat, fp_skip)');
-  await appendCronJobActivityLog(getSql(env), {
+  await markSyncRunStarted(getDb(env));
+  await pauseBackfillForSync(getDb(env));
+  await recordCronTick(getDb(env), 'CF Cron run — sync bulanan (mode cepat, fp_skip)');
+  await appendCronJobActivityLog(getDb(env), {
     kind: 'cron_run',
     action: 'accepted',
     detail: 'sync bulanan · burst 2×3 hal · /tick tiap menit',
@@ -839,7 +839,7 @@ export default {
         const auth = resolveSyncAuth(request, url, env, { soft: true });
         if (!auth.ok) {
           if (auth.ignored) {
-            const report = await buildSyncStatusReport(getSql(env));
+            const report = await buildSyncStatusReport(getDb(env));
             return new Response(
               JSON.stringify({
                 status: 'ignored',
@@ -852,19 +852,19 @@ export default {
           return auth.response;
         }
 
-        const prog = await getSyncProgress(getSql(env));
+        const prog = await getSyncProgress(getDb(env));
         const offset = prog.currentOffset ?? 0;
-        await releaseChunkLock(getSql(env));
-        await markSyncPaused(getSql(env));
-        await recordCronTick(getSql(env), `sync dijeda manual @ offset ${offset}`);
-        await appendCronJobActivityLog(getSql(env), {
+        await releaseChunkLock(getDb(env));
+        await markSyncPaused(getDb(env));
+        await recordCronTick(getDb(env), `sync dijeda manual @ offset ${offset}`);
+        await appendCronJobActivityLog(getDb(env), {
           kind: 'cron_skip',
           action: 'paused',
           detail: `sync dijeda @ offset ${offset.toLocaleString('id-ID')}`,
           offset,
         });
 
-        const report = await buildSyncStatusReport(getSql(env));
+        const report = await buildSyncStatusReport(getDb(env));
         return new Response(
           JSON.stringify({
             status: 'success',
@@ -878,12 +878,12 @@ export default {
 
       if (pathname === '/backfill-measure' || pathname === '/backfill-start' || pathname === '/backfill-stop') {
         const auth = resolveSyncAuth(request, url, env, { soft: true });
-        const sql = getSql(env);
-        const metaBf = await getApiMeta(sql);
+        const db = getDb(env);
+        const metaBf = await getApiMeta(db);
 
         if (!auth.ok) {
           if (auth.ignored) {
-            const report = await buildSyncStatusReport(sql);
+            const report = await buildSyncStatusReport(db);
             return new Response(
               JSON.stringify({
                 status: 'ignored',
@@ -897,12 +897,12 @@ export default {
         }
 
         if (pathname === '/backfill-measure') {
-          const remaining = await countNullRowFp(sql);
-          await recordRowFpStats(sql, remaining, {
+          const remaining = await countNullRowFp(db);
+          await recordRowFpStats(db, remaining, {
             active: false,
             cronEnabled: false,
           });
-          const row_fp = await getRowFpStatsForReport(sql, metaBf.totalSekolah);
+          const row_fp = await getRowFpStatsForReport(db, metaBf.totalSekolah);
           return new Response(
             JSON.stringify({
               status: 'success',
@@ -915,11 +915,11 @@ export default {
         }
 
         if (pathname === '/backfill-start') {
-          const remaining = await countNullRowFp(sql);
+          const remaining = await countNullRowFp(db);
           if (remaining <= 0) {
-            await recordRowFpStats(sql, 0, { active: false, cronEnabled: false });
-            await recordRowFpBackfillNote(sql, 'sudah 100%');
-            const row_fp = await getRowFpStatsForReport(sql, metaBf.totalSekolah);
+            await recordRowFpStats(db, 0, { active: false, cronEnabled: false });
+            await recordRowFpBackfillNote(db, 'sudah 100%');
+            const row_fp = await getRowFpStatsForReport(db, metaBf.totalSekolah);
             return new Response(
               JSON.stringify({
                 status: 'success',
@@ -929,15 +929,15 @@ export default {
               { headers: jsonHeaders }
             );
           }
-          await recordRowFpStats(sql, remaining, { active: true, cronEnabled: true });
-          await recordRowFpBackfillNote(sql, 'dimulai dari dashboard');
-          await appendBackfillActivityLog(sql, {
+          await recordRowFpStats(db, remaining, { active: true, cronEnabled: true });
+          await recordRowFpBackfillNote(db, 'dimulai dari dashboard');
+          await appendBackfillActivityLog(db, {
             action: 'mulai',
             detail: 'backfill row_fp dari dashboard',
             null_remaining: remaining,
           });
           const backfill = await runBackfillCronIfDue(env);
-          const report = await buildSyncStatusReport(sql);
+          const report = await buildSyncStatusReport(db);
           return new Response(
             JSON.stringify({
               status: 'success',
@@ -949,18 +949,18 @@ export default {
           );
         }
 
-        const rfStop = await getRowFpStatsForReport(sql, metaBf.totalSekolah);
-        await recordRowFpStats(sql, rfStop.null_count ?? 0, {
+        const rfStop = await getRowFpStatsForReport(db, metaBf.totalSekolah);
+        await recordRowFpStats(db, rfStop.null_count ?? 0, {
           active: false,
           cronEnabled: false,
         });
-        await recordRowFpBackfillNote(sql, 'dihentikan dari dashboard');
-        await appendBackfillActivityLog(sql, {
+        await recordRowFpBackfillNote(db, 'dihentikan dari dashboard');
+        await appendBackfillActivityLog(db, {
           action: 'henti',
           detail: 'backfill row_fp dihentikan manual',
           null_remaining: rfStop.null_count,
         });
-        const report = await buildSyncStatusReport(sql);
+        const report = await buildSyncStatusReport(db);
         return new Response(
           JSON.stringify({
             status: 'success',
@@ -975,13 +975,13 @@ export default {
         const auth = assertSyncAuthorized(request, url, env);
         if (!auth.ok) return auth.response;
 
-        const metaBf = await getApiMeta(getSql(env));
-        const rfBf = await getRowFpStatsForReport(getSql(env), metaBf.totalSekolah);
+        const metaBf = await getApiMeta(getDb(env));
+        const rfBf = await getRowFpStatsForReport(getDb(env), metaBf.totalSekolah);
         if (!rfBf.backfill_cron && rfBf.null_count != null && rfBf.null_count > 0) {
-          await recordRowFpStats(getSql(env), rfBf.null_count, { active: true, cronEnabled: true });
+          await recordRowFpStats(getDb(env), rfBf.null_count, { active: true, cronEnabled: true });
         }
         const backfill = await runBackfillCronIfDue(env);
-        const report = await buildSyncStatusReport(getSql(env));
+        const report = await buildSyncStatusReport(getDb(env));
         return new Response(
           JSON.stringify({
             status: 'success',
@@ -995,8 +995,8 @@ export default {
       if (pathname === '/resume') {
         const auth = resolveSyncAuth(request, url, env, { soft: false });
         if (!auth.ok) return auth.response;
-        const sql = getSql(env);
-        const info = await ensureGithubSyncRunning(sql);
+        const db = getDb(env);
+        const info = await ensureGithubSyncRunning(db);
         return new Response(JSON.stringify({ status: 'ok', ...info }), {
           headers: jsonHeaders,
         });
@@ -1029,7 +1029,7 @@ export default {
         const auth = resolveSyncAuth(request, url, env, { soft: softRun });
         if (!auth.ok) {
           if (auth.ignored) {
-            const report = await buildSyncStatusReport(getSql(env));
+            const report = await buildSyncStatusReport(getDb(env));
             return new Response(
               JSON.stringify({
                 status: 'ignored',
@@ -1049,9 +1049,9 @@ export default {
           const plan = await planResumeCron(env);
 
           if (plan.action === 'skip') {
-            await recordCronTick(getSql(env), `lewati — ${plan.reason}`);
+            await recordCronTick(getDb(env), `lewati — ${plan.reason}`);
             if (plan.reason !== 'completed') {
-              await appendCronJobActivityLog(getSql(env), {
+              await appendCronJobActivityLog(getDb(env), {
                 kind: 'cron_skip',
                 action: plan.reason,
                 offset: plan.offset,
@@ -1071,10 +1071,10 @@ export default {
           }
 
           if (!waitForResult) {
-            const acquired = await tryAcquireChunkLock(getSql(env), plan.offset);
+            const acquired = await tryAcquireChunkLock(getDb(env), plan.offset);
             if (!acquired) {
-              await recordCronTick(getSql(env), `lewati — chunk masih berjalan @ ${plan.offset}`);
-              await appendCronJobActivityLog(getSql(env), {
+              await recordCronTick(getDb(env), `lewati — chunk masih berjalan @ ${plan.offset}`);
+              await appendCronJobActivityLog(getDb(env), {
                 kind: 'cron_skip',
                 action: 'chunk_in_progress',
                 offset: plan.offset,
@@ -1091,8 +1091,8 @@ export default {
               );
             }
 
-            await recordCronTick(getSql(env), `diterima @ ${plan.offset}`);
-            await appendCronJobActivityLog(getSql(env), {
+            await recordCronTick(getDb(env), `diterima @ ${plan.offset}`);
+            await appendCronJobActivityLog(getDb(env), {
               kind: 'cron_tick',
               action: 'accepted',
               detail: 'permintaan diterima, memproses di background',
@@ -1113,7 +1113,7 @@ export default {
           }
 
           const exec = await executeResumeCron(env, plan.offset, {});
-          const report = await buildSyncStatusReport(getSql(env));
+          const report = await buildSyncStatusReport(getDb(env));
           return new Response(JSON.stringify({ ...report, cron_tick: exec }), {
             headers: jsonHeaders,
           });
@@ -1121,7 +1121,7 @@ export default {
 
         const offset = Math.max(0, parseInt(url.searchParams.get('offset') || '0', 10) || 0);
         const resume = url.searchParams.get('resume') === '1';
-        const sqlRun = getSql(env);
+        const sqlRun = getDb(env);
         const driver =
           url.searchParams.get('driver') === 'github'
             ? SYNC_DRIVER_GITHUB
@@ -1140,7 +1140,7 @@ export default {
         const burstOn = url.searchParams.get('burst') === '1';
         const assumeLight = monthlyStart ? !fastOff : burstOn;
 
-        const batchOpts = await pickCronBatchPlan(getSql(env), {
+        const batchOpts = await pickCronBatchPlan(getDb(env), {
           maxChunks: waitForResult ? MANUAL_MAX_CHUNKS : undefined,
           wallMs: waitForResult ? MANUAL_WALL_MS : undefined,
           maxPages: monthlyStart ? CRON_TICK_PAGES_FULL : undefined,
@@ -1148,8 +1148,8 @@ export default {
         });
 
         if (!waitForResult) {
-          await recordCronTick(getSql(env), `run diterima @ ${offset}`);
-          await appendCronJobActivityLog(getSql(env), {
+          await recordCronTick(getDb(env), `run diterima @ ${offset}`);
+          await appendCronJobActivityLog(getDb(env), {
             kind: 'cron_run',
             action: 'accepted',
             detail: resume
@@ -1176,14 +1176,14 @@ export default {
           );
         }
 
-        await appendCronJobActivityLog(getSql(env), {
+        await appendCronJobActivityLog(getDb(env), {
           kind: 'cron_run',
           action: 'run',
           detail: 'memproses batch (wait=1)',
           offset,
         });
-        const batch = await runCronBatch(getSql(env), offset, batchOpts);
-        const report = await buildSyncStatusReport(getSql(env));
+        const batch = await runCronBatch(getDb(env), offset, batchOpts);
+        const report = await buildSyncStatusReport(getDb(env));
 
         return new Response(
           JSON.stringify({
@@ -1205,7 +1205,7 @@ export default {
         return new Response('Not Found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
       }
 
-      const report = await buildSyncStatusReport(getSql(env));
+      const report = await buildSyncStatusReport(getDb(env));
 
       if (!wantsJson) {
         return new Response(renderSyncStatusHtml(report), {

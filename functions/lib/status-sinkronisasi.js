@@ -1,40 +1,39 @@
 import { formatSyncTimeWib } from './sync-meta.js';
-import { countSekolah } from './sekolah-pg.js';
-import { metaGet } from './pg-meta.js';
+import { countSekolah } from './sekolah-db.js';
+import { metaGet } from './db-meta.js';
 
 const KEY_LAST_SYNC = 'last_sync_at';
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} db
  */
-export async function recordSinkronisasiSelesai(sql) {
-  const total = await countSekolah(sql);
+export async function recordSinkronisasiSelesai(db) {
+  const total = await countSekolah(db);
   const now = new Date().toISOString();
-  await sql`
+  await db.prepare(`
     INSERT INTO status_sinkronisasi (id, waktu_selesai_terakhir, total_sekolah, updated_at)
-    VALUES (2, ${now}, ${total}, NOW())
+    VALUES (2, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT (id) DO UPDATE SET
-      waktu_selesai_terakhir = EXCLUDED.waktu_selesai_terakhir,
-      total_sekolah = EXCLUDED.total_sekolah,
-      updated_at = NOW()
-  `;
+      waktu_selesai_terakhir = excluded.waktu_selesai_terakhir,
+      total_sekolah = excluded.total_sekolah,
+      updated_at = CURRENT_TIMESTAMP
+  `).bind(now, total).run();
 }
 
 /**
  * Metadata publik untuk halaman utama & GET /api/status
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} db
  */
-export async function getStatusSinkronisasiPublik(sql) {
+export async function getStatusSinkronisasiPublik(db) {
   let waktuIso = null;
   let total = null;
 
   try {
-    const rows = await sql`
+    const row = await db.prepare(`
       SELECT waktu_selesai_terakhir, total_sekolah
       FROM status_sinkronisasi
       WHERE id = 2
-    `;
-    const row = rows[0];
+    `).first();
     if (row?.waktu_selesai_terakhir) {
       waktuIso = new Date(row.waktu_selesai_terakhir).toISOString();
     }
@@ -47,7 +46,7 @@ export async function getStatusSinkronisasiPublik(sql) {
 
   if (!waktuIso) {
     try {
-      const legacy = await metaGet(sql, KEY_LAST_SYNC);
+      const legacy = await metaGet(db, KEY_LAST_SYNC);
       if (legacy) waktuIso = new Date(legacy.includes('T') ? legacy : legacy + 'Z').toISOString();
     } catch {
       /* ignore */
@@ -56,7 +55,7 @@ export async function getStatusSinkronisasiPublik(sql) {
 
   if (total == null || !Number.isFinite(total)) {
     try {
-      total = await countSekolah(sql);
+      total = await countSekolah(db);
     } catch {
       total = null;
     }

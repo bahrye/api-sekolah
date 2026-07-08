@@ -1,8 +1,8 @@
 import { getApiMeta } from '../lib/sync-meta.js';
 import { getStatusSinkronisasiPublik } from '../lib/status-sinkronisasi.js';
 import { formatNeonRowResponse } from '../lib/sekolah-schema.js';
-import { getSql } from '../lib/neon.js';
-import { listSekolah, searchSekolah } from '../lib/sekolah-pg.js';
+import { getDb } from '../lib/db.js';
+import { listSekolah, searchSekolah } from '../lib/sekolah-db.js';
 
 const DEVELOPER = 'Syamsul Bahri';
 
@@ -31,15 +31,15 @@ export async function onRequest(context) {
   }
 
   try {
-    const sql = getSql(context.env);
+    const db = getDb(context.env);
     const [sinkron, apiMeta] = await Promise.all([
-      getStatusSinkronisasiPublik(sql),
-      getApiMeta(sql),
+      getStatusSinkronisasiPublik(db),
+      getApiMeta(db),
     ]);
     const totalSekolah = sinkron.total_sekolah ?? apiMeta.totalSekolah;
     const rows = keyword
-      ? await searchSekolah(sql, keyword.trim(), limit, offset)
-      : await listSekolah(sql, limit, offset);
+      ? await searchSekolah(db, keyword.trim(), limit, offset)
+      : await listSekolah(db, limit, offset);
 
     const formattedResults = rows.map((row) => formatNeonRowResponse(row));
 

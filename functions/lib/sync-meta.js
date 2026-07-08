@@ -1,5 +1,5 @@
-import { metaUpsert, metaGetMany, metaGet, metaDelete } from './pg-meta.js';
-import { countSekolah } from './sekolah-pg.js';
+import { metaUpsert, metaGetMany, metaGet, metaDelete } from './db-meta.js';
+import { countSekolah } from './sekolah-db.js';
 import { recordSinkronisasiSelesai } from './status-sinkronisasi.js';
 
 const KEY_LAST_SYNC = 'last_sync_at';
@@ -25,14 +25,14 @@ export const STALE_SYNC_MS = 4 * 60 * 1000;
 export const CHUNK_LOCK_TTL_MS = 120_000;
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function getApiMeta(sql) {
+export async function getApiMeta(db) {
   try {
-    const map = await metaGetMany(sql, [KEY_LAST_SYNC, KEY_TOTAL]);
+    const map = await metaGetMany(db, [KEY_LAST_SYNC, KEY_TOTAL]);
     let total = map[KEY_TOTAL] != null ? parseInt(map[KEY_TOTAL], 10) : null;
     if (!Number.isFinite(total)) {
-      total = await countSekolah(sql);
+      total = await countSekolah(db);
     }
     return {
       lastSyncIso: map[KEY_LAST_SYNC] ?? null,
@@ -44,10 +44,10 @@ export async function getApiMeta(sql) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function getLastSyncAt(sql) {
-  const meta = await getApiMeta(sql);
+export async function getLastSyncAt(db) {
+  const meta = await getApiMeta(db);
   return meta.lastSyncIso;
 }
 
@@ -65,44 +65,44 @@ export function formatSyncTimeWib(iso) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function recordLastSyncAt(sql) {
-  await metaUpsert(sql, KEY_LAST_SYNC, new Date().toISOString());
+export async function recordLastSyncAt(db) {
+  await metaUpsert(db, KEY_LAST_SYNC, new Date().toISOString());
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {number} delta
  */
-export async function incrementTotalSekolah(sql, delta) {
+export async function incrementTotalSekolah(db, delta) {
   if (delta <= 0) return;
-  const current = await metaGet(sql, KEY_TOTAL);
+  const current = await metaGet(db, KEY_TOTAL);
   const n = (parseInt(current || '0', 10) || 0) + delta;
-  await metaUpsert(sql, KEY_TOTAL, n);
+  await metaUpsert(db, KEY_TOTAL, n);
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {{ inserted: number, updated: number }} stats
  * @param {boolean} finished
  */
-export async function maybeRecordLastSync(sql, stats, finished) {
+export async function maybeRecordLastSync(db, stats, finished) {
   const hadWrites = stats.inserted + stats.updated > 0;
-  if (stats.inserted > 0) await incrementTotalSekolah(sql, stats.inserted);
-  if (hadWrites || finished) await recordLastSyncAt(sql);
+  if (stats.inserted > 0) await incrementTotalSekolah(db, stats.inserted);
+  if (hadWrites || finished) await recordLastSyncAt(db);
   if (finished) {
-    const total = await countSekolah(sql);
-    await metaUpsert(sql, KEY_TOTAL, total);
+    const total = await countSekolah(db);
+    await metaUpsert(db, KEY_TOTAL, total);
   }
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function getSyncProgress(sql) {
+export async function getSyncProgress(db) {
   try {
-    const map = await metaGetMany(sql, [
+    const map = await metaGetMany(db, [
       KEY_SYNC_OFFSET,
       KEY_SYNC_STATE,
       KEY_SYNC_API_TOTAL,
@@ -122,29 +122,29 @@ export async function getSyncProgress(sql) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {{ nextOffset: number, done: boolean, apiTotal?: number }} opts
  */
-export async function recordSyncProgress(sql, { nextOffset, done, apiTotal }) {
+export async function recordSyncProgress(db, { nextOffset, done, apiTotal }) {
   let state;
   if (done) {
     state = 'completed';
-    await setCronEnabled(sql, false);
+    await setCronEnabled(db, false);
     try {
-      await recordSinkronisasiSelesai(sql);
+      await recordSinkronisasiSelesai(db);
     } catch (err) {
       console.error('recordSinkronisasiSelesai:', err?.message || err);
     }
-  } else if (await isSyncManuallyPaused(sql)) {
+  } else if (await isSyncManuallyPaused(db)) {
     state = 'stalled';
   } else {
     state = 'running';
   }
   const now = new Date().toISOString();
-  await metaUpsert(sql, KEY_SYNC_OFFSET, nextOffset);
-  await metaUpsert(sql, KEY_SYNC_STATE, state);
-  await metaUpsert(sql, KEY_SYNC_CHUNK_AT, now);
-  if (apiTotal != null) await metaUpsert(sql, KEY_SYNC_API_TOTAL, apiTotal);
+  await metaUpsert(db, KEY_SYNC_OFFSET, nextOffset);
+  await metaUpsert(db, KEY_SYNC_STATE, state);
+  await metaUpsert(db, KEY_SYNC_CHUNK_AT, now);
+  if (apiTotal != null) await metaUpsert(db, KEY_SYNC_API_TOTAL, apiTotal);
 }
 
 /**
@@ -207,66 +207,66 @@ export function resolveSyncRunState(prog, apiTotal, cron = null, opts = null) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function markSyncStalled(sql) {
-  await metaUpsert(sql, KEY_SYNC_STATE, 'stalled');
+export async function markSyncStalled(db) {
+  await metaUpsert(db, KEY_SYNC_STATE, 'stalled');
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function markSyncPaused(sql) {
-  await setCronEnabled(sql, false);
-  await markSyncStalled(sql);
+export async function markSyncPaused(db) {
+  await setCronEnabled(db, false);
+  await markSyncStalled(db);
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {number} offset
  */
-export async function markSyncResumeAt(sql, offset) {
-  await recordSyncProgress(sql, { nextOffset: offset, done: false });
-  await setCronEnabled(sql, true);
+export async function markSyncResumeAt(db, offset) {
+  await recordSyncProgress(db, { nextOffset: offset, done: false });
+  await setCronEnabled(db, true);
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {boolean} enabled
  */
-export async function setCronEnabled(sql, enabled) {
-  await metaUpsert(sql, KEY_SYNC_CRON_ENABLED, enabled ? '1' : '0');
+export async function setCronEnabled(db, enabled) {
+  await metaUpsert(db, KEY_SYNC_CRON_ENABLED, enabled ? '1' : '0');
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function isCronEnabled(sql) {
+export async function isCronEnabled(db) {
   try {
-    return (await metaGet(sql, KEY_SYNC_CRON_ENABLED)) === '1';
+    return (await metaGet(db, KEY_SYNC_CRON_ENABLED)) === '1';
   } catch {
     return false;
   }
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function isSyncManuallyPaused(sql) {
-  if (await isCronEnabled(sql)) return false;
-  const prog = await getSyncProgress(sql);
+export async function isSyncManuallyPaused(db) {
+  if (await isCronEnabled(db)) return false;
+  const prog = await getSyncProgress(db);
   if (prog.runState !== 'stalled') return false;
-  const meta = await getApiMeta(sql);
+  const meta = await getApiMeta(db);
   const total = prog.apiTotal ?? meta.totalSekolah ?? 0;
   return (prog.currentOffset ?? 0) < total;
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-async function getChunkLockTimestamp(sql) {
+async function getChunkLockTimestamp(db) {
   try {
-    const v = await metaGet(sql, KEY_CHUNK_LOCK);
+    const v = await metaGet(db, KEY_CHUNK_LOCK);
     if (!v) return null;
     const t = new Date(v).getTime();
     return Number.isFinite(t) ? t : null;
@@ -276,24 +276,24 @@ async function getChunkLockTimestamp(sql) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function clearStaleChunkLock(sql) {
-  const lockAt = await getChunkLockTimestamp(sql);
+export async function clearStaleChunkLock(db) {
+  const lockAt = await getChunkLockTimestamp(db);
   if (lockAt == null) return false;
   if (Date.now() - lockAt >= CHUNK_LOCK_TTL_MS) {
-    await releaseChunkLock(sql);
+    await releaseChunkLock(db);
     return true;
   }
   return false;
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function isChunkLocked(sql) {
+export async function isChunkLocked(db) {
   try {
-    const lockAt = await getChunkLockTimestamp(sql);
+    const lockAt = await getChunkLockTimestamp(db);
     if (lockAt == null) return false;
     const age = Date.now() - lockAt;
     return age >= 0 && age < CHUNK_LOCK_TTL_MS;
@@ -303,11 +303,11 @@ export async function isChunkLocked(sql) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function getChunkLockOffset(sql) {
+export async function getChunkLockOffset(db) {
   try {
-    const v = await metaGet(sql, KEY_CHUNK_LOCK_OFFSET);
+    const v = await metaGet(db, KEY_CHUNK_LOCK_OFFSET);
     if (v == null) return null;
     const n = parseInt(v, 10);
     return Number.isFinite(n) ? n : null;
@@ -317,47 +317,47 @@ export async function getChunkLockOffset(sql) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {number} [offset]
  */
-export async function tryAcquireChunkLock(sql, offset) {
-  await clearStaleChunkLock(sql);
-  if (await isChunkLocked(sql)) return false;
-  await metaUpsert(sql, KEY_CHUNK_LOCK, new Date().toISOString());
+export async function tryAcquireChunkLock(db, offset) {
+  await clearStaleChunkLock(db);
+  if (await isChunkLocked(db)) return false;
+  await metaUpsert(db, KEY_CHUNK_LOCK, new Date().toISOString());
   if (offset != null && Number.isFinite(offset)) {
-    await metaUpsert(sql, KEY_CHUNK_LOCK_OFFSET, offset);
+    await metaUpsert(db, KEY_CHUNK_LOCK_OFFSET, offset);
   }
   return true;
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function releaseChunkLock(sql) {
+export async function releaseChunkLock(db) {
   try {
-    await metaDelete(sql, KEY_CHUNK_LOCK);
-    await metaDelete(sql, KEY_CHUNK_LOCK_OFFSET);
+    await metaDelete(db, KEY_CHUNK_LOCK);
+    await metaDelete(db, KEY_CHUNK_LOCK_OFFSET);
   } catch {
     /* ignore */
   }
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {string} note
  */
-export async function recordCronTick(sql, note) {
+export async function recordCronTick(db, note) {
   const now = new Date().toISOString();
-  await metaUpsert(sql, KEY_SYNC_CRON_TICK, now);
-  await metaUpsert(sql, KEY_SYNC_CRON_NOTE, note);
+  await metaUpsert(db, KEY_SYNC_CRON_TICK, now);
+  await metaUpsert(db, KEY_SYNC_CRON_NOTE, note);
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function getCronHeartbeat(sql) {
+export async function getCronHeartbeat(db) {
   try {
-    const map = await metaGetMany(sql, [
+    const map = await metaGetMany(db, [
       KEY_SYNC_CRON_TICK,
       KEY_SYNC_CRON_NOTE,
       KEY_SYNC_CRON_ENABLED,
@@ -373,22 +373,22 @@ export async function getCronHeartbeat(sql) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function markSyncRunStarted(sql) {
+export async function markSyncRunStarted(db) {
   const now = new Date().toISOString();
-  await setCronEnabled(sql, true);
-  await metaUpsert(sql, KEY_SYNC_OFFSET, '0');
-  await metaUpsert(sql, KEY_SYNC_STATE, 'running');
-  await metaUpsert(sql, KEY_SYNC_CHUNK_AT, now);
+  await setCronEnabled(db, true);
+  await metaUpsert(db, KEY_SYNC_OFFSET, '0');
+  await metaUpsert(db, KEY_SYNC_STATE, 'running');
+  await metaUpsert(db, KEY_SYNC_CHUNK_AT, now);
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  */
-export async function getSyncDriver(sql) {
+export async function getSyncDriver(db) {
   try {
-    const v = await metaGet(sql, KEY_SYNC_DRIVER);
+    const v = await metaGet(db, KEY_SYNC_DRIVER);
     return v === SYNC_DRIVER_GITHUB ? SYNC_DRIVER_GITHUB : SYNC_DRIVER_CRON;
   } catch {
     return SYNC_DRIVER_CRON;
@@ -396,11 +396,11 @@ export async function getSyncDriver(sql) {
 }
 
 /**
- * @param {import('@neondatabase/serverless').NeonQueryFunction} sql
+ * @param {import('@cloudflare/workers-types').D1Database} sql
  * @param {string} driver
  */
-export async function setSyncDriver(sql, driver) {
+export async function setSyncDriver(db, driver) {
   const v =
     driver === SYNC_DRIVER_GITHUB ? SYNC_DRIVER_GITHUB : SYNC_DRIVER_CRON;
-  await metaUpsert(sql, KEY_SYNC_DRIVER, v);
+  await metaUpsert(db, KEY_SYNC_DRIVER, v);
 }
