@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS sekolah (
   nama_kabupaten TEXT,
   nama_provinsi TEXT,
   alamat_jalan TEXT,
+  satuan_pendidikan_id TEXT,
+  kode_wilayah TEXT,
   row_fp TEXT,
   migrated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

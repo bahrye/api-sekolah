@@ -261,7 +261,6 @@ export function renderSyncStatusHtml(report) {
       </div>
       <a href="${homeUrl}" class="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg">← Beranda</a>
     </header>
-    <p id="refresh-hint" class="text-[11px] text-center text-slate-400 mb-4 -mt-2">Memperbarui sync, row_fp &amp; log otomatis · sinkron penuh pukul <span id="refresh-at">—</span></p>
 
     <div class="bg-white rounded-xl border border-slate-200 p-5 mb-4 shadow-sm">
       <div class="flex justify-between items-center mb-3">
@@ -274,66 +273,6 @@ export function renderSyncStatusHtml(report) {
       <p id="sync-progress-pct" class="text-2xl font-bold text-slate-900">${esc(s.progress_percent)}%</p>
       <p id="sync-progress-label" class="text-sm text-slate-600 mt-1">${esc(s.progress_label)}</p>
       <p id="sync-progress-offset" class="text-xs text-slate-400 mt-2">Offset saat ini: ${esc(s.current_offset)} · Sisa ~${esc(s.records_remaining.toLocaleString('id-ID'))}</p>
-
-      <div class="mt-4 pt-4 border-t border-slate-100">
-        <p class="text-xs font-semibold text-slate-600 mb-2">Kontrol update data</p>
-        <label for="sync-secret-input" class="block text-[11px] text-slate-500 mb-1">SYNC_SECRET</label>
-        <input type="password" id="sync-secret-input" autocomplete="off" placeholder="Masukkan secret…"
-          class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <div class="flex gap-2">
-          <button type="button" id="btn-sync-start"
-            class="flex-1 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg px-3 py-2.5 transition-colors">
-            Mulai
-          </button>
-          <button type="button" id="btn-sync-stop"
-            class="flex-1 text-sm font-semibold text-slate-800 bg-slate-100 border border-slate-200 hover:bg-slate-200 disabled:opacity-50 rounded-lg px-3 py-2.5 transition-colors">
-            Berhenti
-          </button>
-        </div>
-        <p id="control-msg" class="text-xs mt-2 min-h-[1.25rem] text-slate-500"></p>
-      </div>
-    </div>
-
-    <div class="bg-white rounded-xl border border-slate-200 p-5 mb-4 shadow-sm text-sm space-y-2">
-      <p><span class="text-slate-500">Total di database</span><br><strong id="sync-details-total">${d.total_sekolah != null ? esc(d.total_sekolah.toLocaleString('id-ID')) + ' sekolah' : '—'}</strong></p>
-      <p><span class="text-slate-500">Update data terakhir</span><br><strong id="sync-details-update">${esc(d.waktu_update_terakhir)}</strong></p>
-      <p><span class="text-slate-500">Chunk terakhir diproses</span><br><strong id="sync-details-chunk">${esc(s.last_chunk_at_wib)}</strong></p>
-      <p><span class="text-slate-500">Cron terakhir</span><br><strong id="sync-cron-last">${esc(report.cron_job?.last_call_wib ?? report.cron?.last_tick_wib)}</strong><br><span id="sync-cron-note" class="text-xs text-slate-400">${esc(report.cron_job?.last_call_note ?? report.cron?.last_tick_note)}</span></p>
-      <p><span class="text-slate-500">Job /tick aktif</span><br><strong id="sync-cron-active">${(report.cron_job?.enabled ?? report.cron?.enabled) ? 'Ya (sync berjalan)' : 'Tidak (idle / selesai)'}</strong></p>
-      <p><span class="text-slate-500">Jadwal</span><br>${esc(report.jadwal)}</p>
-      <p id="sync-catatan" class="text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3 text-xs leading-relaxed${s.catatan ? '' : ' hidden'}">${esc(s.catatan || '')}</p>
-    </div>
-
-    <div class="bg-white rounded-xl border border-violet-200 p-5 mb-4 shadow-sm">
-      <div class="flex justify-between items-start gap-2 mb-3">
-        <div>
-          <span class="text-sm font-semibold text-slate-700">Kolom <code class="text-xs bg-violet-50 px-1 rounded">row_fp</code></span>
-          <p class="text-[11px] text-slate-500 mt-0.5">Sidik jari baris · hemat kuota sync</p>
-        </div>
-        <span id="row-fp-badge" class="text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${rowFpBadgeClass(rf)}">${esc(rowFpStatusLabel(rf))}</span>
-      </div>
-      <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-2">
-        <div id="row-fp-progress-bar" class="h-full bg-violet-600 rounded-full transition-all duration-500" style="width:${rowFpPct}%"></div>
-      </div>
-      <p id="row-fp-percent" class="text-xl font-bold text-slate-900">${rf.percent_filled != null ? esc(rf.percent_filled) + '% terisi' : '—'}</p>
-      <p id="row-fp-counts" class="text-sm text-slate-600 mt-1">${rf.measured ? `Kosong: ${Number(rf.null_count).toLocaleString('id-ID')} · Terisi: ${Number(rf.filled_count).toLocaleString('id-ID')}${rf.total ? ' / ' + Number(rf.total).toLocaleString('id-ID') : ''}` : 'Gunakan SYNC_SECRET di atas, lalu Ukur ulang.'}</p>
-      <p id="row-fp-stats-at" class="text-xs text-slate-400 mt-2">Terakhir diukur: ${esc(rf.stats_at_wib || 'belum pernah')}</p>
-      <p id="row-fp-note" class="text-xs text-violet-700 mt-1${rf.backfill_note ? '' : ' hidden'}">${esc(rf.backfill_note || '')}</p>
-      <p id="row-fp-msg" class="text-xs mt-2 min-h-[1.25rem] text-violet-600"></p>
-      <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <button type="button" id="btn-rowfp-measure"
-          class="text-xs font-semibold text-violet-800 bg-violet-50 border border-violet-200 hover:bg-violet-100 rounded-lg px-2 py-2 transition-colors">
-          Ukur ulang
-        </button>
-        <button type="button" id="btn-rowfp-start"
-          class="text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 rounded-lg px-2 py-2 transition-colors">
-          Mulai backfill
-        </button>
-        <button type="button" id="btn-rowfp-stop"
-          class="text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-lg px-2 py-2 transition-colors">
-          Berhenti
-        </button>
-      </div>
     </div>
 
     <div class="bg-white rounded-xl border border-slate-200 p-5 mb-4 shadow-sm">
@@ -345,10 +284,6 @@ export function renderSyncStatusHtml(report) {
         ${renderActivityLogItemsHtml(report.activity_log, esc)}
       </ol>
     </div>
-
-    <p class="text-xs text-slate-500 bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 mb-4 text-center leading-relaxed">
-      Secret salah → perintah <strong>diabaikan</strong> (sync yang sedang jalan tidak dihentikan). Secret benar → Mulai/Berhenti update data &amp; backfill <code class="bg-white px-1 rounded">row_fp</code> dari halaman ini.
-    </p>
 
     <p class="text-xs text-slate-400 text-center">JSON: <a class="text-blue-600 underline" href="?format=json">?format=json</a> · Progres &amp; log diperbarui otomatis tanpa reload halaman</p>
   </div>

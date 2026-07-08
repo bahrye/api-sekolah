@@ -15,6 +15,8 @@ export const FIELDS = [
   'Kabupaten',
   'Provinsi',
   'Alamat',
+  'SatuanPendidikanId',
+  'KodeWilayah',
 ];
 
 /** Kolom untuk respons API publik (tanpa kolom internal) */
@@ -40,6 +42,8 @@ export function rowFromDb(r) {
     Kabupaten: r.nama_kabupaten,
     Provinsi: r.nama_provinsi,
     Alamat: r.alamat_jalan,
+    SatuanPendidikanId: r.satuan_pendidikan_id,
+    KodeWilayah: r.kode_wilayah,
     [ROW_FP_COLUMN]: r.row_fp,
   };
 }
@@ -79,6 +83,8 @@ export function mapFromApi(item) {
     Kabupaten: normalizeFieldValue(item.namaKabupaten ?? item.Kabupaten),
     Provinsi: normalizeFieldValue(item.namaProvinsi ?? item.Provinsi),
     Alamat: normalizeFieldValue(item.alamatJalan ?? item.Alamat),
+    SatuanPendidikanId: normalizeFieldValue(item.satuanPendidikanId ?? item.SatuanPendidikanId),
+    KodeWilayah: normalizeFieldValue(item.kodeWilayah ?? item.KodeWilayah),
   };
 }
 
@@ -112,6 +118,8 @@ export function formatRowResponse(row) {
     nama_kabupaten: row.Kabupaten,
     nama_provinsi: row.Provinsi || null,
     alamat_jalan: row.Alamat,
+    satuan_pendidikan_id: row.SatuanPendidikanId,
+    kode_wilayah: row.KodeWilayah,
   };
 }
 

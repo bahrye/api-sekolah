@@ -25,6 +25,8 @@ const UPSERT_COLS = [
   'nama_kabupaten',
   'nama_provinsi',
   'alamat_jalan',
+  'satuan_pendidikan_id',
+  'kode_wilayah',
   'row_fp',
 ];
 
@@ -47,6 +49,8 @@ export function rowToDbRecord(row) {
     nama_kabupaten: row.Kabupaten || null,
     nama_provinsi: row.Provinsi || null,
     alamat_jalan: row.Alamat || null,
+    satuan_pendidikan_id: row.SatuanPendidikanId || null,
+    kode_wilayah: row.KodeWilayah || null,
     row_fp: row[ROW_FP_COLUMN] ?? row.row_fp ?? '',
   };
 }
@@ -69,7 +73,8 @@ export async function listSekolah(db, limit, offset) {
     SELECT
       npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan,
       status_satuan_pendidikan, jenjang_pendidikan, pembina, jalur_pendidikan,
-      nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan, row_fp
+      nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan, 
+      satuan_pendidikan_id, kode_wilayah, row_fp
     FROM sekolah
     ORDER BY npsn
     LIMIT ? OFFSET ?
@@ -89,7 +94,8 @@ export async function searchSekolah(db, keyword, limit, offset) {
     SELECT
       npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan,
       status_satuan_pendidikan, jenjang_pendidikan, pembina, jalur_pendidikan,
-      nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan, row_fp
+      nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan,
+      satuan_pendidikan_id, kode_wilayah, row_fp
     FROM sekolah
     WHERE npsn LIKE ? OR nama LIKE ?
     ORDER BY npsn
@@ -109,7 +115,8 @@ export async function fetchSekolahByNpsns(db, npsns) {
     SELECT
       npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan,
       status_satuan_pendidikan, jenjang_pendidikan, pembina, jalur_pendidikan,
-      nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan, row_fp
+      nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan,
+      satuan_pendidikan_id, kode_wilayah, row_fp
     FROM sekolah
     WHERE npsn IN (${placeholders})
   `).bind(...npsns).all();
@@ -140,7 +147,7 @@ export async function upsertSekolahRowsBulk(db, rows) {
       r.npsn, r.nama, r.bentuk_pendidikan, r.bentuk_pendidikan_group, r.jenis_pendidikan,
       r.status_satuan_pendidikan, r.jenjang_pendidikan, r.pembina, r.jalur_pendidikan,
       r.nama_desa, r.nama_kecamatan, r.nama_kabupaten, r.nama_provinsi, r.alamat_jalan,
-      r.row_fp
+      r.satuan_pendidikan_id, r.kode_wilayah, r.row_fp
     );
   });
 

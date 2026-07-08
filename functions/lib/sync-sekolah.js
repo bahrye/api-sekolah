@@ -114,7 +114,7 @@ export function progressPercent(offset) {
  * @param {{ offset?: number, maxPages?: number, bootstrapOnly?: boolean }} options
  */
 export async function syncSekolahChunk(
-  sql,
+  db,
   { offset = 0, maxPages = DEFAULT_MAX_PAGES, bootstrapOnly = false, wallMs = CHUNK_WALL_MS } = {}
 ) {
   const stats = {

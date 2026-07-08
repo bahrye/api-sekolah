@@ -336,7 +336,7 @@ async function processChunk(db, offset, maxPages, wallMs = chunkWallMsForPages(m
  * @param {{ maxChunks?: number, wallMs?: number }} opts
  */
 async function runCronBatch(
-  sql,
+  db,
   startOffset,
   { maxChunks = 1, wallMs, maxPages, recentWrites } = {}
 ) {
@@ -557,7 +557,7 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
     }
 
     await recordCronTick(
-      sql,
+      db,
       burstMode
         ? `mulai burst ${batchOpts.maxChunks}×chunk @ ${startOffset} (${batchOpts.maxPages} hal ≈${batchOpts.maxPages * PAGE_SIZE}, wall ${Math.round(batchOpts.wallMs / 1000)}s)`
         : `mulai chunk @ ${startOffset} (${batchOpts.maxPages} hal, ~${batchOpts.maxPages * PAGE_SIZE}, wall ${Math.round(batchOpts.wallMs / 1000)}s)`
@@ -577,7 +577,7 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
       const stepDown = lowerChunkPages(tier);
       if (stepDown && stepDown >= CRON_TICK_PAGES_FAST) {
         await recordCronTick(
-          sql,
+          db,
           `timeout ${batchOpts.maxPages} hal → lanjut ${stepDown} hal (~${recordsForMaxPages(stepDown)}) @ ${batch.lastOffset}`
         );
         const cont = await runCronBatch(db, batch.lastOffset, {
@@ -596,7 +596,7 @@ async function executeResumeCron(env, offset, opts = {}, lockHeld = false) {
     }
 
     await recordCronTick(
-      sql,
+      db,
       batch.done
         ? `selesai @ ${batch.lastOffset}`
         : `chunk OK → offset ${batch.lastOffset} (${batch.chunks} chunk, ${batch.pagesUsed ?? batchOpts.maxPages} hal)`
@@ -1196,11 +1196,8 @@ export default {
         );
       }
 
-      const dashboardAuth = resolveSyncAuth(request, url, env, { soft: false });
-      if (!dashboardAuth.ok) {
-        if (wantsJson) return dashboardAuth.response;
-        return new Response('Not Found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
-      }
+      // Halaman monitoring dibuat publik agar mudah diakses
+      // (Endpoint aksi seperti /run atau /pause tetap memiliki otorisasi mandiri)
 
       const report = await buildSyncStatusReport(getDb(env));
 
