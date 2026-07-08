@@ -89,7 +89,28 @@ export async function listSekolah(db, limit, offset) {
  * @param {number} offset
  */
 export async function searchSekolah(db, keyword, limit, offset) {
-  const like = `%${keyword}%`;
+  // 1. Jalur Cepat: Jika persis 8 digit angka, cek sebagai NPSN exact match
+  if (/^\d{8}$/.test(keyword)) {
+    const { results } = await db.prepare(`
+      SELECT
+        npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan,
+        status_satuan_pendidikan, jenjang_pendidikan, pembina, jalur_pendidikan,
+        nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan,
+        satuan_pendidikan_id, kode_wilayah, row_fp
+      FROM sekolah
+      WHERE npsn = ?
+      LIMIT 1
+    `).bind(keyword).all();
+    
+    // Jika ketemu langsung return, sangat cepat (1ms) karena pakai Primary Key
+    if (results && results.length > 0) return results;
+  }
+
+  // 2. Pencarian Umum
+  // Hilangkan ORDER BY npsn agar SQLite berhenti scan saat limit tercapai (Jauh lebih cepat!)
+  const likeName = `%${keyword}%`;
+  const likeNpsn = `${keyword}%`; // Prefix search untuk npsn lebih relevan
+  
   const { results } = await db.prepare(`
     SELECT
       npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan,
@@ -98,9 +119,8 @@ export async function searchSekolah(db, keyword, limit, offset) {
       satuan_pendidikan_id, kode_wilayah, row_fp
     FROM sekolah
     WHERE npsn LIKE ? OR nama LIKE ?
-    ORDER BY npsn
     LIMIT ? OFFSET ?
-  `).bind(like, like, limit, offset).all();
+  `).bind(likeNpsn, likeName, limit, offset).all();
   return results || [];
 }
 
