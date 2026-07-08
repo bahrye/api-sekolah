@@ -1,6 +1,6 @@
 import { getApiMeta } from '../lib/sync-meta.js';
 import { getStatusSinkronisasiPublik } from '../lib/status-sinkronisasi.js';
-import { formatNeonRowResponse } from '../lib/sekolah-schema.js';
+import { formatDbRowResponse } from '../lib/sekolah-schema.js';
 import { getDb } from '../lib/db.js';
 import { listSekolah, searchSekolah } from '../lib/sekolah-db.js';
 
@@ -41,7 +41,7 @@ export async function onRequest(context) {
       ? await searchSekolah(db, keyword.trim(), limit, offset)
       : await listSekolah(db, limit, offset);
 
-    const formattedResults = rows.map((row) => formatNeonRowResponse(row));
+    const formattedResults = rows.map((row) => formatDbRowResponse(row));
 
     const metadata = {
       limit_ditampilkan: limit,

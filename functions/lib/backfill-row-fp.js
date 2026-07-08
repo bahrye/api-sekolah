@@ -31,7 +31,7 @@ export const BACKFILL_BURST_WALL_MS = 85_000;
 
 export const PAGES_BACKFILL_URL = 'https://api-sekolah-kita.pages.dev/backfill-row-fp.html';
 export const WORKER_SYNC_STATUS_URL =
-  'https://api-sekolah-cron.syamsulbahri-agro27b.workers.dev/';
+  'https://api-sekolah-cron.dunia-sekolah.workers.dev/';
 
 /**
  * @param {string} continueUrl

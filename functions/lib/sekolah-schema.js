@@ -24,7 +24,7 @@ export const SELECT_COLS = FIELDS.join(', ');
 export const ROW_FP_COLUMN = 'row_fp';
 
 /** Baris dari PostgreSQL (snake_case) → format internal sync */
-export function rowFromNeon(r) {
+export function rowFromDb(r) {
   return {
     NPSN: r.npsn,
     Nama: r.nama,
@@ -44,8 +44,8 @@ export function rowFromNeon(r) {
   };
 }
 
-export function formatNeonRowResponse(r) {
-  return formatRowResponse(rowFromNeon(r));
+export function formatDbRowResponse(r) {
+  return formatRowResponse(rowFromDb(r));
 }
 export const ROW_FP_VERSION = '1';
 

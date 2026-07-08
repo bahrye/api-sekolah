@@ -1,5 +1,5 @@
 import {
-  rowFromNeon,
+  rowFromDb,
   ROW_FP_COLUMN,
   fingerprintRow,
   rowChanged,
@@ -113,7 +113,7 @@ export async function fetchSekolahByNpsns(db, npsns) {
     FROM sekolah
     WHERE npsn IN (${placeholders})
   `).bind(...npsns).all();
-  return new Map((results || []).map((r) => [r.npsn, rowFromNeon(r)]));
+  return new Map((results || []).map((r) => [r.npsn, rowFromDb(r)]));
 }
 
 /**
@@ -210,7 +210,7 @@ export async function fetchRowsMissingRowFp(db, limit) {
     WHERE row_fp IS NULL OR row_fp = ''
     LIMIT ?
   `).bind(limit).all();
-  return (results || []).map(rowFromNeon);
+  return (results || []).map(rowFromDb);
 }
 
 /**
