@@ -8,8 +8,7 @@ const files = [
   'functions/lib/sync-meta.js',
   'functions/lib/sync-activity-log.js',
   'functions/lib/sync-sekolah.js',
-  'functions/lib/sync-status.js',
-  'cron-sync.js'
+  'functions/lib/sync-status.js'
 ];
 
 files.forEach(f => {
