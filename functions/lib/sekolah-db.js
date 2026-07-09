@@ -265,4 +265,20 @@ export async function backfillRowFpBatchDb(db, batchSize) {
   return { processed: rows.length, updated: rows.length, done: false };
 }
 
+/**
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ */
+export async function getRekapSekolah(db) {
+  const { results } = await db.prepare(`
+    SELECT
+      IFNULL(nama_provinsi, 'TIDAK DIKETAHUI') AS nama_provinsi,
+      IFNULL(bentuk_pendidikan, 'TIDAK DIKETAHUI') AS bentuk_pendidikan,
+      COUNT(npsn) AS total
+    FROM sekolah
+    GROUP BY IFNULL(nama_provinsi, 'TIDAK DIKETAHUI'), IFNULL(bentuk_pendidikan, 'TIDAK DIKETAHUI')
+    ORDER BY nama_provinsi ASC, bentuk_pendidikan ASC
+  `).all();
+  return results || [];
+}
+
 export { fingerprintRow, rowChanged };
