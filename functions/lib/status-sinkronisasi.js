@@ -32,7 +32,8 @@ export async function getStatusSinkronisasiPublik(db) {
     const row = await db.prepare(`
       SELECT waktu_selesai_terakhir, total_sekolah
       FROM status_sinkronisasi
-      WHERE id = 2
+      ORDER BY waktu_selesai_terakhir DESC
+      LIMIT 1
     `).first();
     if (row?.waktu_selesai_terakhir) {
       waktuIso = new Date(row.waktu_selesai_terakhir).toISOString();
