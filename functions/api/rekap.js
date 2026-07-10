@@ -17,19 +17,30 @@ export async function onRequest(context) {
     const rows = await getRekapSekolah(db);
     
     const provSet = new Set();
+    const negaraSet = new Set();
     const jenjangSet = new Set();
-    const mapData = {};
+    const mapIndonesia = {};
+    const mapLuarNegeri = {};
 
     for (const row of rows) {
       const p = row.nama_provinsi;
+      const n = row.nama_negara;
       const j = row.bentuk_pendidikan;
       const total = row.total;
 
-      provSet.add(p);
       jenjangSet.add(j);
 
-      if (!mapData[p]) mapData[p] = {};
-      mapData[p][j] = total;
+      if (p === 'LUAR NEGERI') {
+        if (n) {
+          negaraSet.add(n);
+          if (!mapLuarNegeri[n]) mapLuarNegeri[n] = {};
+          mapLuarNegeri[n][j] = total;
+        }
+      } else {
+        provSet.add(p);
+        if (!mapIndonesia[p]) mapIndonesia[p] = {};
+        mapIndonesia[p][j] = total;
+      }
     }
 
     return new Response(
@@ -37,9 +48,13 @@ export async function onRequest(context) {
         status: 'success',
         metadata: {
           provinsi: Array.from(provSet).sort(),
+          negara: Array.from(negaraSet).sort(),
           jenjang: Array.from(jenjangSet).sort(),
         },
-        data: mapData,
+        data: {
+          indonesia: mapIndonesia,
+          luar_negeri: mapLuarNegeri,
+        },
       }),
       { headers }
     );

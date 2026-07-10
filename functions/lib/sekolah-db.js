@@ -272,11 +272,23 @@ export async function getRekapSekolah(db) {
   const { results } = await db.prepare(`
     SELECT
       IFNULL(nama_provinsi, 'TIDAK DIKETAHUI') AS nama_provinsi,
+      NULL AS nama_negara,
       IFNULL(bentuk_pendidikan, 'TIDAK DIKETAHUI') AS bentuk_pendidikan,
       COUNT(npsn) AS total
     FROM sekolah
+    WHERE nama_provinsi IS NULL OR (nama_provinsi != 'LUAR NEGERI')
     GROUP BY IFNULL(nama_provinsi, 'TIDAK DIKETAHUI'), IFNULL(bentuk_pendidikan, 'TIDAK DIKETAHUI')
-    ORDER BY nama_provinsi ASC, bentuk_pendidikan ASC
+
+    UNION ALL
+
+    SELECT
+      'LUAR NEGERI' AS nama_provinsi,
+      IFNULL(nama_kabupaten, 'TIDAK DIKETAHUI') AS nama_negara,
+      IFNULL(bentuk_pendidikan, 'TIDAK DIKETAHUI') AS bentuk_pendidikan,
+      COUNT(npsn) AS total
+    FROM sekolah
+    WHERE nama_provinsi = 'LUAR NEGERI'
+    GROUP BY IFNULL(nama_kabupaten, 'TIDAK DIKETAHUI'), IFNULL(bentuk_pendidikan, 'TIDAK DIKETAHUI')
   `).all();
   return results || [];
 }

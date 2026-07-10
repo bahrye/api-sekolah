@@ -292,10 +292,17 @@
         </div>
 
         <section class="mt-8 sm:mt-12 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="px-4 sm:px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                <h3 class="font-bold text-slate-800 text-lg sm:text-xl">Pemetaan Data Sekolah</h3>
-                <span class="text-xs font-medium bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">Berdasarkan Bentuk
-                    Pendidikan & Provinsi</span>
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-lg sm:text-xl">Pemetaan Data Sekolah</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Berdasarkan Bentuk Pendidikan & Wilayah</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200" id="rekap-tabs">
+                        <button class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-white text-slate-800 shadow-sm border border-slate-200/50" id="tab-id">INDONESIA</button>
+                        <button class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors text-slate-600 hover:text-slate-900" id="tab-ln">LUAR NEGERI</button>
+                    </div>
+                </div>
             </div>
             <div class="p-0 overflow-x-auto api-url-scroll max-h-[600px] overflow-y-auto">
                 <table class="w-full text-sm text-left text-slate-600 min-w-[800px] border-collapse" id="rekap-table">
@@ -445,6 +452,86 @@
 
             var rekapThead = document.getElementById('rekap-thead');
             var rekapTbody = document.getElementById('rekap-tbody');
+            var tabId = document.getElementById('tab-id');
+            var tabLn = document.getElementById('tab-ln');
+            var currentTab = 'indonesia';
+            var rekapData = null;
+
+            function renderRekap() {
+                if (!rekapData) return;
+                var metadata = rekapData.metadata;
+                var data = rekapData.data;
+                var jenjangList = metadata.jenjang;
+
+                var isLuarNegeri = currentTab === 'luar_negeri';
+                var list = isLuarNegeri ? metadata.negara : metadata.provinsi;
+                var sourceData = isLuarNegeri ? data.luar_negeri : data.indonesia;
+                var labelFirstCol = isLuarNegeri ? 'NEGARA' : 'PROVINSI';
+
+                // Build Header
+                var theadHtml = '<tr><th scope="col" class="px-6 py-4 whitespace-nowrap bg-slate-100 font-bold text-slate-700 md:sticky md:left-0 z-30 border-r border-slate-200 md:shadow-[1px_0_0_0_#e2e8f0]">' + labelFirstCol + '</th>';
+                for (var i = 0; i < jenjangList.length; i++) {
+                    theadHtml += '<th scope="col" class="px-4 py-4 whitespace-nowrap text-center bg-slate-50">' + jenjangList[i] + '</th>';
+                }
+                theadHtml += '<th scope="col" class="px-4 py-4 whitespace-nowrap text-center font-bold bg-slate-100 border-l border-slate-200">TOTAL</th>';
+                theadHtml += '</tr>';
+                rekapThead.innerHTML = theadHtml;
+
+                // Build Body
+                var tbodyHtml = '';
+                var grandTotalAll = 0;
+                var jenjangTotals = {};
+                for (var i = 0; i < jenjangList.length; i++) jenjangTotals[jenjangList[i]] = 0;
+
+                for (var i = 0; i < list.length; i++) {
+                    var item = list[i];
+                    var rowTotal = 0;
+                    var tr = '<tr class="hover:bg-blue-50 transition-colors group bg-white">';
+                    tr += '<td class="px-6 py-3 font-medium text-slate-800 whitespace-nowrap bg-white group-hover:bg-blue-50 md:sticky md:left-0 z-10 border-r border-slate-100 md:shadow-[1px_0_0_0_#f1f5f9] transition-colors">' + item + '</td>';
+
+                    for (var j = 0; j < jenjangList.length; j++) {
+                        var jenjang = jenjangList[j];
+                        var count = (sourceData[item] && sourceData[item][jenjang]) ? sourceData[item][jenjang] : 0;
+                        rowTotal += count;
+                        jenjangTotals[jenjang] += count;
+                        tr += '<td class="px-4 py-3 text-center whitespace-nowrap' + (count > 0 ? ' text-slate-700' : ' text-slate-300') + '">' + (count > 0 ? Number(count).toLocaleString('id-ID') : '-') + '</td>';
+                    }
+                    grandTotalAll += rowTotal;
+                    tr += '<td class="px-4 py-3 text-center whitespace-nowrap font-semibold text-slate-800 bg-slate-50 border-l border-slate-100">' + Number(rowTotal).toLocaleString('id-ID') + '</td>';
+                    tr += '</tr>';
+                    tbodyHtml += tr;
+                }
+
+                // Build Footer Row
+                var tf = '<tr class="bg-slate-100 border-t-2 border-slate-200 sticky bottom-0 z-20 shadow-[0_-1px_2px_rgba(0,0,0,0.05)]">';
+                tf += '<td class="px-6 py-4 font-bold text-slate-800 whitespace-nowrap md:sticky md:left-0 z-30 border-r border-slate-200 bg-slate-100 md:shadow-[1px_0_0_0_#e2e8f0]">TOTAL KESELURUHAN</td>';
+                for (var j = 0; j < jenjangList.length; j++) {
+                    tf += '<td class="px-4 py-4 text-center whitespace-nowrap font-bold text-slate-800 bg-slate-100">' + Number(jenjangTotals[jenjangList[j]]).toLocaleString('id-ID') + '</td>';
+                }
+                tf += '<td class="px-4 py-4 text-center whitespace-nowrap font-bold text-blue-700 bg-blue-50 border-l border-slate-200">' + Number(grandTotalAll).toLocaleString('id-ID') + '</td>';
+                tf += '</tr>';
+                tbodyHtml += tf;
+
+                rekapTbody.innerHTML = tbodyHtml;
+            }
+
+            if (tabId && tabLn) {
+                tabId.addEventListener('click', function () {
+                    if (currentTab === 'indonesia') return;
+                    currentTab = 'indonesia';
+                    tabId.className = 'px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-white text-slate-800 shadow-sm border border-slate-200/50';
+                    tabLn.className = 'px-3 py-1.5 text-xs font-medium rounded-md transition-colors text-slate-600 hover:text-slate-900';
+                    renderRekap();
+                });
+
+                tabLn.addEventListener('click', function () {
+                    if (currentTab === 'luar_negeri') return;
+                    currentTab = 'luar_negeri';
+                    tabLn.className = 'px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-white text-slate-800 shadow-sm border border-slate-200/50';
+                    tabId.className = 'px-3 py-1.5 text-xs font-medium rounded-md transition-colors text-slate-600 hover:text-slate-900';
+                    renderRekap();
+                });
+            }
 
             function loadRekap() {
                 fetch(base + '/api/rekap')
@@ -454,56 +541,8 @@
                             rekapTbody.innerHTML = '<tr><td class="px-6 py-8 text-center text-red-500">Gagal memuat rekap data.</td></tr>';
                             return;
                         }
-                        var metadata = json.metadata;
-                        var data = json.data;
-                        var jenjangList = metadata.jenjang;
-                        var provinsiList = metadata.provinsi;
-
-                        // Build Header
-                        var theadHtml = '<tr><th scope="col" class="px-6 py-4 whitespace-nowrap bg-slate-100 font-bold text-slate-700 md:sticky md:left-0 z-30 border-r border-slate-200 md:shadow-[1px_0_0_0_#e2e8f0]">PROVINSI</th>';
-                        for (var i = 0; i < jenjangList.length; i++) {
-                            theadHtml += '<th scope="col" class="px-4 py-4 whitespace-nowrap text-center bg-slate-50">' + jenjangList[i] + '</th>';
-                        }
-                        theadHtml += '<th scope="col" class="px-4 py-4 whitespace-nowrap text-center font-bold bg-slate-100 border-l border-slate-200">TOTAL</th>';
-                        theadHtml += '</tr>';
-                        rekapThead.innerHTML = theadHtml;
-
-                        // Build Body
-                        var tbodyHtml = '';
-                        var grandTotalAll = 0;
-                        var jenjangTotals = {};
-                        for (var i = 0; i < jenjangList.length; i++) jenjangTotals[jenjangList[i]] = 0;
-
-                        for (var i = 0; i < provinsiList.length; i++) {
-                            var prov = provinsiList[i];
-                            var rowTotal = 0;
-                            var tr = '<tr class="hover:bg-blue-50 transition-colors group bg-white">';
-                            tr += '<td class="px-6 py-3 font-medium text-slate-800 whitespace-nowrap bg-white group-hover:bg-blue-50 md:sticky md:left-0 z-10 border-r border-slate-100 md:shadow-[1px_0_0_0_#f1f5f9] transition-colors">' + prov + '</td>';
-
-                            for (var j = 0; j < jenjangList.length; j++) {
-                                var jenjang = jenjangList[j];
-                                var count = (data[prov] && data[prov][jenjang]) ? data[prov][jenjang] : 0;
-                                rowTotal += count;
-                                jenjangTotals[jenjang] += count;
-                                tr += '<td class="px-4 py-3 text-center whitespace-nowrap' + (count > 0 ? ' text-slate-700' : ' text-slate-300') + '">' + (count > 0 ? Number(count).toLocaleString('id-ID') : '-') + '</td>';
-                            }
-                            grandTotalAll += rowTotal;
-                            tr += '<td class="px-4 py-3 text-center whitespace-nowrap font-semibold text-slate-800 bg-slate-50 border-l border-slate-100">' + Number(rowTotal).toLocaleString('id-ID') + '</td>';
-                            tr += '</tr>';
-                            tbodyHtml += tr;
-                        }
-
-                        // Build Footer Row
-                        var tf = '<tr class="bg-slate-100 border-t-2 border-slate-200 sticky bottom-0 z-20 shadow-[0_-1px_2px_rgba(0,0,0,0.05)]">';
-                        tf += '<td class="px-6 py-4 font-bold text-slate-800 whitespace-nowrap md:sticky md:left-0 z-30 border-r border-slate-200 bg-slate-100 md:shadow-[1px_0_0_0_#e2e8f0]">TOTAL KESELURUHAN</td>';
-                        for (var j = 0; j < jenjangList.length; j++) {
-                            tf += '<td class="px-4 py-4 text-center whitespace-nowrap font-bold text-slate-800 bg-slate-100">' + Number(jenjangTotals[jenjangList[j]]).toLocaleString('id-ID') + '</td>';
-                        }
-                        tf += '<td class="px-4 py-4 text-center whitespace-nowrap font-bold text-blue-700 bg-blue-50 border-l border-slate-200">' + Number(grandTotalAll).toLocaleString('id-ID') + '</td>';
-                        tf += '</tr>';
-                        tbodyHtml += tf;
-
-                        rekapTbody.innerHTML = tbodyHtml;
+                        rekapData = json;
+                        renderRekap();
                     })
                     .catch(function () {
                         rekapTbody.innerHTML = '<tr><td class="px-6 py-8 text-center text-red-500">Gagal terhubung ke API rekap data.</td></tr>';
