@@ -30,16 +30,13 @@ export async function getStatusSinkronisasiPublik(db) {
 
   try {
     const row = await db.prepare(`
-      SELECT waktu_selesai_terakhir, total_sekolah
+      SELECT waktu_selesai_terakhir
       FROM status_sinkronisasi
       ORDER BY waktu_selesai_terakhir DESC
       LIMIT 1
     `).first();
     if (row?.waktu_selesai_terakhir) {
       waktuIso = new Date(row.waktu_selesai_terakhir).toISOString();
-    }
-    if (row?.total_sekolah != null) {
-      total = Number(row.total_sekolah);
     }
   } catch {
     /* tabel belum ada */
@@ -54,12 +51,10 @@ export async function getStatusSinkronisasiPublik(db) {
     }
   }
 
-  if (total == null || !Number.isFinite(total)) {
-    try {
-      total = await countSekolah(db);
-    } catch {
-      total = null;
-    }
+  try {
+    total = await countSekolah(db);
+  } catch {
+    total = null;
   }
 
   return {
