@@ -2,13 +2,15 @@ import { getApiMeta } from '../lib/sync-meta.js';
 import { getStatusSinkronisasiPublik } from '../lib/status-sinkronisasi.js';
 import { formatDbRowResponse } from '../lib/sekolah-schema.js';
 import { getDb } from '../lib/db.js';
-import { listSekolah, searchSekolah } from '../lib/sekolah-db.js';
+import { listSekolah, searchSekolah, listSekolahFiltered, countSekolahFiltered } from '../lib/sekolah-db.js';
 
 const DEVELOPER = 'Syamsul Bahri';
 
 export async function onRequest(context) {
   const { searchParams } = new URL(context.request.url);
   const keyword = searchParams.get('keyword');
+  const provinsi = searchParams.get('provinsi');
+  const bentuk = searchParams.get('bentuk');
 
   const DEFAULT_LIMIT = 20;
   const MAX_LIMIT = 50;
@@ -37,9 +39,24 @@ export async function onRequest(context) {
       getApiMeta(db),
     ]);
     const totalSekolah = sinkron.total_sekolah ?? apiMeta.totalSekolah;
-    const rows = keyword
-      ? await searchSekolah(db, keyword.trim(), limit, offset)
-      : await listSekolah(db, limit, offset);
+    
+    let rows;
+    let totalResult;
+
+    if (provinsi || bentuk) {
+      const filters = {
+        keyword: keyword?.trim() || undefined,
+        provinsi: provinsi?.trim() || undefined,
+        bentuk: bentuk?.trim() || undefined
+      };
+      rows = await listSekolahFiltered(db, filters, limit, offset);
+      totalResult = await countSekolahFiltered(db, filters);
+    } else {
+      rows = keyword
+        ? await searchSekolah(db, keyword.trim(), limit, offset)
+        : await listSekolah(db, limit, offset);
+      totalResult = keyword ? null : totalSekolah;
+    }
 
     const formattedResults = rows.map((row) => formatDbRowResponse(row));
 
@@ -51,7 +68,10 @@ export async function onRequest(context) {
       developer: DEVELOPER,
     };
 
-    if (keyword) {
+    if (provinsi || bentuk) {
+      metadata.total_data_tersedia = totalResult;
+      metadata.has_more = offset + formattedResults.length < totalResult;
+    } else if (keyword) {
       metadata.total_data_tersedia = null;
       metadata.catatan_total =
         'Total hasil pencarian tidak dihitung agar kuota baca database tetap hemat.';

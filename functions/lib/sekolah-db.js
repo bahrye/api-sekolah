@@ -293,4 +293,106 @@ export async function getRekapSekolah(db) {
   return results || [];
 }
 
+/**
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {{ keyword?: string, provinsi?: string, bentuk?: string }} filters
+ * @param {number} limit
+ * @param {number} offset
+ */
+export async function listSekolahFiltered(db, filters, limit, offset) {
+  let query = `
+    SELECT
+      npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan,
+      status_satuan_pendidikan, jenjang_pendidikan, pembina, jalur_pendidikan,
+      nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan, 
+      satuan_pendidikan_id, kode_wilayah, row_fp
+    FROM sekolah
+  `;
+  const conditions = [];
+  const params = [];
+
+  if (filters.keyword) {
+    if (/^\d{8}$/.test(filters.keyword)) {
+      conditions.push(`npsn = ?`);
+      params.push(filters.keyword);
+    } else {
+      conditions.push(`(npsn LIKE ? OR nama LIKE ?)`);
+      params.push(`${filters.keyword}%`, `%${filters.keyword}%`);
+    }
+  }
+
+  if (filters.provinsi) {
+    if (filters.provinsi === 'LUAR NEGERI') {
+      conditions.push(`nama_provinsi = 'LUAR NEGERI'`);
+    } else if (filters.provinsi.startsWith('LUAR NEGERI - ')) {
+      const country = filters.provinsi.replace('LUAR NEGERI - ', '');
+      conditions.push(`nama_provinsi = 'LUAR NEGERI' AND nama_kabupaten = ?`);
+      params.push(country);
+    } else {
+      conditions.push(`nama_provinsi = ?`);
+      params.push(filters.provinsi);
+    }
+  }
+
+  if (filters.bentuk) {
+    conditions.push(`bentuk_pendidikan = ?`);
+    params.push(filters.bentuk);
+  }
+
+  if (conditions.length > 0) {
+    query += ` WHERE ` + conditions.join(' AND ');
+  }
+
+  query += ` ORDER BY npsn LIMIT ? OFFSET ?`;
+  params.push(limit, offset);
+
+  const { results } = await db.prepare(query).bind(...params).all();
+  return results || [];
+}
+
+/**
+ * @param {import('@cloudflare/workers-types').D1Database} db
+ * @param {{ keyword?: string, provinsi?: string, bentuk?: string }} filters
+ */
+export async function countSekolahFiltered(db, filters) {
+  let query = `SELECT COUNT(*) AS c FROM sekolah`;
+  const conditions = [];
+  const params = [];
+
+  if (filters.keyword) {
+    if (/^\d{8}$/.test(filters.keyword)) {
+      conditions.push(`npsn = ?`);
+      params.push(filters.keyword);
+    } else {
+      conditions.push(`(npsn LIKE ? OR nama LIKE ?)`);
+      params.push(`${filters.keyword}%`, `%${filters.keyword}%`);
+    }
+  }
+
+  if (filters.provinsi) {
+    if (filters.provinsi === 'LUAR NEGERI') {
+      conditions.push(`nama_provinsi = 'LUAR NEGERI'`);
+    } else if (filters.provinsi.startsWith('LUAR NEGERI - ')) {
+      const country = filters.provinsi.replace('LUAR NEGERI - ', '');
+      conditions.push(`nama_provinsi = 'LUAR NEGERI' AND nama_kabupaten = ?`);
+      params.push(country);
+    } else {
+      conditions.push(`nama_provinsi = ?`);
+      params.push(filters.provinsi);
+    }
+  }
+
+  if (filters.bentuk) {
+    conditions.push(`bentuk_pendidikan = ?`);
+    params.push(filters.bentuk);
+  }
+
+  if (conditions.length > 0) {
+    query += ` WHERE ` + conditions.join(' AND ');
+  }
+
+  const row = await db.prepare(query).bind(...params).first();
+  return row?.c ?? 0;
+}
+
 export { fingerprintRow, rowChanged };

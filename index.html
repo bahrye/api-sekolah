@@ -494,10 +494,28 @@
                         var count = (sourceData[item] && sourceData[item][jenjang]) ? sourceData[item][jenjang] : 0;
                         rowTotal += count;
                         jenjangTotals[jenjang] += count;
-                        tr += '<td class="px-4 py-3 text-center whitespace-nowrap' + (count > 0 ? ' text-slate-700' : ' text-slate-300') + '">' + (count > 0 ? Number(count).toLocaleString('id-ID') : '-') + '</td>';
+
+                        var cellContent = '-';
+                        if (count > 0) {
+                            var filterProv = isLuarNegeri ? 'LUAR NEGERI - ' + item : item;
+                            var detailUrl = base + '/api/sekolah?provinsi=' + encodeURIComponent(filterProv) + '&bentuk=' + encodeURIComponent(jenjang);
+                            cellContent = '<span class="inline-flex items-center gap-1">' + Number(count).toLocaleString('id-ID') + 
+                                '<a href="' + detailUrl + '" target="_blank" class="text-blue-500 hover:text-blue-700 hover:scale-110 transition-all" title="Lihat ' + count + ' sekolah ' + jenjang + ' di ' + item + '">' +
+                                '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
+                                '</a></span>';
+                        }
+                        tr += '<td class="px-4 py-3 text-center whitespace-nowrap' + (count > 0 ? ' text-slate-700' : ' text-slate-300') + '">' + cellContent + '</td>';
                     }
                     grandTotalAll += rowTotal;
-                    tr += '<td class="px-4 py-3 text-center whitespace-nowrap font-semibold text-slate-800 bg-slate-50 border-l border-slate-100">' + Number(rowTotal).toLocaleString('id-ID') + '</td>';
+
+                    var filterProv = isLuarNegeri ? 'LUAR NEGERI - ' + item : item;
+                    var rowTotalUrl = base + '/api/sekolah?provinsi=' + encodeURIComponent(filterProv);
+                    var rowTotalContent = '<span class="inline-flex items-center gap-1 font-semibold text-slate-800">' + Number(rowTotal).toLocaleString('id-ID') + 
+                        '<a href="' + rowTotalUrl + '" target="_blank" class="text-blue-600 hover:text-blue-800 hover:scale-110 transition-all" title="Lihat semua ' + rowTotal + ' sekolah di ' + item + '">' +
+                        '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
+                        '</a></span>';
+
+                    tr += '<td class="px-4 py-3 text-center whitespace-nowrap bg-slate-50 border-l border-slate-100">' + rowTotalContent + '</td>';
                     tr += '</tr>';
                     tbodyHtml += tr;
                 }
@@ -506,9 +524,22 @@
                 var tf = '<tr class="bg-slate-100 border-t-2 border-slate-200 sticky bottom-0 z-20 shadow-[0_-1px_2px_rgba(0,0,0,0.05)]">';
                 tf += '<td class="px-6 py-4 font-bold text-slate-800 whitespace-nowrap md:sticky md:left-0 z-30 border-r border-slate-200 bg-slate-100 md:shadow-[1px_0_0_0_#e2e8f0]">TOTAL KESELURUHAN</td>';
                 for (var j = 0; j < jenjangList.length; j++) {
-                    tf += '<td class="px-4 py-4 text-center whitespace-nowrap font-bold text-slate-800 bg-slate-100">' + Number(jenjangTotals[jenjangList[j]]).toLocaleString('id-ID') + '</td>';
+                    var jenjang = jenjangList[j];
+                    var colTotal = jenjangTotals[jenjang];
+                    var colTotalUrl = base + '/api/sekolah?bentuk=' + encodeURIComponent(jenjang);
+                    var colTotalContent = '<span class="inline-flex items-center gap-1 font-bold text-slate-800">' + Number(colTotal).toLocaleString('id-ID') + 
+                        '<a href="' + colTotalUrl + '" target="_blank" class="text-blue-600 hover:text-blue-800 hover:scale-110 transition-all" title="Lihat semua ' + colTotal + ' sekolah ' + jenjang + '">' +
+                        '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
+                        '</a></span>';
+                    tf += '<td class="px-4 py-4 text-center whitespace-nowrap bg-slate-100">' + colTotalContent + '</td>';
                 }
-                tf += '<td class="px-4 py-4 text-center whitespace-nowrap font-bold text-blue-700 bg-blue-50 border-l border-slate-200">' + Number(grandTotalAll).toLocaleString('id-ID') + '</td>';
+                var grandTotalUrl = base + '/api/sekolah';
+                var grandTotalContent = '<span class="inline-flex items-center gap-1 font-bold text-blue-700">' + Number(grandTotalAll).toLocaleString('id-ID') + 
+                    '<a href="' + grandTotalUrl + '" target="_blank" class="text-blue-700 hover:text-blue-900 hover:scale-110 transition-all" title="Lihat semua ' + grandTotalAll + ' sekolah">' +
+                    '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
+                    '</a></span>';
+
+                tf += '<td class="px-4 py-4 text-center whitespace-nowrap bg-blue-50 border-l border-slate-200">' + grandTotalContent + '</td>';
                 tf += '</tr>';
                 tbodyHtml += tf;
 
