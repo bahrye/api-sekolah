@@ -8,6 +8,24 @@ const KEY_LAST_SYNC = 'last_sync_at';
  * @param {import('@cloudflare/workers-types').D1Database} db
  */
 export async function recordSinkronisasiSelesai(db) {
+  // Auto-fill missing province names using other schools in the same kabupaten
+  try {
+    await db.prepare(`
+      UPDATE sekolah
+      SET nama_provinsi = (
+        SELECT s2.nama_provinsi
+        FROM sekolah s2
+        WHERE s2.nama_kabupaten = sekolah.nama_kabupaten
+          AND s2.nama_provinsi IS NOT NULL
+          AND s2.nama_provinsi != ''
+        LIMIT 1
+      )
+      WHERE nama_provinsi IS NULL OR nama_provinsi = ''
+    `).run();
+  } catch {
+    /* ignore */
+  }
+
   const total = await countSekolah(db);
   const now = new Date().toISOString();
   await db.prepare(`
