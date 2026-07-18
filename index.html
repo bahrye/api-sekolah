@@ -98,20 +98,25 @@
                     <div class="flex flex-row items-center gap-3 shrink-0 w-full sm:w-auto">
                         <div
                             class="bg-white/80 rounded-lg border border-blue-100 px-3 py-2.5 flex-grow sm:flex-grow-0 sm:max-w-[240px]">
-                            <p class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-blue-600 mb-0.5">
+                            <p
+                                class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-blue-600 mb-0.5">
                                 Update terakhir (WIB)</p>
                             <p id="last-update-at" class="text-sm font-semibold text-slate-900">Memuat…</p>
                             <p id="last-update-iso" class="text-[10px] text-slate-400 mt-0.5 font-mono break-all"></p>
                             <p id="total-data-count" class="text-[10px] text-slate-500 mt-1.5"></p>
                         </div>
-                        <a href="https://fetch-data-belajar-sync.dunia-sekolah.workers.dev/" target="_blank" rel="noopener noreferrer"
+                        <a href="https://fetch-data-belajar-sync.school-id.workers.dev/" target="_blank"
+                            rel="noopener noreferrer"
                             class="inline-flex flex-col items-center justify-center bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-lg border border-slate-200 transition-all shadow-sm shrink-0 self-stretch px-3 text-center group"
                             title="Buka status sinkronisasi data">
-                            <svg class="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <svg class="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
-                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-slate-700 block mt-1.5">Status Sync</span>
+                            <span
+                                class="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-slate-700 block mt-1.5">Status
+                                Sync</span>
                         </a>
                     </div>
                 </div>
@@ -295,15 +300,20 @@
         </div>
 
         <section class="mt-8 sm:mt-12 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="px-4 sm:px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+            <div
+                class="px-4 sm:px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                 <div>
                     <h3 class="font-bold text-slate-800 text-lg sm:text-xl">Pemetaan Data Sekolah</h3>
                     <p class="text-xs text-slate-500 mt-0.5">Berdasarkan Bentuk Pendidikan & Wilayah</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200" id="rekap-tabs">
-                        <button class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-white text-slate-800 shadow-sm border border-slate-200/50" id="tab-id">INDONESIA</button>
-                        <button class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors text-slate-600 hover:text-slate-900" id="tab-ln">LUAR NEGERI</button>
+                        <button
+                            class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-white text-slate-800 shadow-sm border border-slate-200/50"
+                            id="tab-id">INDONESIA</button>
+                        <button
+                            class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors text-slate-600 hover:text-slate-900"
+                            id="tab-ln">LUAR NEGERI</button>
                     </div>
                 </div>
             </div>
@@ -502,7 +512,7 @@
                         if (count > 0) {
                             var filterProv = isLuarNegeri ? 'LUAR NEGERI - ' + item : item;
                             var detailUrl = base + '/api/sekolah?provinsi=' + encodeURIComponent(filterProv) + '&bentuk=' + encodeURIComponent(jenjang);
-                            cellContent = '<span class="inline-flex items-center gap-1">' + Number(count).toLocaleString('id-ID') + 
+                            cellContent = '<span class="inline-flex items-center gap-1">' + Number(count).toLocaleString('id-ID') +
                                 '<a href="' + detailUrl + '" target="_blank" class="text-blue-500 hover:text-blue-700 hover:scale-110 transition-all" title="Lihat ' + count + ' sekolah ' + jenjang + ' di ' + item + '">' +
                                 '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
                                 '</a></span>';
@@ -513,7 +523,7 @@
 
                     var filterProv = isLuarNegeri ? 'LUAR NEGERI - ' + item : item;
                     var rowTotalUrl = base + '/api/sekolah?provinsi=' + encodeURIComponent(filterProv);
-                    var rowTotalContent = '<span class="inline-flex items-center gap-1 font-semibold text-slate-800">' + Number(rowTotal).toLocaleString('id-ID') + 
+                    var rowTotalContent = '<span class="inline-flex items-center gap-1 font-semibold text-slate-800">' + Number(rowTotal).toLocaleString('id-ID') +
                         '<a href="' + rowTotalUrl + '" target="_blank" class="text-blue-600 hover:text-blue-800 hover:scale-110 transition-all" title="Lihat semua ' + rowTotal + ' sekolah di ' + item + '">' +
                         '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
                         '</a></span>';
@@ -530,14 +540,14 @@
                     var jenjang = jenjangList[j];
                     var colTotal = jenjangTotals[jenjang];
                     var colTotalUrl = base + '/api/sekolah?bentuk=' + encodeURIComponent(jenjang);
-                    var colTotalContent = '<span class="inline-flex items-center gap-1 font-bold text-slate-800">' + Number(colTotal).toLocaleString('id-ID') + 
+                    var colTotalContent = '<span class="inline-flex items-center gap-1 font-bold text-slate-800">' + Number(colTotal).toLocaleString('id-ID') +
                         '<a href="' + colTotalUrl + '" target="_blank" class="text-blue-600 hover:text-blue-800 hover:scale-110 transition-all" title="Lihat semua ' + colTotal + ' sekolah ' + jenjang + '">' +
                         '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
                         '</a></span>';
                     tf += '<td class="px-4 py-4 text-center whitespace-nowrap bg-slate-100">' + colTotalContent + '</td>';
                 }
                 var grandTotalUrl = base + '/api/sekolah';
-                var grandTotalContent = '<span class="inline-flex items-center gap-1 font-bold text-blue-700">' + Number(grandTotalAll).toLocaleString('id-ID') + 
+                var grandTotalContent = '<span class="inline-flex items-center gap-1 font-bold text-blue-700">' + Number(grandTotalAll).toLocaleString('id-ID') +
                     '<a href="' + grandTotalUrl + '" target="_blank" class="text-blue-700 hover:text-blue-900 hover:scale-110 transition-all" title="Lihat semua ' + grandTotalAll + ' sekolah">' +
                     '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
                     '</a></span>';
