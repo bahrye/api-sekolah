@@ -17,7 +17,7 @@ const KEY_ROW_FP_BACKFILL_NOTE = 'row_fp_backfill_note';
 
 /** Cron Trigger: await langsung (batas subrequest Worker ~50) */
 export const CRON_BACKFILL_WALL_MS = 26_000;
-/** Maks batch per /tick (tiap batch ≈ 2–4 subrequest Neon) */
+/** Maks batch per /tick (tiap batch ≈ 2–4 subrequest D1) */
 export const CRON_BACKFILL_MAX_BATCHES = 2;
 
 /** Tanpa pembaruan stats selama ini → chain Pages dianggap mati, cron Worker lanjutkan */

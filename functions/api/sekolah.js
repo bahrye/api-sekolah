@@ -50,7 +50,7 @@ export async function onRequest(context) {
         bentuk: bentuk?.trim() || undefined
       };
       rows = await listSekolahFiltered(db, filters, limit, offset);
-      totalResult = await countSekolahFiltered(db, filters);
+      totalResult = keyword ? null : await countSekolahFiltered(db, filters);
     } else {
       rows = keyword
         ? await searchSekolah(db, keyword.trim(), limit, offset)
@@ -69,8 +69,14 @@ export async function onRequest(context) {
     };
 
     if (provinsi || bentuk) {
-      metadata.total_data_tersedia = totalResult;
-      metadata.has_more = offset + formattedResults.length < totalResult;
+      if (keyword) {
+        metadata.total_data_tersedia = null;
+        metadata.catatan_total = 'Total hasil pencarian tidak dihitung agar kuota baca database tetap hemat.';
+        metadata.has_more = formattedResults.length === limit;
+      } else {
+        metadata.total_data_tersedia = totalResult;
+        metadata.has_more = offset + formattedResults.length < totalResult;
+      }
     } else if (keyword) {
       metadata.total_data_tersedia = null;
       metadata.catatan_total =

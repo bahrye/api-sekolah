@@ -6,13 +6,10 @@
     "deploy:cf": "wrangler pages deploy . --project-name=api-sekolah-kita --branch production --commit-dirty=true",
     "deploy": "npm run deploy:cf",
     "ship": "node scripts/ship.js",
-    "ship:all": "node scripts/ship.js && npm run deploy:cf",
-    "migrate:neon": "node scripts/migrate-to-neon.js",
-    "neon:schema": "node scripts/apply-neon-sync-schema.js"
+    "ship:all": "node scripts/ship.js && npm run deploy:cf"
   },
   "devDependencies": {
     "csv-parser": "^3.2.1",
-    "pg": "^8.22.0",
     "wrangler": "^4.92.0"
   }
 }

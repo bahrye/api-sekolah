@@ -343,7 +343,7 @@ export async function listSekolahFiltered(db, filters, limit, offset) {
     query += ` WHERE ` + conditions.join(' AND ');
   }
 
-  query += ` ORDER BY npsn LIMIT ? OFFSET ?`;
+  query += ` LIMIT ? OFFSET ?`;
   params.push(limit, offset);
 
   const { results } = await db.prepare(query).bind(...params).all();

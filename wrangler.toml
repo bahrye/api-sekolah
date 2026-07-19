@@ -1,8 +1,7 @@
 name = "api-sekolah-kita"
 pages_build_output_dir = "./"
 
-# Database utama: Neon PostgreSQL (MIGRASI KE D1)
-# Set DATABASE_URL di Cloudflare Pages → Settings → Environment variables (TIDAK DIGUNAKAN LAGI)
+# Database utama: Cloudflare D1
 # Lokal: salin ke .dev.vars (lihat .dev.vars.example)
 
 [[d1_databases]]

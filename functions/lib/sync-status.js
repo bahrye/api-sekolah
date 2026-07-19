@@ -210,10 +210,10 @@ export function renderWorkerConfigErrorHtml(message) {
     <p class="text-sm text-slate-700 mb-4">${esc(message)}</p>
     <ol class="text-sm text-slate-600 list-decimal list-inside space-y-2 mb-4">
       <li>Buka terminal di folder proyek <code class="bg-slate-100 px-1 rounded">api-sekolah</code></li>
-      <li>Jalankan:<br><code class="block mt-1 bg-slate-900 text-emerald-300 text-xs p-3 rounded">npx wrangler secret put DATABASE_URL -c wrangler.cron.toml</code></li>
-      <li>Tempel connection string Neon (dari dashboard Neon → Connect)</li>
+      <li>Jalankan konfigurasi D1: <code class="block mt-1 bg-slate-900 text-emerald-300 text-xs p-3 rounded">npx wrangler d1 create api-sekolah-db</code></li>
+      <li>Update wrangler.toml dengan ID database</li>
       <li>Deploy ulang: <code class="bg-slate-100 px-1 rounded">npm run deploy</code></li>
-      <li>Skema sync (sekali): <code class="bg-slate-100 px-1 rounded">npm run neon:schema</code></li>
+      <li>Jalankan migrasi: <code class="bg-slate-100 px-1 rounded">npx wrangler d1 migrations apply api-sekolah-db --remote</code></li>
     </ol>
     <p class="text-xs text-slate-500">Pages juga butuh variabel <strong>DATABASE_URL</strong> di Cloudflare Dashboard.</p>
     <a href="https://api-sekolah-kita.pages.dev" class="inline-block mt-4 text-sm font-semibold text-emerald-700">← Kembali ke beranda API</a>
@@ -256,7 +256,7 @@ export function renderSyncStatusHtml(report) {
         <img src="/favicon-sync.svg" alt="" width="40" height="40" class="w-10 h-10 rounded-xl shadow-sm shrink-0">
         <div class="min-w-0">
           <h1 class="text-lg font-bold text-slate-900 truncate">Status sinkronisasi</h1>
-          <p class="text-xs text-slate-500">EduAPI · Cloudflare Cron + Neon</p>
+          <p class="text-xs text-slate-500">EduAPI · Cloudflare Cron + D1</p>
         </div>
       </div>
       <a href="${homeUrl}" class="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg">← Beranda</a>
