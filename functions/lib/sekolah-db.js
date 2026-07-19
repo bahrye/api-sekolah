@@ -89,28 +89,11 @@ export async function listSekolah(db, limit, offset) {
  * @param {number} offset
  */
 export async function searchSekolah(db, keyword, limit, offset) {
-  // 1. Jalur Cepat: Jika persis 8 digit angka, cek sebagai NPSN exact match
-  if (/^\d{8}$/.test(keyword)) {
-    const { results } = await db.prepare(`
-      SELECT
-        npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan,
-        status_satuan_pendidikan, jenjang_pendidikan, pembina, jalur_pendidikan,
-        nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan,
-        satuan_pendidikan_id, kode_wilayah, row_fp
-      FROM sekolah
-      WHERE npsn = ?
-      LIMIT 1
-    `).bind(keyword).all();
-    
-    // Jika ketemu langsung return, sangat cepat (1ms) karena pakai Primary Key
-    if (results && results.length > 0) return results;
+  // Hanya melayani pencarian berdasarkan NPSN (murni angka)
+  if (!/^\d+$/.test(keyword)) {
+    return [];
   }
 
-  // 2. Pencarian Umum
-  // Hilangkan ORDER BY npsn agar SQLite berhenti scan saat limit tercapai (Jauh lebih cepat!)
-  const likeName = `%${keyword}%`;
-  const likeNpsn = `${keyword}%`; // Prefix search untuk npsn lebih relevan
-  
   const { results } = await db.prepare(`
     SELECT
       npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan,
@@ -118,9 +101,10 @@ export async function searchSekolah(db, keyword, limit, offset) {
       nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan,
       satuan_pendidikan_id, kode_wilayah, row_fp
     FROM sekolah
-    WHERE npsn LIKE ? OR nama LIKE ?
+    WHERE npsn LIKE ?
     LIMIT ? OFFSET ?
-  `).bind(likeNpsn, likeName, limit, offset).all();
+  `).bind(`${keyword}%`, limit, offset).all();
+  
   return results || [];
 }
 
@@ -312,13 +296,11 @@ export async function listSekolahFiltered(db, filters, limit, offset) {
   const params = [];
 
   if (filters.keyword) {
-    if (/^\d{8}$/.test(filters.keyword)) {
-      conditions.push(`npsn = ?`);
-      params.push(filters.keyword);
-    } else {
-      conditions.push(`(npsn LIKE ? OR nama LIKE ?)`);
-      params.push(`${filters.keyword}%`, `%${filters.keyword}%`);
+    if (!/^\d+$/.test(filters.keyword)) {
+      return []; // Keyword bukan angka NPSN valid
     }
+    conditions.push(`npsn LIKE ?`);
+    params.push(`${filters.keyword}%`);
   }
 
   if (filters.provinsi) {
@@ -360,13 +342,11 @@ export async function countSekolahFiltered(db, filters) {
   const params = [];
 
   if (filters.keyword) {
-    if (/^\d{8}$/.test(filters.keyword)) {
-      conditions.push(`npsn = ?`);
-      params.push(filters.keyword);
-    } else {
-      conditions.push(`(npsn LIKE ? OR nama LIKE ?)`);
-      params.push(`${filters.keyword}%`, `%${filters.keyword}%`);
+    if (!/^\d+$/.test(filters.keyword)) {
+      return 0; // Keyword bukan angka NPSN valid
     }
+    conditions.push(`npsn LIKE ?`);
+    params.push(`${filters.keyword}%`);
   }
 
   if (filters.provinsi) {

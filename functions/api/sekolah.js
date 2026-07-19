@@ -90,16 +90,19 @@ export async function onRequest(context) {
           : formattedResults.length === limit;
     }
 
-    return new Response(
-      JSON.stringify({
-        status: 'success',
-        source: 'API Sekolah Mandiri',
-        developer: DEVELOPER,
-        metadata,
-        data: formattedResults,
-      }),
-      { headers }
-    );
+    const responsePayload = {
+      status: 'success',
+      source: 'API Sekolah Mandiri',
+      developer: DEVELOPER,
+      metadata,
+      data: formattedResults,
+    };
+
+    if (keyword && formattedResults.length === 0) {
+      responsePayload.message = 'Hmm, NPSN tidak ditemukan! 🕵️‍♂️ Pastikan angka NPSN yang dimasukkan sudah benar, atau sekolah tersebut mungkin belum terdaftar di semesta kami.';
+    }
+
+    return new Response(JSON.stringify(responsePayload), { headers });
   } catch (error) {
     return new Response(
       JSON.stringify({

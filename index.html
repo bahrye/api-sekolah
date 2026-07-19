@@ -132,11 +132,13 @@
                     </svg>
                 </a>
                 <div class="flex items-stretch gap-2 w-full sm:flex-1 sm:min-w-0">
-                    <label for="api-keyword" class="sr-only">NPSN atau nama sekolah</label>
-                    <input type="search" id="api-keyword" name="keyword" autocomplete="off"
-                        placeholder="NPSN atau nama sekolah…"
+                    <label for="api-keyword" class="sr-only">NPSN</label>
+                    <input type="text" id="api-keyword" name="keyword" autocomplete="off"
+                        inputmode="numeric" pattern="\d*" maxlength="8"
+                        oninput="this.value = this.value.replace(/[^0-9]/g, '');"
+                        placeholder="NPSN..."
                         class="flex-1 min-w-0 w-full rounded-lg border border-slate-200 bg-white shadow-sm px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        title="Ketik NPSN atau nama sekolah, lalu klik Coba API langsung">
+                        title="Ketik 8 digit angka NPSN, lalu klik Coba API langsung">
                     <button type="button" id="copy-api-url"
                         class="shrink-0 inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-2.5 rounded-lg hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm"
                         aria-label="Salin URL API">
@@ -181,9 +183,9 @@
                     <div class="md:hidden divide-y divide-slate-100">
                         <article class="p-4">
                             <p class="font-mono font-semibold text-blue-600 text-sm mb-1">keyword</p>
-                            <p class="text-sm text-slate-600 mb-2">Cari berdasarkan NPSN atau nama sekolah.</p>
+                            <p class="text-sm text-slate-600 mb-2">Cari berdasarkan NPSN.</p>
                             <code
-                                class="block text-[11px] bg-slate-100 rounded px-2 py-1.5 break-all">?keyword=surabaya</code>
+                                class="block text-[11px] bg-slate-100 rounded px-2 py-1.5 break-all">?keyword=20532161</code>
                         </article>
                         <article class="p-4">
                             <p class="font-mono font-semibold text-blue-600 text-sm mb-1">limit</p>
@@ -212,7 +214,7 @@
                                 <tr class="hover:bg-slate-50 transition-colors">
                                     <td class="px-6 py-4 font-mono font-medium text-blue-600 whitespace-nowrap">keyword
                                     </td>
-                                    <td class="px-6 py-4">Mencari berdasarkan NPSN atau penggalan nama sekolah.</td>
+                                    <td class="px-6 py-4">Mencari berdasarkan NPSN.</td>
                                     <td class="px-6 py-4 font-mono text-xs"><span
                                             class="bg-slate-100 rounded px-2 py-1 inline-block">?keyword=60723552</span>
                                     </td>
