@@ -216,7 +216,7 @@ Berikut adalah format respons JSON standar yang dikembalikan oleh `/api/sekolah`
 
 Proyek ini bersifat open-source. Jika Anda menemukan bug atau ingin menambahkan fitur baru, silakan buka *Issue* atau kirimkan *Pull Request*.
 
-* **Developer**: [Syamsul Bahri](https://github.com/syamsulbahri)
+* **Developer**: [Syamsul Bahri](https://github.com/bahrye)
 * **Hubungi**: [WhatsApp Developer](https://wa.me/qr/FMVS3NLDIRUAA1)
 
 ---

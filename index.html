@@ -6,335 +6,421 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
         content="API data master satuan pendidikan Indonesia — cepat, edge serverless, ratusan ribu sekolah.">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#0f172a">
     <title>EduAPI Indonesia — Dokumentasi API Sekolah</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/favicon.svg">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            900: '#1e3a8a',
+                            950: '#172554',
+                        }
+                    },
+                    animation: {
+                        'gradient-x': 'gradient-x 15s ease infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        'gradient-x': {
+                            '0%, 100%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'left center'
+                            },
+                            '50%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'right center'
+                            },
+                        },
+                        'float': {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
+        /* Custom Scrollbar */
         ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
+            width: 8px;
+            height: 8px;
         }
 
         ::-webkit-scrollbar-track {
-            background: #f1f5f9;
+            background: #0f172a;
         }
 
         ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
+            background: #334155;
             border-radius: 4px;
+            border: 2px solid #0f172a;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
+            background: #475569;
         }
 
-        pre code {
-            white-space: pre-wrap;
-            word-break: break-word;
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .gradient-text {
+            background: linear-gradient(to right, #60a5fa, #a78bfa, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-bg {
+            background-image:
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(167, 139, 250, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(244, 114, 182, 0.15) 0px, transparent 50%),
+                radial-gradient(at 0% 100%, rgba(45, 212, 191, 0.15) 0px, transparent 50%);
         }
 
         .api-url-scroll {
             -webkit-overflow-scrolling: touch;
             scrollbar-width: thin;
         }
+
+        /* Table sticky header fixes for dark theme */
+        .table-sticky-col {
+            position: sticky;
+            left: 0;
+            z-index: 10;
+        }
     </style>
 </head>
 
-<body class="bg-slate-50 text-slate-800 font-sans antialiased flex flex-col min-h-screen">
+<body
+    class="bg-[#0b1120] text-slate-300 font-sans antialiased selection:bg-brand-500 selection:text-white hero-bg min-h-screen flex flex-col relative overflow-x-hidden">
 
-    <header class="bg-white/95 backdrop-blur border-b border-slate-200 sticky top-0 z-50">
-        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center gap-3">
-            <div class="flex items-center gap-2.5 min-w-0">
-                <img src="/favicon.svg" alt="" width="36" height="36" class="w-9 h-9 shrink-0 rounded-lg shadow-sm">
-                <div class="min-w-0">
-                    <h1 class="text-base sm:text-xl font-bold text-slate-900 truncate">EduAPI Indonesia</h1>
-                    <p class="text-[10px] sm:text-xs text-slate-500 hidden sm:block">Data Satuan Pendidikan</p>
+    <!-- Ambient background effect -->
+    <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <div
+            class="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-brand-600/10 blur-[120px] animate-float">
+        </div>
+        <div class="absolute top-[20%] -right-[10%] w-[40%] h-[40%] rounded-full bg-purple-600/10 blur-[120px] animate-float"
+            style="animation-delay: -3s;"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 glass-panel border-b-0 border-white/10 shadow-lg">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-purple-600 p-[1px] shadow-lg shadow-brand-500/20">
+                    <div class="w-full h-full bg-slate-900 rounded-xl flex items-center justify-center">
+                        <img src="/favicon.svg" alt="" class="w-6 h-6">
+                    </div>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white tracking-tight">EduAPI <span
+                            class="text-brand-400">Indonesia</span></h1>
+                    <p class="text-[11px] text-slate-400 font-medium tracking-wide uppercase">Data Satuan Pendidikan</p>
                 </div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-                <a href="https://github.com/syamsulbahri" target="_blank" rel="noopener noreferrer"
-                    class="text-xs sm:text-sm font-medium text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 sm:bg-transparent px-2.5 py-1 rounded-full sm:px-0 sm:py-0">
+            <div>
+                <a href="https://github.com/bahrye" target="_blank" rel="noopener noreferrer"
+                    class="group flex items-center gap-2 px-4 py-2 rounded-full glass-panel hover:bg-white/10 transition-all border border-white/5 hover:border-white/20 text-sm font-medium text-white shadow-sm">
+                    <svg class="w-5 h-5 text-slate-300 group-hover:text-white transition-colors" fill="currentColor"
+                        viewBox="0 0 24 24">
+                        <path
+                            d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z">
+                        </path>
+                    </svg>
                     v1.0.0
                 </a>
             </div>
         </div>
     </header>
 
-    <main class="flex-grow w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+    <main class="flex-grow w-full max-w-6xl mx-auto px-4 sm:px-6 py-12 relative z-10">
 
-        <section class="mb-8 sm:mb-12">
-            <p class="text-xs font-semibold uppercase tracking-wider text-blue-600 mb-2">REST API · Cloudflare Edge</p>
-            <h2
-                class="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight mb-3 leading-tight">
-                API Data Master Pendidikan
+        <!-- Hero Section -->
+        <section class="mb-16 text-center max-w-3xl mx-auto">
+            <div
+                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-xs font-semibold uppercase tracking-wider mb-6">
+                <span class="relative flex h-2 w-2">
+                    <span
+                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
+                </span>
+                Cloudflare Edge Serverless
+            </div>
+            <h2 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight mb-6 leading-tight">
+                API Data Master <br class="hidden sm:block" />
+                <span class="gradient-text">Pendidikan Indonesia</span>
             </h2>
-            <p class="text-slate-600 text-base sm:text-lg max-w-2xl leading-relaxed">
-                Gateway API super cepat berbasis Edge Serverless untuk mengakses ratusan ribu data master satuan
-                pendidikan di seluruh Indonesia.
+            <p class="text-slate-400 text-lg sm:text-xl leading-relaxed mb-10">
+                Gateway API super cepat untuk mengakses ratusan ribu data master satuan pendidikan di seluruh Indonesia.
+                Terintegrasi langsung dengan sumber resmi.
             </p>
 
-            <div id="sync-status"
-                class="mt-6 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 sm:p-5 shadow-sm">
-                <div class="flex flex-col sm:flex-row sm:items-start gap-4">
-                    <div class="flex items-start gap-3 flex-1 min-w-0">
-                        <div class="shrink-0 w-10 h-10 rounded-lg bg-blue-600 text-white flex items-center justify-center"
-                            aria-hidden="true">
+            <!-- Interactive API Try Section -->
+            <div class="relative group">
+                <div
+                    class="absolute -inset-1 bg-gradient-to-r from-brand-500 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200">
+                </div>
+                <div class="relative glass-panel rounded-2xl p-2 flex flex-col sm:flex-row items-center gap-2">
+                    <div
+                        class="flex-1 w-full flex items-center bg-slate-900/50 rounded-xl border border-white/5 px-4 py-3 focus-within:border-brand-500/50 focus-within:bg-slate-900 transition-colors">
+                        <svg class="w-5 h-5 text-slate-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <input type="text" id="api-keyword" name="keyword" autocomplete="off" inputmode="numeric"
+                            pattern="\d*" maxlength="8" oninput="this.value = this.value.replace(/[^0-9]/g, '');"
+                            placeholder="Ketik 8 digit NPSN..."
+                            class="w-full bg-transparent border-none text-white placeholder-slate-500 focus:outline-none focus:ring-0 text-lg font-mono">
+                    </div>
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <button type="button" id="copy-api-url"
+                            class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium transition-all border border-white/10 active:scale-95"
+                            aria-label="Salin URL API">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                </path>
                             </svg>
-                        </div>
-                        <div class="min-w-0">
-                            <h3 class="text-sm sm:text-base font-bold text-slate-900 mb-1">Pembaruan data berkala</h3>
-                            <p class="text-sm text-slate-600 leading-relaxed">
-                                Database diperbarui secara berkala dari portal resmi
-                                <strong class="text-slate-800">belajar.id</strong>.
-                                Update biasanya dilakukan setiap hari.
-                            </p>
-                        </div>
-                    </div>
-                    <div class="flex flex-row items-center gap-3 shrink-0 w-full sm:w-auto">
-                        <div
-                            class="bg-white/80 rounded-lg border border-blue-100 px-3 py-2.5 flex-grow sm:flex-grow-0 sm:max-w-[240px]">
-                            <p
-                                class="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-blue-600 mb-0.5">
-                                Update terakhir (WIB)</p>
-                            <p id="last-update-at" class="text-sm font-semibold text-slate-900">Memuat…</p>
-                            <p id="last-update-iso" class="text-[10px] text-slate-400 mt-0.5 font-mono break-all"></p>
-                            <p id="total-data-count" class="text-[10px] text-slate-500 mt-1.5"></p>
-                        </div>
-                        <a href="https://fetch-data-belajar-sync.school-id.workers.dev/" target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex flex-col items-center justify-center bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 rounded-lg border border-slate-200 transition-all shadow-sm shrink-0 self-stretch px-3 text-center group"
-                            title="Buka status sinkronisasi data">
-                            <svg class="w-5 h-5 text-slate-400 group-hover:text-blue-500 transition-colors" fill="none"
-                                stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <span id="copy-api-label">Salin Link</span>
+                        </button>
+                        <a id="try-api" href="/api/sekolah?limit=5"
+                            class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold transition-all shadow-lg shadow-brand-500/25 active:scale-95">
+                            Coba API
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                    d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                             </svg>
-                            <span
-                                class="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-slate-700 block mt-1.5">Status
-                                Sync</span>
                         </a>
                     </div>
                 </div>
             </div>
-
-            <div class="mt-5 flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 w-full">
-                <a id="try-api" href="/api/sekolah?limit=5"
-                    class="inline-flex items-center justify-center gap-2 bg-blue-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shrink-0">
-                    Coba API langsung
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                </a>
-                <div class="flex items-stretch gap-2 w-full sm:flex-1 sm:min-w-0">
-                    <label for="api-keyword" class="sr-only">NPSN</label>
-                    <input type="text" id="api-keyword" name="keyword" autocomplete="off"
-                        inputmode="numeric" pattern="\d*" maxlength="8"
-                        oninput="this.value = this.value.replace(/[^0-9]/g, '');"
-                        placeholder="NPSN..."
-                        class="flex-1 min-w-0 w-full rounded-lg border border-slate-200 bg-white shadow-sm px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        title="Ketik 8 digit angka NPSN, lalu klik Coba API langsung">
-                    <button type="button" id="copy-api-url"
-                        class="shrink-0 inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-3 py-2.5 rounded-lg hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm"
-                        aria-label="Salin URL API">
-                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        <span id="copy-api-label">Salin</span>
-                    </button>
-                </div>
-            </div>
         </section>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-            <div class="lg:col-span-2 space-y-6 sm:space-y-8 order-2 lg:order-1">
+        <!-- Status Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+            <div class="glass-panel rounded-2xl p-6 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <svg class="w-16 h-16 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                        </path>
+                    </svg>
+                </div>
+                <h3 class="text-slate-400 text-sm font-medium mb-2 uppercase tracking-wider">Update Terakhir (WIB)</h3>
+                <p id="last-update-at" class="text-2xl font-bold text-white mb-1">Memuat…</p>
+                <p id="last-update-iso" class="text-xs text-slate-500 font-mono truncate"></p>
+            </div>
 
-                <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50">
-                        <h3 class="font-semibold text-slate-800 text-sm sm:text-base">Endpoint Utama</h3>
+            <div class="glass-panel rounded-2xl p-6 relative overflow-hidden group">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <svg class="w-16 h-16 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+                        </path>
+                    </svg>
+                </div>
+                <h3 class="text-slate-400 text-sm font-medium mb-2 uppercase tracking-wider">Total Data Sekolah</h3>
+                <p id="total-data-count" class="text-2xl font-bold text-white mb-1">Memuat…</p>
+                <p class="text-xs text-slate-500">Terindeks di database</p>
+            </div>
+
+            <a href="https://fetch-data-belajar-sync.school-id.workers.dev/" target="_blank" rel="noopener noreferrer"
+                class="glass-panel rounded-2xl p-6 flex flex-col justify-center items-center text-center hover:bg-white/5 transition-colors border border-brand-500/20 hover:border-brand-500/50 group">
+                <div
+                    class="w-12 h-12 rounded-full bg-brand-500/20 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform group-hover:bg-brand-500/30">
+                    <svg class="w-6 h-6 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                    </svg>
+                </div>
+                <h3 class="text-white font-bold text-lg mb-1">Status Sinkronisasi</h3>
+                <p class="text-sm text-slate-400">Lihat log pembaruan dari belajar.id</p>
+            </a>
+        </div>
+
+        <!-- Documentation & Demo -->
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-16">
+            <!-- Documentation -->
+            <div class="space-y-6">
+                <div class="glass-panel rounded-2xl overflow-hidden border border-white/10">
+                    <div class="px-6 py-4 border-b border-white/10 bg-white/5">
+                        <h3 class="font-bold text-white text-lg">Endpoint Utama</h3>
                     </div>
-                    <div class="p-4 sm:p-6">
+                    <div class="p-6">
                         <div
-                            class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-slate-800 text-slate-200 p-3 rounded-lg font-mono text-xs sm:text-sm overflow-x-auto">
+                            class="flex items-center gap-3 bg-slate-900/80 p-4 rounded-xl font-mono text-sm border border-white/5">
                             <span
-                                class="self-start sm:self-auto bg-green-500 text-white px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0">GET</span>
-                            <span class="break-all">/api/sekolah</span>
+                                class="bg-brand-500/20 text-brand-400 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">GET</span>
+                            <span class="text-slate-300 break-all">/api/sekolah</span>
                         </div>
-                        <p class="mt-4 text-sm text-slate-600 leading-relaxed">
+                        <p class="mt-4 text-slate-400 leading-relaxed">
                             Mengembalikan daftar sekolah dalam format JSON. Gunakan parameter di bawah untuk pencarian
-                            dan paginasi.
+                            dan paginasi yang spesifik.
                         </p>
                     </div>
-                </section>
+                </div>
 
-                <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50">
-                        <h3 class="font-semibold text-slate-800 text-sm sm:text-base">Parameter URL (Query)</h3>
+                <div class="glass-panel rounded-2xl overflow-hidden border border-white/10">
+                    <div class="px-6 py-4 border-b border-white/10 bg-white/5">
+                        <h3 class="font-bold text-white text-lg">Parameter Query</h3>
                     </div>
-
-                    <!-- Mobile: cards -->
-                    <div class="md:hidden divide-y divide-slate-100">
-                        <article class="p-4">
-                            <p class="font-mono font-semibold text-blue-600 text-sm mb-1">keyword</p>
-                            <p class="text-sm text-slate-600 mb-2">Cari berdasarkan NPSN.</p>
-                            <code
-                                class="block text-[11px] bg-slate-100 rounded px-2 py-1.5 break-all">?keyword=20532161</code>
-                        </article>
-                        <article class="p-4">
-                            <p class="font-mono font-semibold text-blue-600 text-sm mb-1">limit</p>
-                            <p class="text-sm text-slate-600 mb-2">Data per halaman (default 20, maks. 50).</p>
-                            <code class="block text-[11px] bg-slate-100 rounded px-2 py-1.5 break-all">?limit=50</code>
-                        </article>
-                        <article class="p-4">
-                            <p class="font-mono font-semibold text-blue-600 text-sm mb-1">offset</p>
-                            <p class="text-sm text-slate-600 mb-2">Paginasi — mulai dari baris ke-n.</p>
-                            <code
-                                class="block text-[11px] bg-slate-100 rounded px-2 py-1.5 break-all">?offset=100</code>
-                        </article>
-                    </div>
-
-                    <!-- Desktop: table -->
-                    <div class="hidden md:block overflow-x-auto">
-                        <table class="w-full text-sm text-left text-slate-600 min-w-[520px]">
-                            <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-slate-400 uppercase bg-black/20">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 whitespace-nowrap">Parameter</th>
-                                    <th scope="col" class="px-6 py-3">Deskripsi</th>
-                                    <th scope="col" class="px-6 py-3 whitespace-nowrap">Contoh</th>
+                                    <th scope="col" class="px-6 py-4">Parameter</th>
+                                    <th scope="col" class="px-6 py-4">Deskripsi</th>
+                                    <th scope="col" class="px-6 py-4">Contoh</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                <tr class="hover:bg-slate-50 transition-colors">
-                                    <td class="px-6 py-4 font-mono font-medium text-blue-600 whitespace-nowrap">keyword
-                                    </td>
-                                    <td class="px-6 py-4">Mencari berdasarkan NPSN.</td>
-                                    <td class="px-6 py-4 font-mono text-xs"><span
-                                            class="bg-slate-100 rounded px-2 py-1 inline-block">?keyword=60723552</span>
+                            <tbody class="divide-y divide-white/5 text-slate-300">
+                                <tr class="hover:bg-white/5 transition-colors">
+                                    <td class="px-6 py-4 font-mono text-brand-400 font-medium">keyword</td>
+                                    <td class="px-6 py-4">Mencari berdasarkan NPSN spesifik.</td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-2">
+                                            <span class="bg-slate-800 rounded px-2 py-1 font-mono text-xs border border-white/5">?keyword=60723552</span>
+                                            <button type="button" class="copy-param-btn p-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors" data-param="?keyword=60723552" title="Salin link lengkap">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
-                                <tr class="hover:bg-slate-50 transition-colors">
-                                    <td class="px-6 py-4 font-mono font-medium text-blue-600 whitespace-nowrap">limit
+                                <tr class="hover:bg-white/5 transition-colors">
+                                    <td class="px-6 py-4 font-mono text-brand-400 font-medium">limit</td>
+                                    <td class="px-6 py-4">Jumlah data per halaman (default 20, maks 50).</td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-2">
+                                            <span class="bg-slate-800 rounded px-2 py-1 font-mono text-xs border border-white/5">?limit=50</span>
+                                            <button type="button" class="copy-param-btn p-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors" data-param="?limit=50" title="Salin link lengkap">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                            </button>
+                                        </div>
                                     </td>
-                                    <td class="px-6 py-4">Jumlah data per halaman (default: 20, maksimal: 50).</td>
-                                    <td class="px-6 py-4 font-mono text-xs"><span
-                                            class="bg-slate-100 rounded px-2 py-1 inline-block">?limit=50</span></td>
                                 </tr>
-                                <tr class="hover:bg-slate-50 transition-colors">
-                                    <td class="px-6 py-4 font-mono font-medium text-blue-600 whitespace-nowrap">offset
+                                <tr class="hover:bg-white/5 transition-colors">
+                                    <td class="px-6 py-4 font-mono text-brand-400 font-medium">offset</td>
+                                    <td class="px-6 py-4">Titik mulai paginasi (default 0).</td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-2">
+                                            <span class="bg-slate-800 rounded px-2 py-1 font-mono text-xs border border-white/5">?offset=20</span>
+                                            <button type="button" class="copy-param-btn p-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors" data-param="?offset=20" title="Salin link lengkap">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                            </button>
+                                        </div>
                                     </td>
-                                    <td class="px-6 py-4">Titik mulai paginasi (default: 0).</td>
-                                    <td class="px-6 py-4 font-mono text-xs"><span
-                                            class="bg-slate-100 rounded px-2 py-1 inline-block">?offset=20</span></td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                </section>
-
-                <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden lg:hidden">
-                    <div class="px-4 py-3 border-b border-slate-100 bg-slate-50">
-                        <h3 class="font-semibold text-slate-800 text-sm">Metadata respons</h3>
-                    </div>
-                    <ul class="p-4 text-sm text-slate-600 space-y-2">
-                        <li><code class="text-blue-600 text-xs">total_data_tersedia</code> — jumlah hasil di database
-                        </li>
-                        <li><code class="text-blue-600 text-xs">waktu_update_data_terakhir</code> — update terakhir
-                            (WIB)</li>
-                    </ul>
-                </section>
+                </div>
             </div>
 
-            <div class="lg:col-span-1 order-1 lg:order-2">
-                <section
-                    class="bg-slate-900 rounded-xl shadow-lg border border-slate-700 overflow-hidden flex flex-col max-h-[min(70vh,520px)] lg:max-h-none lg:min-h-[420px] lg:h-full sticky top-[4.5rem] lg:top-24">
-                    <div
-                        class="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-slate-700 bg-slate-800 flex justify-between items-center shrink-0">
-                        <h3 class="font-medium text-slate-300 text-xs sm:text-sm">Contoh Respons (JSON)</h3>
-                        <div class="flex gap-1.5" aria-hidden="true">
-                            <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500"></div>
-                            <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-yellow-500"></div>
-                            <div class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500"></div>
-                        </div>
+            <!-- Code Preview -->
+            <div class="glass-panel rounded-2xl overflow-hidden border border-white/10 flex flex-col h-full shadow-2xl">
+                <div class="px-4 py-3 border-b border-white/10 bg-black/40 flex justify-between items-center">
+                    <div class="flex gap-2">
+                        <div class="w-3 h-3 rounded-full bg-rose-500/80"></div>
+                        <div class="w-3 h-3 rounded-full bg-amber-500/80"></div>
+                        <div class="w-3 h-3 rounded-full bg-emerald-500/80"></div>
                     </div>
-                    <div
-                        class="p-3 sm:p-4 overflow-auto flex-grow text-[10px] sm:text-xs font-mono text-emerald-400 leading-relaxed">
-                        <pre><code>{
-  "status": "success",
-  "source": "API Sekolah Mandiri",
-  "developer": "Syamsul Bahri",
-  "metadata": {
-    "total_data_tersedia": 552577,
-    "limit_ditampilkan": 20,
-    "offset_saat_ini": 0,
-    "waktu_update_data_terakhir": "17 Mei 2026 pukul 18.26",
-    "waktu_update_data_terakhir_iso": "2026-05-17T11:26:31Z",
-    "developer": "Syamsul Bahri"
-  },
-  "data": [
-    {
-      "npsn": "60723552",
-      "nama": "MIS BUTUNG",
-      "bentuk_pendidikan": "MI",
-      "bentuk_pendidikan_group": "SD SEDERAJAT",
-      "jenis_pendidikan": "PENDIDIKAN UMUM",
-      "status_satuan_pendidikan": "SWASTA",
-      "jenjang_pendidikan": "PENDIDIKAN DASAR",
-      "pembina": "KEMENTERIAN AGAMA",
-      "jalur_pendidikan": "FORMAL",
-      "nama_desa": "TANUNTUNG",
-      "nama_kecamatan": "KEC. HERLANG",
-      "nama_kabupaten": "KAB. BULUKUMBA",
-      "nama_provinsi": "PROV. SULAWESI SELATAN",
-      "alamat_jalan": "BUTUNG"
-    }
-  ]
-}</code></pre>
-                    </div>
-                </section>
+                    <span class="text-xs font-mono text-slate-400">response.json</span>
+                </div>
+                <div
+                    class="p-6 overflow-auto flex-grow bg-slate-900/60 font-mono text-sm leading-relaxed text-slate-300">
+                    <pre><code class="language-json"><span class="text-brand-300">{</span>
+  <span class="text-purple-400">"status"</span>: <span class="text-emerald-400">"success"</span>,
+  <span class="text-purple-400">"source"</span>: <span class="text-emerald-400">"API Sekolah Mandiri"</span>,
+  <span class="text-purple-400">"developer"</span>: <span class="text-emerald-400">"Syamsul Bahri"</span>,
+  <span class="text-purple-400">"metadata"</span>: <span class="text-brand-300">{</span>
+    <span class="text-purple-400">"total_data_tersedia"</span>: <span class="text-orange-400">552577</span>,
+    <span class="text-purple-400">"limit_ditampilkan"</span>: <span class="text-orange-400">20</span>,
+    <span class="text-purple-400">"offset_saat_ini"</span>: <span class="text-orange-400">0</span>,
+    <span class="text-purple-400">"waktu_update_data_terakhir"</span>: <span class="text-emerald-400">"17 Mei 2026 pukul 18.26"</span>,
+    <span class="text-purple-400">"waktu_update_data_terakhir_iso"</span>: <span class="text-emerald-400">"2026-05-17T11:26:31Z"</span>
+  <span class="text-brand-300">}</span>,
+  <span class="text-purple-400">"data"</span>: <span class="text-brand-300">[</span>
+    <span class="text-brand-300">{</span>
+      <span class="text-purple-400">"npsn"</span>: <span class="text-emerald-400">"60723552"</span>,
+      <span class="text-purple-400">"nama"</span>: <span class="text-emerald-400">"MIS BUTUNG"</span>,
+      <span class="text-purple-400">"bentuk_pendidikan"</span>: <span class="text-emerald-400">"MI"</span>,
+      <span class="text-purple-400">"bentuk_pendidikan_group"</span>: <span class="text-emerald-400">"SD SEDERAJAT"</span>,
+      <span class="text-purple-400">"jenis_pendidikan"</span>: <span class="text-emerald-400">"PENDIDIKAN UMUM"</span>,
+      <span class="text-purple-400">"status_satuan_pendidikan"</span>: <span class="text-emerald-400">"SWASTA"</span>,
+      <span class="text-purple-400">"jenjang_pendidikan"</span>: <span class="text-emerald-400">"PENDIDIKAN DASAR"</span>,
+      <span class="text-purple-400">"pembina"</span>: <span class="text-emerald-400">"KEMENTERIAN AGAMA"</span>,
+      <span class="text-purple-400">"nama_provinsi"</span>: <span class="text-emerald-400">"PROV. SULAWESI SELATAN"</span>
+    <span class="text-brand-300">}</span>
+  <span class="text-brand-300">]</span>
+<span class="text-brand-300">}</span></code></pre>
+                </div>
             </div>
         </div>
 
-        <section class="mt-8 sm:mt-12 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <!-- Rekap Data Table Section -->
+        <section class="glass-panel rounded-2xl overflow-hidden border border-white/10 shadow-xl mb-10">
             <div
-                class="px-4 sm:px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                class="px-6 py-5 border-b border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <div>
-                    <h3 class="font-bold text-slate-800 text-lg sm:text-xl">Pemetaan Data Sekolah</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Berdasarkan Bentuk Pendidikan & Wilayah</p>
+                    <h3 class="font-bold text-white text-xl">Pemetaan Data Sekolah</h3>
+                    <p class="text-sm text-slate-400 mt-1">Berdasarkan Bentuk Pendidikan & Wilayah</p>
                 </div>
-                <div class="flex items-center gap-3">
-                    <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200" id="rekap-tabs">
-                        <button
-                            class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-white text-slate-800 shadow-sm border border-slate-200/50"
-                            id="tab-id">INDONESIA</button>
-                        <button
-                            class="px-3 py-1.5 text-xs font-medium rounded-md transition-colors text-slate-600 hover:text-slate-900"
-                            id="tab-ln">LUAR NEGERI</button>
-                    </div>
+                <div class="flex p-1 bg-slate-900/80 rounded-xl border border-white/10" id="rekap-tabs">
+                    <button
+                        class="px-4 py-2 text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-lg"
+                        id="tab-id">INDONESIA</button>
+                    <button
+                        class="px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white hover:bg-white/5"
+                        id="tab-ln">LUAR NEGERI</button>
                 </div>
             </div>
-            <div class="p-0 overflow-x-auto api-url-scroll max-h-[600px] overflow-y-auto">
-                <table class="w-full text-sm text-left text-slate-600 min-w-[800px] border-collapse" id="rekap-table">
+
+            <div class="p-0 overflow-x-auto api-url-scroll max-h-[600px] overflow-y-auto relative bg-slate-900/30">
+                <table class="w-full text-sm text-left text-slate-300 min-w-[800px] border-collapse" id="rekap-table">
                     <thead
-                        class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200 sticky top-0 z-20 shadow-sm"
+                        class="text-xs text-slate-400 uppercase bg-black/40 border-b border-white/10 sticky top-0 z-20 backdrop-blur-md"
                         id="rekap-thead">
                         <tr>
                             <th scope="col"
-                                class="px-6 py-4 whitespace-nowrap bg-slate-50 md:sticky md:left-0 z-30 border-r border-slate-200">
-                                Memuat...</th>
+                                class="px-6 py-5 whitespace-nowrap table-sticky-col bg-black/40 backdrop-blur-md border-r border-white/10 shadow-[1px_0_0_0_rgba(255,255,255,0.05)]">
+                                Memuat...
+                            </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100" id="rekap-tbody">
+                    <tbody class="divide-y divide-white/5" id="rekap-tbody">
                         <tr>
-                            <td class="px-6 py-12 text-center text-slate-500 italic bg-slate-50/50">
-                                <div class="flex flex-col items-center justify-center gap-3">
-                                    <svg class="animate-spin h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg"
+                            <td class="px-6 py-16 text-center text-slate-500">
+                                <div class="flex flex-col items-center justify-center gap-4">
+                                    <svg class="animate-spin h-8 w-8 text-brand-500" xmlns="http://www.w3.org/2000/svg"
                                         fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                                             stroke-width="4"></circle>
@@ -342,7 +428,8 @@
                                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                         </path>
                                     </svg>
-                                    Sedang mengambil data rekapitulasi sekolah...
+                                    <span class="font-medium animate-pulse">Mengambil data rekapitulasi
+                                        sekolah...</span>
                                 </div>
                             </td>
                         </tr>
@@ -352,251 +439,289 @@
         </section>
     </main>
 
-    <footer class="bg-white border-t border-slate-200 mt-auto">
+    <footer class="border-t border-white/10 bg-black/40 backdrop-blur-lg mt-auto relative z-10">
         <div
-            class="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
-            <p class="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-md">
-                Data bersumber dari portal resmi <b>belajar.id</b>. Pembaruan berkala; waktu selesai terakhir
-                ditampilkan di atas.
-            </p>
-            <div class="flex flex-wrap items-center justify-center gap-2">
-                <span class="text-xs sm:text-sm text-slate-600 font-medium">Dibuat oleh</span>
+            class="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
+            <div>
+                <div class="flex items-center justify-center md:justify-start gap-2 mb-2">
+                    <img src="/favicon.svg" alt="" class="w-5 h-5 opacity-75">
+                    <span class="font-bold text-white">EduAPI</span>
+                </div>
+                <p class="text-sm text-slate-400 max-w-md">
+                    Data tersinkronisasi dari portal resmi belajar.id secara berkala.
+                </p>
+            </div>
+            <div class="flex flex-col items-center md:items-end gap-2">
+                <span class="text-sm text-slate-500">Developed with 💙 by</span>
                 <a href="https://wa.me/qr/FMVS3NLDIRUAA1" target="_blank" rel="noopener noreferrer"
-                    class="bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold tracking-wide hover:bg-blue-200 transition-all">
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-semibold transition-all hover:scale-105 active:scale-95">
                     Syamsul Bahri
                 </a>
             </div>
         </div>
     </footer>
 
+    <!-- All existing scripts preserved but styled to match the new UI -->
     <script>
-        (function () {
-            var base = window.location.origin;
-            var input = document.getElementById('api-keyword');
-            var link = document.getElementById('try-api');
-            var copyBtn = document.getElementById('copy-api-url');
-            var copyLabel = document.getElementById('copy-api-label');
+            (function () {
+                var base = window.location.origin;
+                var input = document.getElementById('api-keyword');
+                var link = document.getElementById('try-api');
+                var copyBtn = document.getElementById('copy-api-url');
+                var copyLabel = document.getElementById('copy-api-label');
 
-            function buildApiUrl() {
-                var kw = input && input.value ? input.value.trim() : '';
-                if (kw) {
-                    return base + '/api/sekolah?keyword=' + encodeURIComponent(kw) + '&limit=5';
+                function buildApiUrl() {
+                    var kw = input && input.value ? input.value.trim() : '';
+                    if (kw) {
+                        return base + '/api/sekolah?keyword=' + encodeURIComponent(kw) + '&limit=5';
+                    }
+                    return base + '/api/sekolah?limit=5';
                 }
-                return base + '/api/sekolah?limit=5';
-            }
 
-            function syncTryLink() {
-                if (link) link.href = buildApiUrl();
-            }
+                function syncTryLink() {
+                    if (link) link.href = buildApiUrl();
+                }
 
-            syncTryLink();
-            if (input) {
-                input.addEventListener('input', syncTryLink);
-                input.addEventListener('keydown', function (e) {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        window.location.href = buildApiUrl();
-                    }
-                });
-            }
+                syncTryLink();
+                if (input) {
+                    input.addEventListener('input', syncTryLink);
+                    input.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            window.location.href = buildApiUrl();
+                        }
+                    });
+                }
 
-            if (copyBtn) {
-                copyBtn.addEventListener('click', function () {
-                    var text = buildApiUrl();
-                    function showCopied() {
-                        if (copyLabel) copyLabel.textContent = 'Tersalin!';
-                        copyBtn.classList.add('border-emerald-300', 'bg-emerald-50', 'text-emerald-800');
-                        setTimeout(function () {
-                            if (copyLabel) copyLabel.textContent = 'Salin';
-                            copyBtn.classList.remove('border-emerald-300', 'bg-emerald-50', 'text-emerald-800');
-                        }, 2000);
-                    }
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(text).then(showCopied).catch(function () {
+                if (copyBtn) {
+                    copyBtn.addEventListener('click', function () {
+                        var text = buildApiUrl();
+                        function showCopied() {
+                            if (copyLabel) copyLabel.textContent = 'Tersalin!';
+                            copyBtn.classList.add('border-emerald-500', 'bg-emerald-500/20', 'text-emerald-400');
+                            copyBtn.classList.remove('border-white/10', 'bg-slate-800', 'text-white');
+                            setTimeout(function () {
+                                if (copyLabel) copyLabel.textContent = 'Salin Link';
+                                copyBtn.classList.remove('border-emerald-500', 'bg-emerald-500/20', 'text-emerald-400');
+                                copyBtn.classList.add('border-white/10', 'bg-slate-800', 'text-white');
+                            }, 2000);
+                        }
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(text).then(showCopied).catch(function () {
+                                fallbackCopy(text);
+                                showCopied();
+                            });
+                        } else {
                             fallbackCopy(text);
                             showCopied();
-                        });
-                    } else {
-                        fallbackCopy(text);
-                        showCopied();
-                    }
-                });
-            }
-
-            function fallbackCopy(text) {
-                var ta = document.createElement('textarea');
-                ta.value = text;
-                ta.setAttribute('readonly', '');
-                ta.style.position = 'fixed';
-                ta.style.left = '-9999px';
-                document.body.appendChild(ta);
-                ta.select();
-                try { document.execCommand('copy'); } catch (e) { /* ignore */ }
-                document.body.removeChild(ta);
-            }
-
-            var lastAt = document.getElementById('last-update-at');
-            var lastIso = document.getElementById('last-update-iso');
-            var totalEl = document.getElementById('total-data-count');
-
-            function loadStatus() {
-                fetch(base + '/api/status')
-                    .then(function (r) { return r.json(); })
-                    .then(function (json) {
-                        if (json.status !== 'success') {
-                            if (lastAt) lastAt.textContent = 'Tidak tersedia';
-                            return;
                         }
-                        if (lastAt) {
-                            lastAt.textContent = json.waktu_update_data_terakhir || 'Belum tercatat';
-                        }
-                        if (lastIso && json.waktu_update_data_terakhir_iso) {
-                            lastIso.textContent = json.waktu_update_data_terakhir_iso;
-                        }
-                        if (totalEl && json.total_data_tersedia != null) {
-                            totalEl.textContent = Number(json.total_data_tersedia).toLocaleString('id-ID') + ' sekolah terindeks';
-                        }
-                    })
-                    .catch(function () {
-                        if (lastAt) lastAt.textContent = 'Gagal memuat';
                     });
-            }
-
-            loadStatus();
-            setInterval(loadStatus, 60000);
-
-            var rekapThead = document.getElementById('rekap-thead');
-            var rekapTbody = document.getElementById('rekap-tbody');
-            var tabId = document.getElementById('tab-id');
-            var tabLn = document.getElementById('tab-ln');
-            var currentTab = 'indonesia';
-            var rekapData = null;
-
-            function renderRekap() {
-                if (!rekapData) return;
-                var metadata = rekapData.metadata;
-                var data = rekapData.data;
-                var jenjangList = metadata.jenjang;
-
-                var isLuarNegeri = currentTab === 'luar_negeri';
-                var list = isLuarNegeri ? metadata.negara : metadata.provinsi;
-                var sourceData = isLuarNegeri ? data.luar_negeri : data.indonesia;
-                var labelFirstCol = isLuarNegeri ? 'NEGARA' : 'PROVINSI';
-
-                // Build Header
-                var theadHtml = '<tr><th scope="col" class="px-6 py-4 whitespace-nowrap bg-slate-100 font-bold text-slate-700 md:sticky md:left-0 z-30 border-r border-slate-200 md:shadow-[1px_0_0_0_#e2e8f0]">' + labelFirstCol + '</th>';
-                for (var i = 0; i < jenjangList.length; i++) {
-                    theadHtml += '<th scope="col" class="px-4 py-4 whitespace-nowrap text-center bg-slate-50">' + jenjangList[i] + '</th>';
                 }
-                theadHtml += '<th scope="col" class="px-4 py-4 whitespace-nowrap text-center font-bold bg-slate-100 border-l border-slate-200">TOTAL</th>';
-                theadHtml += '</tr>';
-                rekapThead.innerHTML = theadHtml;
 
-                // Build Body
-                var tbodyHtml = '';
-                var grandTotalAll = 0;
-                var jenjangTotals = {};
-                for (var i = 0; i < jenjangList.length; i++) jenjangTotals[jenjangList[i]] = 0;
+                function fallbackCopy(text) {
+                    var ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.setAttribute('readonly', '');
+                    ta.style.position = 'fixed';
+                    ta.style.left = '-9999px';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+                    document.body.removeChild(ta);
+                }
 
-                for (var i = 0; i < list.length; i++) {
-                    var item = list[i];
-                    var rowTotal = 0;
-                    var tr = '<tr class="hover:bg-blue-50 transition-colors group bg-white">';
-                    tr += '<td class="px-6 py-3 font-medium text-slate-800 whitespace-nowrap bg-white group-hover:bg-blue-50 md:sticky md:left-0 z-10 border-r border-slate-100 md:shadow-[1px_0_0_0_#f1f5f9] transition-colors">' + item + '</td>';
+                var lastAt = document.getElementById('last-update-at');
+                var lastIso = document.getElementById('last-update-iso');
+                var totalEl = document.getElementById('total-data-count');
 
+                function loadStatus() {
+                    fetch(base + '/api/status')
+                        .then(function (r) { return r.json(); })
+                        .then(function (json) {
+                            if (json.status !== 'success') {
+                                if (lastAt) lastAt.textContent = 'Tidak tersedia';
+                                return;
+                            }
+                            if (lastAt) {
+                                lastAt.textContent = json.waktu_update_data_terakhir || 'Belum tercatat';
+                            }
+                            if (lastIso && json.waktu_update_data_terakhir_iso) {
+                                lastIso.textContent = json.waktu_update_data_terakhir_iso;
+                            }
+                            if (totalEl && json.total_data_tersedia != null) {
+                                totalEl.textContent = Number(json.total_data_tersedia).toLocaleString('id-ID');
+                            }
+                        })
+                        .catch(function () {
+                            if (lastAt) lastAt.textContent = 'Gagal memuat';
+                        });
+                }
+
+                loadStatus();
+                setInterval(loadStatus, 60000);
+
+                var rekapThead = document.getElementById('rekap-thead');
+                var rekapTbody = document.getElementById('rekap-tbody');
+                var tabId = document.getElementById('tab-id');
+                var tabLn = document.getElementById('tab-ln');
+                var currentTab = 'indonesia';
+                var rekapData = null;
+
+                function renderRekap() {
+                    if (!rekapData) return;
+                    var metadata = rekapData.metadata;
+                    var data = rekapData.data;
+                    var jenjangList = metadata.jenjang;
+
+                    var isLuarNegeri = currentTab === 'luar_negeri';
+                    var list = isLuarNegeri ? metadata.negara : metadata.provinsi;
+                    var sourceData = isLuarNegeri ? data.luar_negeri : data.indonesia;
+                    var labelFirstCol = isLuarNegeri ? 'NEGARA' : 'PROVINSI';
+
+                    // Build Header
+                    var theadHtml = '<tr><th scope="col" class="px-6 py-5 whitespace-nowrap bg-black/40 font-bold text-white table-sticky-col border-r border-white/10 backdrop-blur-md shadow-[1px_0_0_0_rgba(255,255,255,0.05)]">' + labelFirstCol + '</th>';
+                    for (var i = 0; i < jenjangList.length; i++) {
+                        theadHtml += '<th scope="col" class="px-4 py-5 whitespace-nowrap text-center font-semibold text-slate-300">' + jenjangList[i] + '</th>';
+                    }
+                    theadHtml += '<th scope="col" class="px-6 py-5 whitespace-nowrap text-center font-bold text-brand-400 bg-brand-500/10 border-l border-white/10">TOTAL</th>';
+                    theadHtml += '</tr>';
+                    rekapThead.innerHTML = theadHtml;
+
+                    // Build Body
+                    var tbodyHtml = '';
+                    var grandTotalAll = 0;
+                    var jenjangTotals = {};
+                    for (var i = 0; i < jenjangList.length; i++) jenjangTotals[jenjangList[i]] = 0;
+
+                    for (var i = 0; i < list.length; i++) {
+                        var item = list[i];
+                        var rowTotal = 0;
+                        var tr = '<tr class="hover:bg-white/5 transition-colors group">';
+                        tr += '<td class="px-6 py-4 font-medium text-slate-200 whitespace-nowrap bg-slate-900/50 group-hover:bg-slate-800/80 table-sticky-col border-r border-white/10 shadow-[1px_0_0_0_rgba(255,255,255,0.02)] transition-colors backdrop-blur-sm">' + item + '</td>';
+
+                        for (var j = 0; j < jenjangList.length; j++) {
+                            var jenjang = jenjangList[j];
+                            var count = (sourceData[item] && sourceData[item][jenjang]) ? sourceData[item][jenjang] : 0;
+                            rowTotal += count;
+                            jenjangTotals[jenjang] += count;
+
+                            var cellContent = '<span class="text-slate-600">-</span>';
+                            if (count > 0) {
+                                var filterProv = isLuarNegeri ? 'LUAR NEGERI - ' + item : item;
+                                var detailUrl = base + '/api/sekolah?provinsi=' + encodeURIComponent(filterProv) + '&bentuk=' + encodeURIComponent(jenjang);
+                                cellContent = '<span class="inline-flex items-center gap-1.5 font-medium text-slate-300 group-hover/cell:text-white">' + Number(count).toLocaleString('id-ID') +
+                                    '<a href="' + detailUrl + '" target="_blank" class="text-brand-400 hover:text-brand-300 hover:scale-110 transition-all opacity-0 group-hover:opacity-100" title="Lihat ' + count + ' sekolah ' + jenjang + ' di ' + item + '">' +
+                                    '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
+                                    '</a></span>';
+                            }
+                            tr += '<td class="px-4 py-4 text-center whitespace-nowrap group/cell">' + cellContent + '</td>';
+                        }
+                        grandTotalAll += rowTotal;
+
+                        var filterProv = isLuarNegeri ? 'LUAR NEGERI - ' + item : item;
+                        var rowTotalUrl = base + '/api/sekolah?provinsi=' + encodeURIComponent(filterProv);
+                        var rowTotalContent = '<span class="inline-flex items-center justify-center gap-1.5 font-bold text-white w-full">' + Number(rowTotal).toLocaleString('id-ID') +
+                            '<a href="' + rowTotalUrl + '" target="_blank" class="text-brand-400 hover:text-brand-300 hover:scale-110 transition-all opacity-0 group-hover:opacity-100" title="Lihat semua ' + rowTotal + ' sekolah di ' + item + '">' +
+                            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
+                            '</a></span>';
+
+                        tr += '<td class="px-6 py-4 text-center whitespace-nowrap bg-white/[0.02] border-l border-white/10">' + rowTotalContent + '</td>';
+                        tr += '</tr>';
+                        tbodyHtml += tr;
+                    }
+
+                    // Build Footer Row
+                    var tf = '<tr class="bg-brand-900/40 border-t border-brand-500/30 sticky bottom-0 z-20 backdrop-blur-md shadow-[0_-1px_10px_rgba(0,0,0,0.2)]">';
+                    tf += '<td class="px-6 py-5 font-bold text-white whitespace-nowrap table-sticky-col border-r border-brand-500/30 bg-brand-900/80 backdrop-blur-md shadow-[1px_0_0_0_rgba(59,130,246,0.3)]">TOTAL KESELURUHAN</td>';
                     for (var j = 0; j < jenjangList.length; j++) {
                         var jenjang = jenjangList[j];
-                        var count = (sourceData[item] && sourceData[item][jenjang]) ? sourceData[item][jenjang] : 0;
-                        rowTotal += count;
-                        jenjangTotals[jenjang] += count;
-
-                        var cellContent = '-';
-                        if (count > 0) {
-                            var filterProv = isLuarNegeri ? 'LUAR NEGERI - ' + item : item;
-                            var detailUrl = base + '/api/sekolah?provinsi=' + encodeURIComponent(filterProv) + '&bentuk=' + encodeURIComponent(jenjang);
-                            cellContent = '<span class="inline-flex items-center gap-1">' + Number(count).toLocaleString('id-ID') +
-                                '<a href="' + detailUrl + '" target="_blank" class="text-blue-500 hover:text-blue-700 hover:scale-110 transition-all" title="Lihat ' + count + ' sekolah ' + jenjang + ' di ' + item + '">' +
-                                '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
-                                '</a></span>';
-                        }
-                        tr += '<td class="px-4 py-3 text-center whitespace-nowrap' + (count > 0 ? ' text-slate-700' : ' text-slate-300') + '">' + cellContent + '</td>';
+                        var colTotal = jenjangTotals[jenjang];
+                        var colTotalUrl = base + '/api/sekolah?bentuk=' + encodeURIComponent(jenjang);
+                        var colTotalContent = '<span class="inline-flex items-center justify-center gap-1.5 font-bold text-white group/cell w-full">' + Number(colTotal).toLocaleString('id-ID') +
+                            '<a href="' + colTotalUrl + '" target="_blank" class="text-brand-300 hover:text-white hover:scale-110 transition-all opacity-0 group-hover/cell:opacity-100" title="Lihat semua ' + colTotal + ' sekolah ' + jenjang + '">' +
+                            '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
+                            '</a></span>';
+                        tf += '<td class="px-4 py-5 text-center whitespace-nowrap">' + colTotalContent + '</td>';
                     }
-                    grandTotalAll += rowTotal;
-
-                    var filterProv = isLuarNegeri ? 'LUAR NEGERI - ' + item : item;
-                    var rowTotalUrl = base + '/api/sekolah?provinsi=' + encodeURIComponent(filterProv);
-                    var rowTotalContent = '<span class="inline-flex items-center gap-1 font-semibold text-slate-800">' + Number(rowTotal).toLocaleString('id-ID') +
-                        '<a href="' + rowTotalUrl + '" target="_blank" class="text-blue-600 hover:text-blue-800 hover:scale-110 transition-all" title="Lihat semua ' + rowTotal + ' sekolah di ' + item + '">' +
-                        '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
+                    var grandTotalUrl = base + '/api/sekolah';
+                    var grandTotalContent = '<span class="inline-flex items-center justify-center gap-1.5 font-black text-brand-300 group/cell w-full text-base">' + Number(grandTotalAll).toLocaleString('id-ID') +
+                        '<a href="' + grandTotalUrl + '" target="_blank" class="text-brand-200 hover:text-white hover:scale-125 transition-all opacity-0 group-hover/cell:opacity-100" title="Lihat semua ' + grandTotalAll + ' sekolah">' +
+                        '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
                         '</a></span>';
 
-                    tr += '<td class="px-4 py-3 text-center whitespace-nowrap bg-slate-50 border-l border-slate-100">' + rowTotalContent + '</td>';
-                    tr += '</tr>';
-                    tbodyHtml += tr;
+                    tf += '<td class="px-6 py-5 text-center whitespace-nowrap bg-brand-500/20 border-l border-brand-500/30">' + grandTotalContent + '</td>';
+                    tf += '</tr>';
+                    tbodyHtml += tf;
+
+                    rekapTbody.innerHTML = tbodyHtml;
                 }
 
-                // Build Footer Row
-                var tf = '<tr class="bg-slate-100 border-t-2 border-slate-200 sticky bottom-0 z-20 shadow-[0_-1px_2px_rgba(0,0,0,0.05)]">';
-                tf += '<td class="px-6 py-4 font-bold text-slate-800 whitespace-nowrap md:sticky md:left-0 z-30 border-r border-slate-200 bg-slate-100 md:shadow-[1px_0_0_0_#e2e8f0]">TOTAL KESELURUHAN</td>';
-                for (var j = 0; j < jenjangList.length; j++) {
-                    var jenjang = jenjangList[j];
-                    var colTotal = jenjangTotals[jenjang];
-                    var colTotalUrl = base + '/api/sekolah?bentuk=' + encodeURIComponent(jenjang);
-                    var colTotalContent = '<span class="inline-flex items-center gap-1 font-bold text-slate-800">' + Number(colTotal).toLocaleString('id-ID') +
-                        '<a href="' + colTotalUrl + '" target="_blank" class="text-blue-600 hover:text-blue-800 hover:scale-110 transition-all" title="Lihat semua ' + colTotal + ' sekolah ' + jenjang + '">' +
-                        '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
-                        '</a></span>';
-                    tf += '<td class="px-4 py-4 text-center whitespace-nowrap bg-slate-100">' + colTotalContent + '</td>';
-                }
-                var grandTotalUrl = base + '/api/sekolah';
-                var grandTotalContent = '<span class="inline-flex items-center gap-1 font-bold text-blue-700">' + Number(grandTotalAll).toLocaleString('id-ID') +
-                    '<a href="' + grandTotalUrl + '" target="_blank" class="text-blue-700 hover:text-blue-900 hover:scale-110 transition-all" title="Lihat semua ' + grandTotalAll + ' sekolah">' +
-                    '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>' +
-                    '</a></span>';
-
-                tf += '<td class="px-4 py-4 text-center whitespace-nowrap bg-blue-50 border-l border-slate-200">' + grandTotalContent + '</td>';
-                tf += '</tr>';
-                tbodyHtml += tf;
-
-                rekapTbody.innerHTML = tbodyHtml;
-            }
-
-            if (tabId && tabLn) {
-                tabId.addEventListener('click', function () {
-                    if (currentTab === 'indonesia') return;
-                    currentTab = 'indonesia';
-                    tabId.className = 'px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-white text-slate-800 shadow-sm border border-slate-200/50';
-                    tabLn.className = 'px-3 py-1.5 text-xs font-medium rounded-md transition-colors text-slate-600 hover:text-slate-900';
-                    renderRekap();
-                });
-
-                tabLn.addEventListener('click', function () {
-                    if (currentTab === 'luar_negeri') return;
-                    currentTab = 'luar_negeri';
-                    tabLn.className = 'px-3 py-1.5 text-xs font-medium rounded-md transition-colors bg-white text-slate-800 shadow-sm border border-slate-200/50';
-                    tabId.className = 'px-3 py-1.5 text-xs font-medium rounded-md transition-colors text-slate-600 hover:text-slate-900';
-                    renderRekap();
-                });
-            }
-
-            function loadRekap() {
-                fetch(base + '/api/rekap')
-                    .then(function (r) { return r.json(); })
-                    .then(function (json) {
-                        if (json.status !== 'success') {
-                            rekapTbody.innerHTML = '<tr><td class="px-6 py-8 text-center text-red-500">Gagal memuat rekap data.</td></tr>';
-                            return;
-                        }
-                        rekapData = json;
+                if (tabId && tabLn) {
+                    tabId.addEventListener('click', function () {
+                        if (currentTab === 'indonesia') return;
+                        currentTab = 'indonesia';
+                        tabId.className = 'px-4 py-2 text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-lg';
+                        tabLn.className = 'px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white hover:bg-white/5';
                         renderRekap();
-                    })
-                    .catch(function () {
-                        rekapTbody.innerHTML = '<tr><td class="px-6 py-8 text-center text-red-500">Gagal terhubung ke API rekap data.</td></tr>';
                     });
-            }
 
-            loadRekap();
-        })();
+                    tabLn.addEventListener('click', function () {
+                        if (currentTab === 'luar_negeri') return;
+                        currentTab = 'luar_negeri';
+                        tabLn.className = 'px-4 py-2 text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-lg';
+                        tabId.className = 'px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white hover:bg-white/5';
+                        renderRekap();
+                    });
+                }
+
+                function loadRekap() {
+                    fetch(base + '/api/rekap')
+                        .then(function (r) { return r.json(); })
+                        .then(function (json) {
+                            if (json.status !== 'success') {
+                                rekapTbody.innerHTML = '<tr><td class="px-6 py-10 text-center text-rose-400 font-medium">Gagal memuat rekap data.</td></tr>';
+                                return;
+                            }
+                            rekapData = json;
+                            renderRekap();
+                        })
+                        .catch(function () {
+                            rekapTbody.innerHTML = '<tr><td class="px-6 py-10 text-center text-rose-400 font-medium">Gagal terhubung ke API rekap data.</td></tr>';
+                        });
+                }
+
+                loadRekap();
+
+                // Parameter Query Copy Functionality
+                var paramBtns = document.querySelectorAll('.copy-param-btn');
+                paramBtns.forEach(function(btn) {
+                    btn.addEventListener('click', function() {
+                        var paramStr = this.getAttribute('data-param');
+                        var fullUrl = base + '/api/sekolah' + paramStr;
+                        var originalHtml = this.innerHTML;
+                        var self = this;
+                        
+                        function showSuccess() {
+                            self.innerHTML = '<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                            self.classList.add('border-emerald-500/50', 'bg-emerald-500/10');
+                            setTimeout(function() {
+                                self.innerHTML = originalHtml;
+                                self.classList.remove('border-emerald-500/50', 'bg-emerald-500/10');
+                            }, 2000);
+                        }
+
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(fullUrl).then(showSuccess).catch(function() {
+                                fallbackCopy(fullUrl);
+                                showSuccess();
+                            });
+                        } else {
+                            fallbackCopy(fullUrl);
+                            showSuccess();
+                        }
+                    });
+                });
+            })();
     </script>
 </body>
 
