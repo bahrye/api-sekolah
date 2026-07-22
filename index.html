@@ -578,8 +578,10 @@
                     var sourceData = isLuarNegeri ? data.luar_negeri : data.indonesia;
                     var labelFirstCol = isLuarNegeri ? 'NEGARA' : 'PROVINSI';
 
+                    var clickHandler = "if(window.innerWidth < 640) { this.querySelector('div').classList.toggle('truncate'); this.querySelector('div').classList.toggle('whitespace-nowrap'); this.querySelector('div').classList.toggle('whitespace-normal'); }";
+
                     // Build Header
-                    var theadHtml = '<tr><th scope="col" class="px-6 py-5 whitespace-nowrap bg-black/40 font-bold text-white table-sticky-col border-r border-white/10 backdrop-blur-md shadow-[1px_0_0_0_rgba(255,255,255,0.05)]">' + labelFirstCol + '</th>';
+                    var theadHtml = '<tr><th scope="col" class="px-3 sm:px-6 py-5 bg-black/40 font-bold text-white table-sticky-col border-r border-white/10 backdrop-blur-md shadow-[1px_0_0_0_rgba(255,255,255,0.05)] w-24 min-w-[6rem] max-w-[6rem] sm:w-auto sm:min-w-[12rem] sm:max-w-none cursor-pointer sm:cursor-auto" onclick="' + clickHandler + '"><div class="truncate whitespace-nowrap text-xs sm:text-sm" title="' + labelFirstCol + '">' + labelFirstCol + '</div></th>';
                     for (var i = 0; i < jenjangList.length; i++) {
                         theadHtml += '<th scope="col" class="px-4 py-5 whitespace-nowrap text-center font-semibold text-slate-300">' + jenjangList[i] + '</th>';
                     }
@@ -596,8 +598,9 @@
                     for (var i = 0; i < list.length; i++) {
                         var item = list[i];
                         var rowTotal = 0;
+                        var shortItem = item.replace(/^(PROV\.|KAB\.|KOTA\.)\s+/i, '');
                         var tr = '<tr class="hover:bg-white/5 transition-colors group">';
-                        tr += '<td class="px-6 py-4 font-medium text-slate-200 whitespace-nowrap bg-slate-900/50 group-hover:bg-slate-800/80 table-sticky-col border-r border-white/10 shadow-[1px_0_0_0_rgba(255,255,255,0.02)] transition-colors backdrop-blur-sm">' + item + '</td>';
+                        tr += '<td class="px-3 sm:px-6 py-4 font-medium text-slate-200 bg-slate-900/50 group-hover:bg-slate-800/80 table-sticky-col border-r border-white/10 shadow-[1px_0_0_0_rgba(255,255,255,0.02)] transition-colors backdrop-blur-sm w-24 min-w-[6rem] max-w-[6rem] sm:w-auto sm:min-w-[12rem] sm:max-w-none cursor-pointer sm:cursor-auto" onclick="' + clickHandler + '"><div class="truncate whitespace-nowrap text-[11px] sm:text-sm" title="' + item + '">' + shortItem + '</div></td>';
 
                         for (var j = 0; j < jenjangList.length; j++) {
                             var jenjang = jenjangList[j];
@@ -632,7 +635,7 @@
 
                     // Build Footer Row
                     var tf = '<tr class="bg-brand-900/40 border-t border-brand-500/30 sticky bottom-0 z-20 backdrop-blur-md shadow-[0_-1px_10px_rgba(0,0,0,0.2)]">';
-                    tf += '<td class="px-6 py-5 font-bold text-white whitespace-nowrap table-sticky-col border-r border-brand-500/30 bg-brand-900/80 backdrop-blur-md shadow-[1px_0_0_0_rgba(59,130,246,0.3)]">TOTAL KESELURUHAN</td>';
+                    tf += '<td class="px-3 sm:px-6 py-5 font-bold text-white table-sticky-col border-r border-brand-500/30 bg-brand-900/80 backdrop-blur-md shadow-[1px_0_0_0_rgba(59,130,246,0.3)] w-24 min-w-[6rem] max-w-[6rem] sm:w-auto sm:min-w-[12rem] sm:max-w-none cursor-pointer sm:cursor-auto" onclick="' + clickHandler + '"><div class="truncate whitespace-nowrap text-[11px] sm:text-sm" title="TOTAL KESELURUHAN">TOTAL KESELURUHAN</div></td>';
                     for (var j = 0; j < jenjangList.length; j++) {
                         var jenjang = jenjangList[j];
                         var colTotal = jenjangTotals[jenjang];
