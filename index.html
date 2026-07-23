@@ -209,7 +209,7 @@
                             </svg>
                             <span id="copy-api-label">Salin Link</span>
                         </button>
-                        <a id="try-api" href="/api/sekolah?limit=5"
+                        <a id="try-api" href="/api/sekolah?limit=5" target="_blank"
                             class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold transition-all shadow-lg shadow-brand-500/25 active:scale-95">
                             Coba API
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -354,7 +354,7 @@
                 </div>
                 <div
                     class="p-6 overflow-auto flex-grow bg-slate-900/60 font-mono text-sm leading-relaxed text-slate-300">
-                    <pre><code class="language-json"><span class="text-brand-300">{</span>
+                    <pre><code class="language-json" id="json-preview"><span class="text-brand-300">{</span>
   <span class="text-purple-400">"status"</span>: <span class="text-emerald-400">"success"</span>,
   <span class="text-purple-400">"source"</span>: <span class="text-emerald-400">"API Sekolah Mandiri"</span>,
   <span class="text-purple-400">"developer"</span>: <span class="text-emerald-400">"Syamsul Bahri"</span>,
@@ -475,8 +475,58 @@
                     return base + '/api/sekolah?limit=5';
                 }
 
+                var jsonPreview = document.getElementById('json-preview');
+
+                function syntaxHighlight(json) {
+                    if (typeof json != 'string') {
+                        json = JSON.stringify(json, undefined, 2);
+                    }
+                    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    json = json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+                        var cls = 'text-orange-400';
+                        if (/^"/.test(match)) {
+                            if (/:$/.test(match)) {
+                                cls = 'text-purple-400';
+                            } else {
+                                cls = 'text-emerald-400';
+                            }
+                        } else if (/true|false/.test(match)) {
+                            cls = 'text-brand-400';
+                        } else if (/null/.test(match)) {
+                            cls = 'text-slate-400';
+                        }
+                        return '<span class="' + cls + '">' + match + '</span>';
+                    });
+                    return json.replace(/([\[\]\{\}])/g, '<span class="text-brand-300">$1</span>');
+                }
+
+                function performSearch(e) {
+                    if (e) e.preventDefault();
+                    var url = buildApiUrl();
+                    
+                    if (jsonPreview) {
+                        jsonPreview.innerHTML = '<div class="flex items-center gap-3"><svg class="animate-spin h-5 w-5 text-brand-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="text-slate-400 animate-pulse font-sans">Mengambil data...</span></div>';
+                    }
+
+                    fetch(url)
+                        .then(function(res) { return res.json(); })
+                        .then(function(data) {
+                            if (jsonPreview) {
+                                jsonPreview.innerHTML = syntaxHighlight(data);
+                            }
+                        })
+                        .catch(function(err) {
+                            if (jsonPreview) {
+                                jsonPreview.innerHTML = '<span class="text-rose-400 font-sans">Error: Gagal mengambil data dari API.</span>';
+                            }
+                        });
+                }
+
                 function syncTryLink() {
                     if (link) link.href = buildApiUrl();
+                    if (input && input.value.length === 8) {
+                        performSearch();
+                    }
                 }
 
                 syncTryLink();
@@ -485,7 +535,7 @@
                     input.addEventListener('keydown', function (e) {
                         if (e.key === 'Enter') {
                             e.preventDefault();
-                            window.location.href = buildApiUrl();
+                            window.open(buildApiUrl(), '_blank');
                         }
                     });
                 }
