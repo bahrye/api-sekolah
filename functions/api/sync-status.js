@@ -52,10 +52,16 @@ export async function onRequestGet(context) {
 
     if (selesai) progressPercent = 100;
 
+    let activeProvince = null;
+    if (activeRow.bentuk_aktif) {
+      const match = activeRow.bentuk_aktif.match(/\((.*?)\)/);
+      if (match) activeProvince = match[1];
+    }
+
     let isRunning = false;
     if (activeRow.updated_at && !selesai) {
       const lastUpdated = new Date(activeRow.updated_at);
-      if (Date.now() - lastUpdated.getTime() < 60 * 1000) {
+      if (Date.now() - lastUpdated.getTime() < 90 * 1000) {
         isRunning = true;
       }
     }
@@ -66,6 +72,7 @@ export async function onRequestGet(context) {
         isCustom,
         isRunning,
         selesai,
+        activeProvince,
         bentukBerikutnya,
         offsetBerikutnya,
         totalSynced,

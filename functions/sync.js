@@ -1,6 +1,30 @@
 import { getSupabase } from './lib/db.js';
 import { VALID_BENTUK } from './lib/sync-supabase-core.js';
 
+
+const parseDateMs = (dStr) => {
+  if (!dStr) return 0;
+  let t = new Date(dStr).getTime();
+  if (!isNaN(t)) return t;
+  t = new Date(dStr.replace(' ', 'T') + '+07:00').getTime();
+  return isNaN(t) ? 0 : t;
+};
+
+const formatWIB = (dStr) => {
+  if (!dStr) return '-';
+  const ms = parseDateMs(dStr);
+  if (!ms) return dStr;
+  const d = new Date(ms + 7 * 60 * 60 * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  const Y = d.getUTCFullYear();
+  const M = pad(d.getUTCMonth() + 1);
+  const D = pad(d.getUTCDate());
+  const h = pad(d.getUTCHours());
+  const m = pad(d.getUTCMinutes());
+  const s = pad(d.getUTCSeconds());
+  return `${D}/${M}/${Y}, ${h}.${m}.${s} WIB`;
+};
+
 const cleanName = (name) => {
   if (!name) return '';
   return name.replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/^PROVINSI|^PROV/, '');
@@ -41,8 +65,8 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         let isCustom = false;
 
         if (row2 && row2.updated_at && row1.updated_at) {
-          const t1 = new Date(row1.updated_at.replace(' ', 'T') + '+07:00').getTime();
-          const t2 = new Date(row2.updated_at.replace(' ', 'T') + '+07:00').getTime();
+          const t1 = parseDateMs(row1.updated_at);
+          const t2 = parseDateMs(row2.updated_at);
           if (t2 > t1) {
             activeRow = row2;
             isCustom = true;
@@ -1052,7 +1076,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             statusBadge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Sinkronisasi Selesai';
           } else if (status.isRunning) {
             statusBadge.className = 'status-badge';
-            statusBadge.innerHTML = '<span class="pulse-dot"></span> Sedang Menyinkronkan...';
+            var pName = status.activeProvince || (status.bentukBerikutnya && status.bentukBerikutnya.match(/\((.*?)\)/)?.[1]); statusBadge.innerHTML = '<span class="pulse-dot"></span> Sedang Menyinkronkan ' + (pName ? '— <strong>' + pName + '</strong>' : '') + '...';
           } else {
             statusBadge.className = 'status-badge stopped';
             statusBadge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Menunggu / Terhenti';
@@ -1155,7 +1179,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
     </svg>
     
     <div id="status" class="status-badge ${selesai ? 'finished' : (!isRunning ? 'stopped' : '')}">
-      ${selesai ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Sinkronisasi Selesai' : (isRunning ? '<span class="pulse-dot"></span> Sedang Menyinkronkan...' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Menunggu / Terhenti')}
+      ${selesai ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Sinkronisasi Selesai' : (isRunning ? `<span class="pulse-dot"></span> Sedang Menyinkronkan ${activeProvince ? '— <strong>' + activeProvince + '</strong>' : ''}...` : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Menunggu / Terhenti')}
     </div>
     
     <div class="progress-bar-container">
@@ -1178,8 +1202,11 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         <span>Bentuk Aktif: <strong style="color: var(--primary-light); text-transform: uppercase;">${bentukBerikutnya}</strong></span>
         <span>Offset Saat Ini: <strong style="color: var(--text-main);">${offsetBerikutnya}</strong></span>
       </div>
-      <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
-        Update Terakhir: <strong style="color: var(--text-subtle);">${activeRow.updated_at || '-'} WIB</strong>
+      <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <span>Provinsi Aktif: <strong style="color: #38bdf8; font-weight: 700;">${activeProvince ? '📍 ' + activeProvince : '🌐 Semua Wilayah'}</strong></span>
+        <span style="font-size: 12px; color: var(--text-muted);">
+          Update Terakhir: <strong style="color: var(--text-subtle);">${formatWIB(activeRow.updated_at)}</strong>
+        </span>
       </div>
     </div>
 

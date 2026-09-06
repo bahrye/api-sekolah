@@ -18,38 +18,66 @@ export async function onRequestPost(context) {
   try {
     const supabase = getSupabase(env);
     const body = await request.json();
-    const { dataList, bentukAktif, offset, isFinished, ...customParams } = body;
+    const { dataList, bentukAktif, offset, isFinished, customSync, ...customParams } = body;
 
     let stats = { baru: 0, diperbarui: 0, tidakBerubah: 0, tanpaNpsn: 0 };
     if (dataList && dataList.length > 0) {
       stats = await syncBatchToSupabase(supabase, dataList);
     }
 
-    const isReset = (bentukAktif === 'tk' || bentukAktif === 'ALL') && offset === 0;
+    const isCustom = Boolean(customSync);
+    const targetId = isCustom ? 2 : 1;
+
+    // Format nama bentuk aktif dan nama provinsi
+    const baseBentuk = (bentukAktif || 'tk').toUpperCase();
+    const displayBentuk = (body.namaProvinsi && body.namaProvinsi !== 'SEMUA')
+      ? `${baseBentuk} (${body.namaProvinsi})`
+      : baseBentuk;
 
     // Ambil status saat ini
     const { data: currentStatus } = await supabase
       .from('status_sinkronisasi')
       .select('*')
-      .eq('id', 1)
+      .eq('id', targetId)
       .single();
 
-    const totalBaru = (isReset ? 0 : (currentStatus?.total_baru || 0)) + stats.baru;
-    const totalDiperbarui = (isReset ? 0 : (currentStatus?.total_diperbarui || 0)) + stats.diperbarui;
-    const totalTidakBerubah = (isReset ? 0 : (currentStatus?.total_tidak_berubah || 0)) + stats.tidakBerubah;
-    const totalTanpaNpsn = (isReset ? 0 : (currentStatus?.total_tanpa_npsn || 0)) + stats.tanpaNpsn;
+    let totalBaru = stats.baru;
+    let totalDiperbarui = stats.diperbarui;
+    let totalTidakBerubah = stats.tidakBerubah;
+    let totalTanpaNpsn = stats.tanpaNpsn;
+    let totalEstimasi = customParams.totalEstimasi || 0;
+
+    if (isCustom) {
+      if (!body.isStart && currentStatus) {
+        totalBaru += (currentStatus.total_baru || 0);
+        totalDiperbarui += (currentStatus.total_diperbarui || 0);
+        totalTidakBerubah += (currentStatus.total_tidak_berubah || 0);
+        totalTanpaNpsn += (currentStatus.total_tanpa_npsn || 0);
+        totalEstimasi = customParams.totalEstimasi || currentStatus.total_estimasi || 0;
+      }
+    } else {
+      const isReset = (bentukAktif === 'tk' || bentukAktif === 'ALL') && offset === 0;
+      if (!isReset && currentStatus) {
+        totalBaru += (currentStatus.total_baru || 0);
+        totalDiperbarui += (currentStatus.total_diperbarui || 0);
+        totalTidakBerubah += (currentStatus.total_tidak_berubah || 0);
+        totalTanpaNpsn += (currentStatus.total_tanpa_npsn || 0);
+      }
+      totalEstimasi = 553831;
+    }
 
     // Update status di Supabase
     await supabase.from('status_sinkronisasi').upsert({
-      id: 1,
-      bentuk_aktif: bentukAktif || 'tk',
+      id: targetId,
+      bentuk_aktif: displayBentuk,
       offset_terakhir: offset || 0,
       total_baru: totalBaru,
       total_diperbarui: totalDiperbarui,
       total_tidak_berubah: totalTidakBerubah,
       total_tanpa_npsn: totalTanpaNpsn,
+      total_estimasi: totalEstimasi,
       updated_at: new Date().toISOString(),
-      waktu_selesai_terakhir: isFinished ? new Date().toISOString() : currentStatus?.waktu_selesai_terakhir,
+      waktu_selesai_terakhir: isFinished ? new Date().toISOString() : (currentStatus?.waktu_selesai_terakhir || null),
     });
 
     // Jika provinsi selesai, catat ke provinsi_sync_status & log_aktivitas_provinsi
