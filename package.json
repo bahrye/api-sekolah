@@ -7,6 +7,7 @@
     "deploy": "npm run deploy:cf",
     "migrate:supabase": "node scripts/migrate-to-supabase.js",
     "sync:supabase": "node scripts/sync-supabase.js",
+    "sync:belajar": "node scripts/fetch-custom.cjs",
     "ship": "node scripts/ship.js",
     "ship:all": "node scripts/ship.js && npm run deploy:cf"
   },

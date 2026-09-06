@@ -47,4 +47,4 @@ jobs:
           PILIHAN_PROVINSI: ${{ github.event.inputs.pilihan_provinsi || '' }}
           MULAI_DARI_AWAL: ${{ github.event.inputs.mulai_dari_awal || 'false' }}
           IS_CRON_SCHEDULE: ${{ github.event_name == 'schedule' }}
-        run: node scripts/fetch-custom.js
+        run: node scripts/fetch-custom.cjs
