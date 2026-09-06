@@ -1,8 +1,7 @@
-import { getApiMeta } from '../lib/sync-meta.js';
 import { getStatusSinkronisasiPublik } from '../lib/status-sinkronisasi.js';
 import { formatDbRowResponse } from '../lib/sekolah-schema.js';
 import { getDb } from '../lib/db.js';
-import { listSekolah, searchSekolah, listSekolahFiltered, countSekolahFiltered } from '../lib/sekolah-db.js';
+import { listSekolah, searchSekolah, listSekolahFiltered } from '../lib/sekolah-db.js';
 
 const DEVELOPER = 'Syamsul Bahri';
 
@@ -26,6 +25,7 @@ export async function onRequest(context) {
     'Content-Type': 'application/json;charset=UTF-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+    'Cache-Control': 'public, max-age=1800, s-maxage=86400, stale-while-revalidate=86400',
   };
 
   if (context.request.method === 'OPTIONS') {
@@ -34,14 +34,10 @@ export async function onRequest(context) {
 
   try {
     const db = getDb(context.env);
-    const [sinkron, apiMeta] = await Promise.all([
-      getStatusSinkronisasiPublik(db),
-      getApiMeta(db),
-    ]);
-    const totalSekolah = sinkron.total_sekolah ?? apiMeta.totalSekolah;
+    const sinkron = await getStatusSinkronisasiPublik(db);
+    const totalSekolah = sinkron.total_sekolah;
     
     let rows;
-    let totalResult;
 
     if (provinsi || bentuk) {
       const filters = {
@@ -50,12 +46,10 @@ export async function onRequest(context) {
         bentuk: bentuk?.trim() || undefined
       };
       rows = await listSekolahFiltered(db, filters, limit, offset);
-      totalResult = keyword ? null : await countSekolahFiltered(db, filters);
     } else {
       rows = keyword
         ? await searchSekolah(db, keyword.trim(), limit, offset)
         : await listSekolah(db, limit, offset);
-      totalResult = keyword ? null : totalSekolah;
     }
 
     const formattedResults = rows.map((row) => formatDbRowResponse(row));
@@ -68,19 +62,9 @@ export async function onRequest(context) {
       developer: DEVELOPER,
     };
 
-    if (provinsi || bentuk) {
-      if (keyword) {
-        metadata.total_data_tersedia = null;
-        metadata.catatan_total = 'Total hasil pencarian tidak dihitung agar kuota baca database tetap hemat.';
-        metadata.has_more = formattedResults.length === limit;
-      } else {
-        metadata.total_data_tersedia = totalResult;
-        metadata.has_more = offset + formattedResults.length < totalResult;
-      }
-    } else if (keyword) {
+    if (provinsi || bentuk || keyword) {
       metadata.total_data_tersedia = null;
-      metadata.catatan_total =
-        'Total hasil pencarian tidak dihitung agar kuota baca database tetap hemat.';
+      metadata.catatan_total = 'Total hasil pencarian/filter tidak dihitung dinamis agar kuota baca database tetap hemat.';
       metadata.has_more = formattedResults.length === limit;
     } else {
       metadata.total_data_tersedia = totalSekolah;

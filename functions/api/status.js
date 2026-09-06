@@ -4,7 +4,7 @@ import { getDb } from '../lib/db.js';
 const jsonHeaders = {
   'Content-Type': 'application/json;charset=UTF-8',
   'Access-Control-Allow-Origin': '*',
-  'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+  'Cache-Control': 'public, max-age=1800, s-maxage=3600, stale-while-revalidate=7200',
 };
 
 /** GET /api/status — metadata publik (tanpa detail proses sync) */
