@@ -1,0 +1,1357 @@
+import { getSupabase } from './lib/db.js';
+import { VALID_BENTUK } from './lib/sync-supabase-core.js';
+
+export async function onRequestGet(context) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const supabase = getSupabase(env);
+
+  try {
+    const { data: results } = await supabase
+      .from('status_sinkronisasi')
+      .select('*')
+      .in('id', [1, 2]);
+
+    let provStatusList = [];
+    let compareCache = null;
+    try {
+      const { data: provRes } = await supabase
+        .from('provinsi_sync_status')
+        .select('nama_provinsi, terakhir_sukses');
+      provStatusList = provRes || [];
+
+      const { data: cacheRow } = await supabase
+        .from('cache_data')
+        .select('value, updated_at')
+        .eq('key', 'perbandingan')
+        .single();
+      if (cacheRow && cacheRow.value) {
+        compareCache = { value: JSON.parse(cacheRow.value), updated_at: cacheRow.updated_at };
+      }
+    } catch (e) {}
+let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakhir: 0 };
+        let row2 = results?.find(r => r.id === 2);
+
+        let activeRow = row1;
+        let isCustom = false;
+
+        if (row2 && row2.updated_at && row1.updated_at) {
+          const t1 = new Date(row1.updated_at.replace(' ', 'T') + '+07:00').getTime();
+          const t2 = new Date(row2.updated_at.replace(' ', 'T') + '+07:00').getTime();
+          if (t2 > t1) {
+            activeRow = row2;
+            isCustom = true;
+          }
+        } else if (row2 && !row1.updated_at) {
+          activeRow = row2;
+          isCustom = true;
+        }
+
+        const bentukBerikutnya = activeRow.bentuk_aktif || 'tk';
+        const offsetBerikutnya = activeRow.offset_terakhir || 0;
+
+        const totalSynced = (activeRow.total_baru || 0) + (activeRow.total_diperbarui || 0) + (activeRow.total_tidak_berubah || 0);
+        const totalEstimasi = activeRow.total_estimasi || totalSynced || (isCustom ? 12654 : 553456);
+
+        const currentIndex = VALID_BENTUK.indexOf(bentukBerikutnya);
+        let progressPercent = 0;
+        if (isCustom) {
+          progressPercent = totalEstimasi > 0 ? Math.min(100, Math.round((totalSynced / totalEstimasi) * 100)) : 0;
+        } else {
+          progressPercent = Math.max(0, Math.round((currentIndex / VALID_BENTUK.length) * 100));
+        }
+
+        const selesai = isCustom ? (bentukBerikutnya === 'Selesai') : (bentukBerikutnya === 'tk' && offsetBerikutnya === 0 && activeRow.waktu_selesai_terakhir !== null && progressPercent === 0);
+
+        if (selesai) {
+          progressPercent = 100;
+        }
+
+        let isRunning = false;
+        if (activeRow.updated_at && !selesai) {
+          // Ganti spasi dengan T agar formatnya valid ISO 8601, tambahkan +07:00 karena waktu sekarang WIB
+          const safeDateStr = activeRow.updated_at.replace(' ', 'T') + '+07:00';
+          const lastUpdated = new Date(safeDateStr);
+          const now = new Date();
+          const diffMs = now - lastUpdated;
+          if (diffMs < 30 * 1000) { // 30 detik
+            isRunning = true;
+          }
+        }
+
+
+
+        const provSyncMap = {};
+        provStatusList.forEach(p => {
+          if (p.terakhir_sukses) {
+            provSyncMap[cleanName(p.nama_provinsi)] = p.terakhir_sukses.split(' ')[0];
+          }
+        });
+
+        const compareMap = {};
+        let compareHtml = '';
+        let hasDiffGlobal = false;
+        let lastChecked = 'Belum ada data';
+
+        let sumTotalApi = 0;
+        let sumTotalDb = 0;
+        let sumApiDuplicates = 0;
+        let sumAdjustedSelisih = 0;
+        let diffCount = 0;
+
+        if (compareCache) {
+          lastChecked = compareCache.updated_at + ' WIB';
+          compareCache.value.forEach(d => {
+            compareMap[d.nama.replace(/[^A-Z]/g, '')] = d.selisih;
+            if (d.selisih !== 0) hasDiffGlobal = true;
+
+            const isGap = (d.raw_selisih > 0) || ((d.total_api || 0) > (d.total_db || 0));
+            const effDuplicates = isGap ? (d.api_duplicates || 0) : 0;
+
+            sumTotalApi += d.total_api || 0;
+            sumTotalDb += d.total_db || 0;
+            sumApiDuplicates += effDuplicates;
+            sumAdjustedSelisih += d.selisih || 0;
+            if (d.selisih !== 0) diffCount++;
+          });
+          compareCache.value.sort((a, b) => {
+            const aDiff = a.selisih !== 0 ? 1 : 0;
+            const bDiff = b.selisih !== 0 ? 1 : 0;
+            if (aDiff !== bDiff) return bDiff - aDiff;
+            return a.nama.localeCompare(b.nama);
+          });
+
+          compareHtml = compareCache.value.map((d, idx) => {
+            const todayDate = new Date(new Date().getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const isSyncedToday = d.terakhir_sukses && d.terakhir_sukses.split(' ')[0] === todayDate;
+
+            let selisihColor = 'var(--danger)';
+            let statusIcon = '⚠️ Berbeda';
+
+            if (d.selisih === 0 || d.is_sinkron_walau_selisih) {
+              selisihColor = 'var(--success)';
+              statusIcon = '✅ Sinkron';
+            } else if (d.selisih < 0) {
+              selisihColor = 'var(--warning)';
+              statusIcon = '⚠️ Ada Pengurangan Data';
+            } else if (isSyncedToday) {
+              selisihColor = 'var(--warning)';
+              statusIcon = '⚠️ Terputus / Ada Data Gagal';
+            }
+
+            const displayStyle = idx >= 5 ? 'display: none;' : '';
+            const trClass = idx >= 5 ? 'hidden-row' : '';
+
+            const isGap = (d.raw_selisih > 0) || ((d.total_api || 0) > (d.total_db || 0));
+            const effDuplicates = isGap ? (d.api_duplicates || 0) : 0;
+            const effEmptyNpsn = isGap ? (d.api_empty_npsn || 0) : 0;
+            const effUnrecognizedShapes = isGap ? (d.api_unrecognized_shapes || 0) : 0;
+
+            const warnings = [];
+            if (effDuplicates > 0) warnings.push(`<span style="cursor: pointer; text-decoration: underline; color: var(--danger);" onclick="showDuplicateModal('${d.nama}')">⚠️ NPSN Ganda: ${effDuplicates}</span>`);
+            if (effEmptyNpsn > 0) warnings.push(`⚠️ NPSN Kosong: ${effEmptyNpsn}`);
+            if (effUnrecognizedShapes > 0) warnings.push(`⚠️ Bentuk Pendidikan Baru: ${effUnrecognizedShapes}`);
+
+            // Fallback jika ada selisih yang belum teridentifikasi
+            if (d.raw_selisih > 0 && effDuplicates === 0 && effEmptyNpsn === 0 && effUnrecognizedShapes === 0) {
+              warnings.push(`⚠️ Indikasi Data Invalid / Sinkron Terputus: ${d.raw_selisih}`);
+            }
+
+            const warningHtml = warnings.length > 0 ? `<div style="font-size: 11px; font-weight: 600; color: var(--danger); margin-top: 6px; line-height: 1.4;">${warnings.join('<br>')}</div>` : '';
+
+            return `
+                <tr class="${trClass}" style="border-bottom: 1px solid var(--border); ${displayStyle}">
+                  <td style="padding: 12px 8px; font-weight: 600; color: var(--text);">${d.nama} <div style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-top: 4px;">Kode: ${d.kode}</div></td>
+                  <td style="padding: 12px 8px; text-align: center; color: var(--info); font-weight: 600; font-size: 14px;">
+                    ${d.total_api.toLocaleString('id-ID')}
+                    ${warningHtml}
+                  </td>
+                  <td style="padding: 12px 8px; text-align: center; color: var(--primary-light); font-weight: 600; font-size: 14px;">
+                    ${d.total_db.toLocaleString('id-ID')}
+                  </td>
+                  <td style="padding: 12px 8px; text-align: center; color: ${selisihColor}; font-weight: bold; font-size: 14px;">${d.selisih > 0 ? '+' : ''}${d.selisih.toLocaleString('id-ID')}</td>
+                  <td style="padding: 12px 8px; text-align: center; color: ${selisihColor}; font-size: 12px; font-weight: 600;">${statusIcon}</td>
+                </tr>
+              `;
+          }).join('');
+          if (hasDiffGlobal) {
+            compareHtml += '<tr class="hidden-row" style="display: none;"><td colspan="5" style="padding: 16px; text-align: center;"><div style="color: var(--text-muted); font-size: 12px; margin-bottom: 8px;">Ada data yang berbeda. Smart Sync akan otomatis memprioritaskan provinsi yang berselisih saja.</div></td></tr>';
+          }
+
+          // Tambahkan baris total
+          let totalSelisihHtml = '';
+          if (sumApiDuplicates > 0 && sumAdjustedSelisih !== 0) {
+            totalSelisihHtml = `
+              <div style="color: var(--success); font-weight: bold;">+${sumApiDuplicates.toLocaleString('id-ID')} ✅</div>
+              <div style="color: var(--danger); font-weight: bold; margin-top: 4px;">${sumAdjustedSelisih > 0 ? '+' : ''}${sumAdjustedSelisih.toLocaleString('id-ID')} ⚠️</div>
+            `;
+          } else if (sumApiDuplicates > 0) {
+            totalSelisihHtml = `<div style="color: var(--success); font-weight: bold;">+${sumApiDuplicates.toLocaleString('id-ID')} ✅</div>`;
+          } else if (sumAdjustedSelisih !== 0) {
+            totalSelisihHtml = `<div style="color: var(--danger); font-weight: bold;">${sumAdjustedSelisih > 0 ? '+' : ''}${sumAdjustedSelisih.toLocaleString('id-ID')} ⚠️</div>`;
+          } else {
+            totalSelisihHtml = `<div style="color: var(--success); font-weight: bold;">0</div>`;
+          }
+
+          compareHtml += `
+             <tr class="hidden-row" style="display: none; border-top: 2px solid var(--border); font-weight: bold; background: rgba(0,0,0,0.03);">
+               <td style="padding: 12px 8px; color: var(--text);">TOTAL KESELURUHAN</td>
+               <td style="padding: 12px 8px; text-align: center; color: var(--info); font-size: 14px;">${sumTotalApi.toLocaleString('id-ID')}</td>
+               <td style="padding: 12px 8px; text-align: center; color: var(--primary-light); font-size: 14px;">${sumTotalDb.toLocaleString('id-ID')}</td>
+               <td style="padding: 12px 8px; text-align: center; font-size: 14px; vertical-align: middle;">${totalSelisihHtml}</td>
+               <td style="padding: 12px 8px; text-align: center; font-size: 12px;">${diffCount} Provinsi Berselisih</td>
+             </tr>
+           `;
+        } else {
+          compareHtml = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">Belum ada data perbandingan. Jalankan cron terlebih dahulu.</td></tr>';
+        }
+
+        const currentDate = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
+        const currentDayOfWeek = currentDate.getDay() || 7;
+        const isMandatoryUpdateDay = (currentDayOfWeek === 3 || currentDayOfWeek === 4);
+
+        const SCHEDULE = {
+          3: ["JAWA TIMUR", "JAWA TENGAH", "BANTEN", "LAMPUNG", "NUSA TENGGARA TIMUR", "RIAU", "SUMATERA BARAT", "DKI JAKARTA", "JAMBI", "DI YOGYAKARTA", "SULAWESI TENGGARA", "SULAWESI UTARA", "MALUKU", "MALUKU UTARA", "KEPULAUAN RIAU", "KEPULAUAN BANGKA BELITUNG", "PAPUA PEGUNUNGAN", "PAPUA TENGAH", "PAPUA BARAT DAYA", "LUAR NEGERI"],
+          4: ["JAWA BARAT", "SUMATERA UTARA", "SULAWESI SELATAN", "SUMATERA SELATAN", "NUSA TENGGARA BARAT", "ACEH", "KALIMANTAN BARAT", "KALIMANTAN SELATAN", "SULAWESI TENGAH", "KALIMANTAN TENGAH", "KALIMANTAN TIMUR", "BALI", "BENGKULU", "SULAWESI BARAT", "GORONTALO", "PAPUA", "KALIMANTAN UTARA", "PAPUA BARAT", "PAPUA SELATAN"]
+        };
+        const nextDayOfWeek = (currentDayOfWeek === 3) ? 4 : null; // Jika Rabu(3), besok(Kamis 4). Kamis tidak punya besok Full Sync.
+        const todaySchedule = SCHEDULE[currentDayOfWeek] || [];
+        const tomorrowSchedule = nextDayOfWeek ? SCHEDULE[nextDayOfWeek] : [];
+
+        const tomorrowDayOfWeek = (currentDayOfWeek % 7) + 1;
+        const isTomorrowMandatory = (tomorrowDayOfWeek === 3 || tomorrowDayOfWeek === 4);
+        const tomorrowScheduleList = SCHEDULE[tomorrowDayOfWeek] || [];
+
+        const todayDateWIB = currentDate.toISOString().split('T')[0];
+        const yesterdayDateWIB = new Date(currentDate.getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const diffData = compareCache && compareCache.value ? compareCache.value.filter(d => {
+          const syncedDate = provSyncMap[cleanName(d.nama)];
+          d.isSyncedToday = syncedDate === todayDateWIB;
+          d.isSyncedRecently = syncedDate === todayDateWIB || syncedDate === yesterdayDateWIB;
+
+          const hasDiff = Math.abs(d.selisih) > 0 && !d.is_sinkron_walau_selisih;
+
+          // Jika sudah tersinkron hari ini dan TIDAK ada selisih, selalu sembunyikan
+          if (d.isSyncedToday && !hasDiff) return false;
+
+          if (isMandatoryUpdateDay) {
+            // Pada hari wajib, tampilkan yang terjadwal (jika belum sinkron hari ini)
+            if (todaySchedule.includes(d.nama) && !d.isSyncedToday) return true;
+            if (tomorrowSchedule.includes(d.nama)) return true;
+            
+            // Selain itu, tampilkan HANYA jika ada selisih (untuk antre besok)
+            if (hasDiff) return true;
+            return false;
+          } else {
+            // Pada hari biasa, jika tidak ada selisih, sembunyikan
+            if (!hasDiff) return false;
+
+            // Jika ada selisih tapi sudah disinkron hari ini, tetap tampilkan (dengan status Smart Sync Besok)
+            // Jadi tidak perlu difilter meskipun d.isSyncedToday true
+            return true;
+          }
+        }) : [];
+
+        if (isMandatoryUpdateDay) {
+          diffData.sort((a, b) => {
+            const aIsToday = todaySchedule.includes(a.nama);
+            const bIsToday = todaySchedule.includes(b.nama);
+            if (aIsToday && !bIsToday) return -1;
+            if (!aIsToday && bIsToday) return 1;
+            if (aIsToday && bIsToday) return todaySchedule.indexOf(a.nama) - todaySchedule.indexOf(b.nama);
+            
+            if (currentDayOfWeek === 3) {
+              const aIsTomorrow = tomorrowSchedule.includes(a.nama);
+              const bIsTomorrow = tomorrowSchedule.includes(b.nama);
+              if (aIsTomorrow && !bIsTomorrow) return -1;
+              if (!aIsTomorrow && bIsTomorrow) return 1;
+              if (aIsTomorrow && bIsTomorrow) return tomorrowSchedule.indexOf(a.nama) - tomorrowSchedule.indexOf(b.nama);
+            }
+
+            const aHasSynced = a.terakhir_sukses ? 1 : 0;
+            const bHasSynced = b.terakhir_sukses ? 1 : 0;
+            if (aHasSynced !== bHasSynced) return aHasSynced - bHasSynced;
+            const maxDiffA = Math.abs(a.selisih);
+            const maxDiffB = Math.abs(b.selisih);
+            return maxDiffB - maxDiffA;
+          });
+        } else if (isTomorrowMandatory) {
+          diffData.sort((a, b) => {
+            // Urutkan yang masuk kategori "hari ini" (punya selisih & belum sync hari ini) di awal
+            const aIsToday = !a.isSyncedToday && (Math.abs(a.selisih) > 0 && !a.is_sinkron_walau_selisih);
+            const bIsToday = !b.isSyncedToday && (Math.abs(b.selisih) > 0 && !b.is_sinkron_walau_selisih);
+
+            if (aIsToday && !bIsToday) return -1;
+            if (!aIsToday && bIsToday) return 1;
+
+            if (aIsToday && bIsToday) {
+              const aHasSynced = a.terakhir_sukses ? 1 : 0;
+              const bHasSynced = b.terakhir_sukses ? 1 : 0;
+              if (aHasSynced !== bHasSynced) return aHasSynced - bHasSynced;
+
+              if (aHasSynced && bHasSynced) {
+                const timeA = new Date(a.terakhir_sukses).getTime();
+                const timeB = new Date(b.terakhir_sukses).getTime();
+                if (timeA !== timeB) return timeA - timeB;
+              }
+              const maxDiffA = Math.abs(a.selisih);
+              const maxDiffB = Math.abs(b.selisih);
+              return maxDiffB - maxDiffA;
+            }
+
+            // Kategori "besok" (Full Sync besok)
+            const aIndex = tomorrowScheduleList.indexOf(a.nama);
+            const bIndex = tomorrowScheduleList.indexOf(b.nama);
+            return aIndex - bIndex;
+          });
+        } else {
+          diffData.sort((a, b) => {
+            const aHasSynced = a.terakhir_sukses ? 1 : 0;
+            const bHasSynced = b.terakhir_sukses ? 1 : 0;
+
+            if (aHasSynced !== bHasSynced) {
+              return aHasSynced - bHasSynced; // 0 (belum sinkron) duluan
+            }
+
+            const aIsDifferent = (Math.abs(a.selisih) > 0 && !a.is_sinkron_walau_selisih) ? 1 : 0;
+            const bIsDifferent = (Math.abs(b.selisih) > 0 && !b.is_sinkron_walau_selisih) ? 1 : 0;
+
+            if (aIsDifferent !== bIsDifferent) {
+              return bIsDifferent - aIsDifferent; // 1 (berbeda) duluan
+            }
+
+            if (aHasSynced && bHasSynced) {
+              const timeA = new Date(a.terakhir_sukses).getTime();
+              const timeB = new Date(b.terakhir_sukses).getTime();
+              if (timeA !== timeB) return timeA - timeB; // Terlama duluan agar bergiliran
+            }
+
+            const maxDiffA = Math.abs(a.selisih);
+            const maxDiffB = Math.abs(b.selisih);
+            return maxDiffB - maxDiffA; // Sisanya urutkan berdasarkan selisih terbesar
+          });
+        }
+
+        const dynamicFullSyncLimit = sumTotalApi > 0 ? Math.ceil(sumTotalApi / 2) : 250000;
+        const BATAS_AMAN = isMandatoryUpdateDay ? dynamicFullSyncLimit : 100000;
+        let syncedToday = 0;
+        try {
+          let syncedTodayRes = [{ total: 0 }];
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          const { data: logs } = await supabase
+            .from('log_aktivitas_provinsi')
+            .select('total_baru, total_diperbarui, total_tidak_berubah')
+            .gte('waktu_selesai', today);
+          const t = (logs || []).reduce((a, l) => a + (l.total_baru || 0) + (l.total_diperbarui || 0) + (l.total_tidak_berubah || 0), 0);
+          syncedTodayRes = [{ total: t }];
+        } catch (e) {}
+          syncedToday = syncedTodayRes[0]?.total || 0;
+        } catch (e) { }
+
+        if (isCustom && activeRow.updated_at) {
+          const updatedAt = new Date(activeRow.updated_at.replace(' ', 'T') + '+07:00').getTime();
+          if (Date.now() - updatedAt < 5 * 60000) {
+            const currentRunning = (activeRow.total_baru || 0) + (activeRow.total_diperbarui || 0) + (activeRow.total_tidak_berubah || 0);
+            syncedToday += currentRunning;
+          }
+        }
+        const SISA_KUOTA = Math.max(0, BATAS_AMAN - syncedToday);
+        let runningTotalEstimasi = 0;
+
+        let activeProvince = null;
+        let isActive = false;
+        if (activeRow && activeRow.updated_at) {
+          const updatedAt = new Date(activeRow.updated_at.replace(' ', 'T') + '+07:00').getTime();
+          if (Date.now() - updatedAt < 5 * 60000) {
+            isActive = true;
+            if (activeRow.bentuk_aktif) {
+              const match = activeRow.bentuk_aktif.match(/\((.*?)\)/);
+              if (match) activeProvince = match[1];
+            }
+          }
+        }
+
+        let bannerHtml = '';
+        if (isMandatoryUpdateDay) {
+          bannerHtml = `
+            <div class="banner-box mandatory">
+              <div class="banner-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </div>
+              <div>
+                <strong style="color: var(--primary-light); font-size: 14px;">Hari Sinkronisasi Penuh Aktif!</strong>
+                <div style="font-size: 13px; margin-top: 4px; color: var(--text-muted); line-height: 1.4;">
+                  Setiap Rabu dan Kamis, sistem memperbarui seluruh provinsi sesuai grup tanpa mengecek perbedaan. Hari ini: <strong style="color: #cbd5e1;">${currentDayOfWeek === 3 ? 'Grup 1 (Rabu)' : 'Grup 2 (Kamis)'}</strong>.
+                </div>
+              </div>
+            </div>
+          `;
+        } else {
+          bannerHtml = `
+            <div class="banner-box smart">
+              <div class="banner-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h-4a2 2 0 01-2-2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+              </div>
+              <div>
+                <strong style="color: #34d399; font-size: 14px;">Mode Smart Sync Aktif!</strong>
+                <div style="font-size: 13px; margin-top: 4px; color: var(--text-muted); line-height: 1.4;">
+                  Di luar hari Rabu dan Kamis, sistem secara otomatis menarik data untuk provinsi yang mendeteksi perbedaan secara cerdas.
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        const queueHtml = `
+          <div id="queue-container">
+          ${bannerHtml}
+          <h2 class="section-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="url(#queue-title-grad)" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Antrean Smart Sync (Otomatis)
+          </h2>
+          <div class="table-card-wrapper">
+            <div class="info-notice-bar">
+              Sistem secara cerdas mendeteksi provinsi mana yang butuh pembaruan. Provinsi dengan data tidak sinkron akan diprioritaskan, sedangkan yang sudah tersinkron namun berbeda akan digilir ke akhir antrean. 
+              Maksimal <strong>~${BATAS_AMAN.toLocaleString('id-ID')} data</strong> disinkronisasi setiap harinya.
+              <div style="margin-top: 8px; font-weight: 600;">
+                Kuota Harian Digunakan: <span style="color: ${SISA_KUOTA <= 0 ? 'var(--danger)' : 'var(--warning)'}; font-weight: 700;">${syncedToday.toLocaleString('id-ID')} / ${BATAS_AMAN.toLocaleString('id-ID')}</span>
+                ${SISA_KUOTA <= 0 ? '<span class="tag-alert-danger">KUOTA PENUH, SISA ANTREAN DITUNDA BESOK</span>' : ''}
+              </div>
+            </div>
+            <div id="queue-table-wrapper" style="overflow-x: auto;">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th style="text-align: left; width: 45px;">#</th>
+                  <th style="text-align: left;">Provinsi</th>
+                  <th style="text-align: center;">Estimasi Data</th>
+                  <th style="text-align: center;">Selisih</th>
+                  <th style="text-align: center;">Status Eksekusi</th>
+                </tr>
+              </thead>
+              <tbody>
+                 ${diffData.length === 0 ? `
+                  <tr><td colspan="5" style="padding: 28px; text-align: center; color: #34d399; font-weight: 600;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      Semua provinsi sudah sinkron sepenuhnya!
+                    </div>
+                  </td></tr>
+                ` : (() => {
+                  let daysSim = [{ offset: 0, used: syncedToday, limit: BATAS_AMAN, items: 0 }];
+                  let queueCounters = {};
+
+                  return diffData.map((d, i) => {
+                    let assignedDayOffset = -1;
+                    let assigned = false;
+                    
+                    let minOffset = d.isSyncedToday ? 1 : 0;
+                    
+                    for (let j = 0; j < daysSim.length; j++) {
+                      let day = daysSim[j];
+                      if (day.offset < minOffset) continue;
+                      
+                      if (day.used + d.total_api <= day.limit) {
+                        day.used += d.total_api;
+                        day.items++;
+                        assignedDayOffset = day.offset;
+                        assigned = true;
+                        break;
+                      } else if (day.items === 0 && day.used === 0) {
+                        day.used += d.total_api;
+                        day.items++;
+                        assignedDayOffset = day.offset;
+                        assigned = true;
+                        break;
+                      }
+                    }
+                    
+                    if (!assigned) {
+                      let newOffset = Math.max(minOffset, daysSim[daysSim.length - 1].offset + 1);
+                      const nextDaySimulated = (currentDayOfWeek + newOffset - 1) % 7 + 1;
+                      const isNextDayMandatory = (nextDaySimulated === 3 || nextDaySimulated === 4);
+                      let newLimit = isNextDayMandatory ? dynamicFullSyncLimit : 100000;
+                      
+                      let newDay = { offset: newOffset, used: d.total_api, limit: newLimit, items: 1 };
+                      daysSim.push(newDay);
+                      daysSim.sort((a,b) => a.offset - b.offset);
+                      assignedDayOffset = newOffset;
+                    }
+                    
+                    queueCounters[assignedDayOffset] = (queueCounters[assignedDayOffset] || 0) + 1;
+
+                    let statusLabel = '';
+                    let rowClass = '';
+
+                    if (isActive && activeProvince && cleanName(activeProvince) === cleanName(d.nama)) {
+                      statusLabel = '<span class="status-pill active-sync"><svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Proses Sinkron</span>';
+                      rowClass = 'row-active';
+                    } else {
+                      if (assignedDayOffset === 0) {
+                        if (isMandatoryUpdateDay && todaySchedule.includes(d.nama)) {
+                          statusLabel = `<span class="status-pill pending">Antrian ke #${queueCounters[assignedDayOffset]}</span>`;
+                        } else {
+                          statusLabel = '<span class="status-pill pending">Dieksekusi Hari Ini</span>';
+                        }
+                      } else {
+                        const scheduledDayOfWeek = (currentDayOfWeek + assignedDayOffset - 1) % 7 + 1;
+                        const isScheduledMandatory = (scheduledDayOfWeek === 3 || scheduledDayOfWeek === 4);
+                        const dayNameMap = {1: 'Senin', 2: 'Selasa', 3: 'Rabu', 4: 'Kamis', 5: "Jum'at", 6: 'Sabtu', 7: 'Minggu'};
+                        const scheduledDayName = dayNameMap[scheduledDayOfWeek];
+                        
+                        if (isScheduledMandatory) {
+                          statusLabel = `<span class="status-pill muted">Full Sync (${scheduledDayName}) #${queueCounters[assignedDayOffset]}</span>`;
+                        } else {
+                          statusLabel = `<span class="status-pill muted">Smart Sync (${scheduledDayName}) #${queueCounters[assignedDayOffset]}</span>`;
+                        }
+                      }
+                    }
+
+                    let selisihColor = 'var(--danger)';
+                    if (d.selisih === 0) {
+                      selisihColor = 'var(--success)';
+                    } else if (d.is_sinkron_walau_selisih) {
+                      selisihColor = 'var(--warning)';
+                    }
+                    const selisihVal = `${d.selisih > 0 ? '+' : ''}${d.selisih.toLocaleString('id-ID')}`;
+
+                    return `
+                      <tr class="${rowClass}">
+                        <td style="padding: 12px; text-align: left; font-weight: 700; color: var(--text-subtle); font-size: 13px;">${i + 1}</td>
+                        <td style="padding: 12px; text-align: left; font-weight: 600; color: var(--text-main); font-size: 14px;">${d.nama}</td>
+                        <td style="padding: 12px; text-align: center; color: var(--info); font-weight: 600; font-size: 14px;">${d.total_api.toLocaleString('id-ID')}</td>
+                        <td style="padding: 12px; text-align: center; color: ${selisihColor}; font-weight: 700; font-size: 14px;">${selisihVal}</td>
+                        <td style="padding: 12px; text-align: center; font-size: 13px;">${statusLabel}</td>
+                      </tr>
+                    `;
+                  }).join('');
+                })()}
+              </tbody>
+            </table>
+            </div>
+          </div>
+          </div>
+        `;
+
+        // Fetch Log Aktivitas
+        const pageStr = url.searchParams.get('page') || '1';
+        const page = parseInt(pageStr, 10) || 1;
+        const limit = 5;
+        const offset = (page - 1) * limit;
+
+        let logAktivitasList = [];
+        let totalLogs = 0;
+        try {
+          let countRes = [{ total: 0 }];
+        try {
+          const { count } = await supabase.from('log_aktivitas_provinsi').select('*', { count: 'exact', head: true });
+          countRes = [{ total: count || 0 }];
+        } catch (e) {}
+          totalLogs = countRes[0]?.total || 0;
+
+          let logRes = [];
+        try {
+          const { data } = await supabase.from('log_aktivitas_provinsi').select('*').order('waktu_selesai', { ascending: false }).range(offset, offset + limit - 1);
+          logRes = data || [];
+        } catch (e) {}
+          logAktivitasList = logRes || [];
+        } catch (e) { } // Abaikan jika tabel belum ada
+
+        const totalPages = Math.ceil(totalLogs / limit) || 1;
+        let paginationHtml = '';
+        if (totalPages > 1) {
+          paginationHtml = `<div id="log-pagination" class="pagination-wrapper">
+            ${page > 1 ? `<a href="javascript:void(0)" onclick="changeLogPage(${page - 1})" class="page-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Prev</a>` : ''}
+            <span class="page-info">Halaman ${page} dari ${totalPages}</span>
+            ${page < totalPages ? `<a href="javascript:void(0)" onclick="changeLogPage(${page + 1})" class="page-btn">Next <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></a>` : ''}
+          </div>`;
+        }
+
+        let logHtml = logAktivitasList.length > 0 ? logAktivitasList.map(log => {
+          const totalData = log.total_baru + log.total_diperbarui + log.total_tidak_berubah;
+          return `<div class="log-item-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <strong style="color: var(--text-main); font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--primary-light)" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                ${log.nama_provinsi}
+              </strong>
+              <span style="color: var(--text-muted); font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                ${log.waktu_selesai}
+              </span>
+            </div>
+            <div class="log-stats-grid">
+              <div class="log-badge-mini success">+${log.total_baru} Baru</div>
+              <div class="log-badge-mini info">↻ ${log.total_diperbarui} Update</div>
+              <div class="log-badge-mini danger">✕ ${log.total_dihapus} Hapus</div>
+              <div class="log-badge-mini muted">✓ ${log.total_tidak_berubah} Tetap</div>
+            </div>
+            <div style="text-align: left; margin-top: 10px; font-weight: 700; font-size: 13px; color: var(--text-subtle); border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; display: flex; justify-content: space-between;">
+              <span>Total Processed</span>
+              <span style="color: var(--primary-light);">${totalData.toLocaleString('id-ID')} Data</span>
+            </div>
+          </div>`;
+        }).join('') : '<div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px;">Belum ada log aktivitas.</div>';
+
+        const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sekolah Sync Dashboard (D1)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔄</text></svg>">
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --card-bg: rgba(15, 23, 42, 0.78);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-subtle: #cbd5e1;
+      --primary: #6366f1;
+      --primary-light: #818cf8;
+      --primary-glow: rgba(99, 102, 241, 0.25);
+      --success: #10b981;
+      --info: #06b6d4;
+      --danger: #f43f5e;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
+      background: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.22) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.18) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.12) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      display: flex; justify-content: center; align-items: flex-start;
+      min-height: 100vh; margin: 0; padding: 40px 16px;
+    }
+    
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--card-border); border-radius: 28px;
+      padding: 36px 28px; width: 100%; max-width: 680px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px rgba(99, 102, 241, 0.12);
+      text-align: center; margin: auto; position: relative; overflow: hidden;
+    }
+
+    .hero-title {
+      margin-top: 8px; font-size: 26px; font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #818cf8 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+    }
+
+    .badge-tag {
+      font-size: 12px; font-weight: 700; vertical-align: middle;
+      padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .badge-tag.custom {
+      color: #fb923c; background: rgba(249, 115, 22, 0.15); border: 1px solid rgba(249, 115, 22, 0.3);
+    }
+    .badge-tag.full {
+      color: #818cf8; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 20px; border-radius: 9999px; font-size: 13px; font-weight: 700;
+      letter-spacing: 0.3px;
+      background: rgba(99, 102, 241, 0.15); color: #818cf8; margin-bottom: 20px;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+      transition: all 0.3s;
+    }
+    .status-badge.finished {
+      background: rgba(16, 185, 129, 0.15); color: #34d399;
+      border-color: rgba(16, 185, 129, 0.3); box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+    }
+    .status-badge.stopped {
+      background: rgba(244, 63, 94, 0.15); color: #fb7185;
+      border-color: rgba(244, 63, 94, 0.3); box-shadow: 0 0 20px rgba(244, 63, 94, 0.2);
+    }
+
+    .pulse-dot {
+      width: 10px; height: 10px; border-radius: 50%; background: #818cf8;
+      box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.7);
+      animation: pulse-ring 1.6s infinite;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(129, 140, 248, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(129, 140, 248, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(129, 140, 248, 0); }
+    }
+
+    .loader-svg {
+      margin: 0 auto 16px auto; display: block;
+      filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.4));
+    }
+    
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 24px; }
+    @media (min-width: 600px) {
+      .grid { grid-template-columns: repeat(4, 1fr); }
+    }
+    
+    .stat-box {
+      background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px; padding: 18px 12px; transition: all 0.25s ease;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+    }
+    .stat-box:hover {
+      transform: translateY(-4px); background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.18);
+      box-shadow: 0 12px 25px rgba(0, 0, 0, 0.4);
+    }
+    .stat-icon-wrapper {
+      width: 36px; height: 36px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center; margin-bottom: 10px;
+    }
+    .stat-icon-wrapper.success { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .stat-icon-wrapper.info { background: rgba(6, 182, 212, 0.15); color: #38bdf8; }
+    .stat-icon-wrapper.danger { background: rgba(244, 63, 94, 0.15); color: #fb7185; }
+    .stat-icon-wrapper.subtle { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+
+    .stat-val { font-size: 22px; font-weight: 800; color: var(--text-main); line-height: 1.1; }
+    .stat-label { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-top: 6px; }
+    
+    .progress-bar-container {
+      max-width: 440px; margin: 0 auto 28px auto;
+    }
+    .progress-bar {
+      height: 10px; background: rgba(255, 255, 255, 0.08); border-radius: 9999px;
+      overflow: hidden; margin-top: 0; border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+      border-radius: 9999px; transition: width 0.5s ease;
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.6);
+    }
+
+    .main-info-box {
+      background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 16px; padding: 14px 20px; font-size: 14px; color: var(--text-subtle);
+      line-height: 1.6; margin-top: 16px; display: inline-block; width: 100%; text-align: left;
+    }
+    
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      margin-top: 28px; padding: 14px 28px;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      color: #ffffff; font-weight: 700; text-decoration: none; font-size: 14px;
+      border-radius: 14px; transition: all 0.3s ease;
+      box-shadow: 0 8px 25px rgba(99, 102, 241, 0.35); border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .btn:hover {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 0 14px 35px rgba(99, 102, 241, 0.5);
+      background: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%);
+    }
+
+    .banner-box {
+      display: flex; gap: 14px; align-items: flex-start;
+      padding: 14px 18px; border-radius: 16px; margin: 24px 0; text-align: left;
+      border-left: 4px solid; backdrop-filter: blur(12px);
+    }
+    .banner-box.mandatory {
+      background: rgba(99, 102, 241, 0.1); border-color: var(--primary);
+    }
+    .banner-box.smart {
+      background: rgba(16, 185, 129, 0.1); border-color: var(--success);
+    }
+    .banner-icon { margin-top: 2px; }
+    .banner-box.mandatory .banner-icon { color: var(--primary-light); }
+    .banner-box.smart .banner-icon { color: #34d399; }
+
+    .section-title {
+      font-size: 17px; font-weight: 700; margin-bottom: 14px; color: var(--text-main);
+      display: flex; align-items: center; gap: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 10px; text-align: left;
+    }
+
+    .table-card-wrapper {
+      background: rgba(0, 0, 0, 0.2); border: 1px solid var(--card-border);
+      border-radius: 18px; overflow: hidden; margin-bottom: 24px; text-align: left;
+    }
+    .info-notice-bar {
+      padding: 14px 18px; background: rgba(255, 255, 255, 0.02); font-size: 13px;
+      color: var(--text-muted); border-bottom: 1px solid var(--card-border); line-height: 1.5;
+    }
+
+    .custom-table {
+      width: 100%; min-width: 520px; border-collapse: collapse; font-size: 13px;
+    }
+    .custom-table thead tr {
+      background: rgba(255, 255, 255, 0.04); color: var(--text-muted);
+      text-transform: uppercase; font-size: 11px; font-weight: 700; letter-spacing: 0.6px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .custom-table th { padding: 14px 12px; }
+    .custom-table td { padding: 13px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+    .custom-table tr:hover { background: rgba(255, 255, 255, 0.025); }
+    .custom-table tr.row-active {
+      background: rgba(245, 158, 11, 0.12) !important;
+    }
+
+    .status-pill {
+      display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+      padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 700;
+    }
+    .status-pill.active-sync { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .status-pill.pending { background: rgba(245, 158, 11, 0.15); color: #fb923c; }
+    .status-pill.muted { background: rgba(255, 255, 255, 0.06); color: var(--text-muted); }
+
+    .tag-alert-danger {
+      color: #fb7185; font-weight: 700; margin-left: 8px; font-size: 11px;
+      background: rgba(244, 63, 94, 0.15); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    .log-item-card {
+      background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 16px; padding: 14px; font-size: 13px; transition: border-color 0.2s;
+    }
+    .log-item-card:hover { border-color: rgba(99, 102, 241, 0.3); }
+
+    .log-stats-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center;
+    }
+    .log-badge-mini {
+      padding: 4px 6px; border-radius: 8px; font-size: 12px; font-weight: 700;
+    }
+    .log-badge-mini.success { background: rgba(16, 185, 129, 0.12); color: #34d399; }
+    .log-badge-mini.info { background: rgba(6, 182, 212, 0.12); color: #38bdf8; }
+    .log-badge-mini.danger { background: rgba(244, 63, 94, 0.12); color: #fb7185; }
+    .log-badge-mini.muted { background: rgba(255, 255, 255, 0.05); color: var(--text-muted); }
+
+    .pagination-wrapper {
+      display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 18px;
+    }
+    .page-btn {
+      padding: 7px 14px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border);
+      border-radius: 10px; color: var(--text-main); text-decoration: none; font-size: 13px; font-weight: 600;
+      display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s;
+    }
+    .page-btn:hover { background: rgba(99, 102, 241, 0.2); border-color: var(--primary); }
+    .page-info { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+
+    .spin-icon { display: inline-block; animation: rotation 1.4s linear infinite; }
+    @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    
+    @media (max-width: 480px) {
+      .card { padding: 24px 16px; border-radius: 20px; }
+      .hero-title { font-size: 20px; }
+      .grid { gap: 10px; }
+      .stat-box { padding: 14px 8px; }
+      .stat-val { font-size: 18px; }
+    }
+  </style>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Restore window scroll
+      const scrollPos = sessionStorage.getItem("scrollPos");
+      if (scrollPos) {
+        window.scrollTo(0, parseInt(scrollPos));
+      }
+      // Restore grid scroll
+      const gridScrollPos = sessionStorage.getItem("gridScrollPos");
+      const gridEl = document.querySelector(".jadwal-grid");
+      if (gridEl) {
+        if (gridScrollPos !== null) {
+          gridEl.scrollTop = parseInt(gridScrollPos);
+        } else {
+          // Auto-focus to today's schedule on first load
+          const todayCard = gridEl.querySelector('.day-card.today');
+          if (todayCard) {
+            const topPos = todayCard.offsetTop - gridEl.offsetTop;
+            gridEl.scrollTop = topPos > 0 ? topPos : 0;
+            sessionStorage.setItem("gridScrollPos", gridEl.scrollTop);
+          }
+        }
+        
+        // Save scroll position on manual scroll
+        gridEl.addEventListener('scroll', function() {
+          sessionStorage.setItem("gridScrollPos", gridEl.scrollTop);
+        });
+      }
+      
+      // Restore compare horizontal scroll
+      const compareScrollPos = sessionStorage.getItem("compareScrollPos");
+      const compareEl = document.getElementById("compare-container");
+      if (compareScrollPos && compareEl) {
+        compareEl.scrollLeft = parseInt(compareScrollPos);
+      }
+      
+      // Restore show all compare
+      const showAll = sessionStorage.getItem("compareShowAll");
+      if (showAll === "true") {
+         const rows = document.querySelectorAll('.hidden-row');
+         const btn = document.getElementById('btn-compare');
+         if (rows.length > 0 && btn) {
+            rows.forEach(r => r.style.display = 'table-row');
+            btn.innerText = 'Tutup Perbandingan';
+         }
+      }
+    });
+    
+    function toggleComparison() {
+      const rows = document.querySelectorAll('.hidden-row');
+      const btn = document.getElementById('btn-compare');
+      let isHidden = true;
+      
+      if (rows.length > 0) {
+        isHidden = rows[0].style.display === 'none';
+        rows.forEach(r => {
+           r.style.display = isHidden ? 'table-row' : 'none';
+        });
+        btn.innerText = isHidden ? 'Tutup Perbandingan' : 'Tampilkan Semua';
+        sessionStorage.setItem('compareShowAll', isHidden ? 'true' : 'false');
+      }
+    }
+
+    async function changeLogPage(page) {
+      try {
+        window.isAutoReloadPaused = true;
+        const url = new URL(window.location.href);
+        url.searchParams.set('page', page);
+        url.searchParams.set('_t', new Date().getTime());
+        
+        const res = await fetch(url.toString(), { cache: 'no-store' });
+        const html = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        const newLogContainer = doc.getElementById('log-container');
+        const currentLogContainer = document.getElementById('log-container');
+        if (newLogContainer && currentLogContainer) {
+          currentLogContainer.innerHTML = newLogContainer.innerHTML;
+        }
+
+        const newPagination = doc.getElementById('log-pagination');
+        const currentPaginationWrapper = document.getElementById('log-pagination-wrapper');
+        if (currentPaginationWrapper) {
+          currentPaginationWrapper.innerHTML = newPagination ? newPagination.outerHTML : '';
+        }
+        
+        window.history.pushState({}, '', url.toString());
+      } catch(e) {
+        console.error("Gagal mengganti halaman log", e);
+      } finally {
+        win    let lastKnownState = null;
+    let autoReloadTimer = null;
+
+    function scheduleNextReload(delay) {
+      if (autoReloadTimer) clearTimeout(autoReloadTimer);
+      autoReloadTimer = setTimeout(doAutoReload, delay);
+    }
+
+    async function fetchFullHtml() {
+      try {
+        const isShowAll = sessionStorage.getItem("compareShowAll") === "true";
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('_t', new Date().getTime());
+
+        const res = await fetch(currentUrl.toString(), { cache: 'no-store' });
+        const html = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        if (!doc) return;
+
+        const jadwalGrid = document.querySelector('.jadwal-grid');
+        const newJadwalGrid = doc.querySelector('.jadwal-grid');
+        if (jadwalGrid && newJadwalGrid) {
+          const currentScroll = jadwalGrid.scrollTop;
+          jadwalGrid.innerHTML = newJadwalGrid.innerHTML;
+          jadwalGrid.scrollTop = currentScroll;
+        }
+
+        const logContainer = document.getElementById('log-container');
+        const newLogContainer = doc.getElementById('log-container');
+        if (logContainer && newLogContainer) logContainer.innerHTML = newLogContainer.innerHTML;
+
+        const logPagination = document.getElementById('log-pagination-wrapper');
+        const newLogPagination = doc.getElementById('log-pagination-wrapper');
+        if (logPagination && newLogPagination) logPagination.innerHTML = newLogPagination.innerHTML;
+
+        const compareBody = document.getElementById('compare-body');
+        const newCompareBody = doc.getElementById('compare-body');
+        if (compareBody && newCompareBody) {
+          if (isShowAll) {
+            const newRows = newCompareBody.querySelectorAll('.hidden-row');
+            newRows.forEach(r => r.style.display = 'table-row');
+          }
+          compareBody.innerHTML = newCompareBody.innerHTML;
+        }
+
+        const lastChecked = document.getElementById('compare-last-checked');
+        const newLastChecked = doc.getElementById('compare-last-checked');
+        if (lastChecked && newLastChecked) lastChecked.innerHTML = newLastChecked.innerHTML;
+
+        const queueContainer = document.getElementById('queue-container');
+        const newQueueContainer = doc.getElementById('queue-container');
+        if (queueContainer && newQueueContainer) {
+          const queueWrapper = queueContainer.querySelector('#queue-table-wrapper');
+          const currentScrollX = queueWrapper ? queueWrapper.scrollLeft : 0;
+          queueContainer.innerHTML = newQueueContainer.innerHTML;
+          const newQueueWrapper = queueContainer.querySelector('#queue-table-wrapper');
+          if (newQueueWrapper) newQueueWrapper.scrollLeft = currentScrollX;
+        }
+      } catch (err) {
+        console.error("Gagal memuat ulang data penuh:", err);
+      }
+    }
+
+    async function doAutoReload() {
+      if (window.isAutoReloadPaused) {
+        scheduleNextReload(10000);
+        return;
+      }
+
+      // Jangan lakukan polling jika tab sedang di latar belakang (hemat kuota D1)
+      if (document.hidden) {
+        scheduleNextReload(30000);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/sync-status?_t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) throw new Error('Status check failed');
+        const status = await res.json();
+        if (!status.ok) throw new Error(status.error || 'Unknown error');
+
+        // Update loader icon
+        const loaderIcon = document.getElementById('loader-icon');
+        if (loaderIcon) {
+          loaderIcon.style.display = (status.isRunning && !status.selesai) ? 'block' : 'none';
+        }
+
+        // Update status badge
+        const statusBadge = document.getElementById('status');
+        if (statusBadge) {
+          if (status.selesai) {
+            statusBadge.className = 'status-badge finished';
+            statusBadge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Sinkronisasi Selesai';
+          } else if (status.isRunning) {
+            statusBadge.className = 'status-badge';
+            statusBadge.innerHTML = '<span class="pulse-dot"></span> Sedang Menyinkronkan...';
+          } else {
+            statusBadge.className = 'status-badge stopped';
+            statusBadge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Menunggu / Terhenti';
+          }
+        }
+
+        // Update progress bar & text
+        const progFill = document.querySelector('.progress-fill');
+        if (progFill) {
+          progFill.style.width = (status.selesai ? 100 : status.progressPercent) + '%';
+        }
+        const progStats = document.getElementById('progress-stats');
+        if (progStats) {
+          const syncedFormatted = Number(status.totalSynced || 0).toLocaleString('id-ID');
+          const estimasiFormatted = Number(status.totalEstimasi || 0).toLocaleString('id-ID');
+          progStats.innerHTML = '<span>' + (status.progressPercent || 0) + '% Selesai</span><span>Data: ' + syncedFormatted + ' / ' + estimasiFormatted + '</span>';
+        }
+
+        // Update stat boxes
+        const statBaru = document.getElementById('stat-baru');
+        if (statBaru) statBaru.innerText = Number(status.activeRow?.total_baru || 0).toLocaleString('id-ID');
+        const statDiperbarui = document.getElementById('stat-diperbarui');
+        if (statDiperbarui) statDiperbarui.innerText = Number(status.activeRow?.total_diperbarui || 0).toLocaleString('id-ID');
+        const statDihapus = document.getElementById('stat-dihapus');
+        if (statDihapus) statDihapus.innerText = Number(status.activeRow?.total_dihapus || 0).toLocaleString('id-ID');
+        const statTidakBerubah = document.getElementById('stat-tidak-berubah');
+        if (statTidakBerubah) statTidakBerubah.innerText = Number(status.activeRow?.total_tidak_berubah || 0).toLocaleString('id-ID');
+
+        // Update info box
+        const mainInfo = document.getElementById('main-info');
+        if (mainInfo) {
+          mainInfo.innerHTML = '<div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">' +
+            '<span>Bentuk Aktif: <strong style="color: var(--primary-light); text-transform: uppercase;">' + (status.bentukBerikutnya || '-') + '</strong></span>' +
+            '<span>Offset Saat Ini: <strong style="color: var(--text-main);">' + (status.offsetBerikutnya || 0) + '</strong></span>' +
+            '</div>' +
+            '<div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">' +
+            'Update Terakhir: <strong style="color: var(--text-subtle);">' + (status.activeRow?.updated_at || '-') + ' WIB</strong>' +
+            '</div>';
+        }
+
+        // Jika terjadi transisi status (misal selesai, atau ganti provinsi), perbarui tabel log & antrian penuh
+        if (lastKnownState) {
+          const stateChanged = (lastKnownState.selesai !== status.selesai) ||
+                               (lastKnownState.bentukBerikutnya !== status.bentukBerikutnya) ||
+                               (lastKnownState.isRunning !== status.isRunning);
+          if (stateChanged) {
+            await fetchFullHtml();
+          }
+        }
+        lastKnownState = status;
+
+        // Interval dinamis: 10s saat sync berjalan, 60s saat idle/selesai
+        const nextDelay = status.isRunning ? 10000 : 60000;
+        scheduleNextReload(nextDelay);
+      } catch (e) {
+        scheduleNextReload(15000);
+      }
+    }
+
+    // Tangani perubahan visibilitas tab: aktifkan reload saat tab dibuka kembali
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden) {
+        doAutoReload();
+      }
+    });
+
+    scheduleNextReload(10000);
+  </script>
+</head>
+<body>
+  <div class="card">
+    <!-- SVGs definition for shared gradients -->
+    <svg width="0" height="0" style="position:absolute;">
+      <defs>
+        <linearGradient id="title-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#818cf8" />
+          <stop offset="100%" stop-color="#c084fc" />
+        </linearGradient>
+        <linearGradient id="queue-title-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#38bdf8" />
+          <stop offset="100%" stop-color="#818cf8" />
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <!-- Animated Dual-Ring SVG Loader -->
+    <svg id="loader-icon" class="loader-svg" width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" style="${!isRunning && !selesai ? 'display: none;' : ''} ${selesai ? 'display: none;' : ''}">
+      <circle cx="26" cy="26" r="20" stroke="url(#loader-grad-1)" stroke-width="4" stroke-dasharray="75 35" stroke-linecap="round">
+        <animateTransform attributeName="transform" type="rotate" from="0 26 26" to="360 26 26" dur="1.1s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="26" cy="26" r="13" stroke="#a855f7" stroke-width="3" stroke-dasharray="35 25" stroke-linecap="round" opacity="0.75">
+        <animateTransform attributeName="transform" type="rotate" from="360 26 26" to="0 26 26" dur="1.7s" repeatCount="indefinite"/>
+      </circle>
+      <defs>
+        <linearGradient id="loader-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#6366f1" />
+          <stop offset="100%" stop-color="#ec4899" />
+        </linearGradient>
+      </defs>
+    </svg>
+    
+    <div id="status" class="status-badge ${selesai ? 'finished' : (!isRunning ? 'stopped' : '')}">
+      ${selesai ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Sinkronisasi Selesai' : (isRunning ? '<span class="pulse-dot"></span> Sedang Menyinkronkan...' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Menunggu / Terhenti')}
+    </div>
+    
+    <div class="progress-bar-container">
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: ${selesai ? 100 : progressPercent}%;"></div>
+      </div>
+      <div id="progress-stats" style="display: flex; justify-content: space-between; font-size: 13px; color: var(--text-muted); margin-top: 8px; font-weight: 600;">
+        <span>${progressPercent}% Selesai</span>
+        <span>Data: ${totalSynced.toLocaleString('id-ID')} / ${totalEstimasi.toLocaleString('id-ID')}</span>
+      </div>
+    </div>
+    
+    <h1 id="main-title" class="hero-title">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="url(#title-grad)" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      Sekolah Sync Dashboard ${isCustom ? '<span class="badge-tag custom">Custom</span>' : '<span class="badge-tag full">Full</span>'}
+    </h1>
+
+    <div id="main-info" class="main-info-box">
+      <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <span>Bentuk Aktif: <strong style="color: var(--primary-light); text-transform: uppercase;">${bentukBerikutnya}</strong></span>
+        <span>Offset Saat Ini: <strong style="color: var(--text-main);">${offsetBerikutnya}</strong></span>
+      </div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+        Update Terakhir: <strong style="color: var(--text-subtle);">${activeRow.updated_at || '-'} WIB</strong>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="stat-box">
+        <div class="stat-icon-wrapper success">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        </div>
+        <div id="stat-baru" class="stat-val" style="color: var(--success);">${activeRow.total_baru || 0}</div>
+        <div class="stat-label">Baru Ditambahkan</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-icon-wrapper info">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </div>
+        <div id="stat-diperbarui" class="stat-val" style="color: var(--info);">${activeRow.total_diperbarui || 0}</div>
+        <div class="stat-label">Diperbarui</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-icon-wrapper danger">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </div>
+        <div id="stat-dihapus" class="stat-val" style="color: var(--danger);">${activeRow.total_dihapus || 0}</div>
+        <div class="stat-label">Dihapus (Nonaktif)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-icon-wrapper subtle">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        </div>
+        <div id="stat-tidak-berubah" class="stat-val">${activeRow.total_tidak_berubah || 0}</div>
+        <div class="stat-label">Tidak Berubah</div>
+      </div>
+    </div>
+    
+    ${queueHtml}
+    
+    <div style="margin-top: 32px; text-align: left;">
+      <h2 class="section-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-light)" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Log Aktivitas Terakhir
+      </h2>
+      <div id="log-container" style="display: flex; flex-direction: column; gap: 10px;">
+        ${logHtml}
+      </div>
+      <div id="log-pagination-wrapper">
+        ${paginationHtml}
+      </div>
+    </div>
+
+    <div style="margin-top: 36px; text-align: left;">
+      <div id="compare-header-box" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); padding-bottom: 10px; margin-bottom: 16px;">
+        <div>
+          <h2 style="font-size: 17px; color: var(--text-main); font-weight: 700; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+            Perbandingan Data (Belajar.id vs DB)
+          </h2>
+          <div id="compare-last-checked" style="font-size: 12px; color: var(--text-muted);">Terakhir dicek: ${lastChecked}</div>
+        </div>
+        ${compareCache && compareCache.value.length > 5 ? `<button id="btn-compare" style="background: rgba(99, 102, 241, 0.2); color: var(--primary-light); border: 1px solid rgba(99, 102, 241, 0.4); padding: 8px 14px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 700; transition: all 0.2s; display: flex; align-items: center; gap: 6px;" onclick="toggleComparison()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg> Tampilkan Semua</button>` : ''}
+      </div>
+      <div id="compare-container" class="table-card-wrapper" style="overflow-x: auto;">
+         <table id="compare-table" class="custom-table">
+           <thead>
+             <tr>
+               <th style="padding: 14px 12px; text-align: left;">Provinsi</th>
+               <th style="padding: 14px 12px; text-align: center;">Belajar.id</th>
+               <th style="padding: 14px 12px; text-align: center;">Database</th>
+               <th style="padding: 14px 12px; text-align: center;">Selisih</th>
+               <th style="padding: 14px 12px; text-align: center;">Status</th>
+             </tr>
+           </thead>
+           <tbody id="compare-body">${compareHtml}</tbody>
+         </table>
+      </div>
+    </div>
+    
+    <a href="https://api-sekolah-kita.pages.dev/" class="btn" target="_blank" rel="noopener noreferrer">
+      Kunjungi Website Utama
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+    </a>
+    
+    <div style="font-size: 12px; color: var(--text-muted); margin-top: 24px; font-weight: 500;">
+      Halaman refresh otomatis setiap 5 detik
+    </div>
+  </div>
+
+  <script>
+    async function showDuplicateModal(provinsi) {
+      window.isAutoReloadPaused = true;
+      const modal = document.getElementById('duplicate-modal');
+      const title = document.getElementById('modal-title');
+      const content = document.getElementById('modal-content');
+      
+      title.innerText = 'Detail NPSN Ganda - Provinsi ' + provinsi;
+      content.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-muted);"><span class="spin-icon">🔄</span> Memuat data NPSN...</div>';
+      modal.style.display = 'block';
+      
+      try {
+        const res = await fetch('/api/duplicates-detail?provinsi=' + encodeURIComponent(provinsi) + '&_t=' + Date.now());
+        const json = await res.json();
+        if (json.success && json.data && json.data.length > 0) {
+          let html = '';
+          json.data.forEach(function(item) {
+            var isIdentical = true;
+            if (item.sekolahList && item.sekolahList.length > 1) {
+              var first = item.sekolahList[0];
+              for (var i = 1; i < item.sekolahList.length; i++) {
+                var current = item.sekolahList[i];
+                if (current.nama !== first.nama ||
+                    current.bentuk !== first.bentuk ||
+                    current.status !== first.status ||
+                    current.kecamatan !== first.kecamatan ||
+                    current.kabupaten !== first.kabupaten ||
+                    (current.alamat || '') !== (first.alamat || '')) {
+                  isIdentical = false;
+                  break;
+                }
+              }
+            } else {
+              isIdentical = false;
+            }
+
+            var borderColor = isIdentical ? 'var(--success)' : 'var(--danger)';
+            var badgeHtml = isIdentical 
+              ? '<span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 8px; border: 1px solid rgba(16, 185, 129, 0.3);">Data Identik (Paginasi API)</span>'
+              : '<span style="background: rgba(244, 63, 94, 0.15); color: #fb7185; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 8px; border: 1px solid rgba(244, 63, 94, 0.3);">Data Berbeda (NPSN Ganda)</span>';
+
+            html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; margin-bottom: 12px; border-left: 4px solid ' + borderColor + ';">' +
+                    '<div style="font-weight: 700; color: var(--primary-light); font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">NPSN: ' + item.npsn + badgeHtml + '</div>' +
+                    '<div style="display: flex; flex-direction: column; gap: 10px;">';
+            item.sekolahList.forEach(function(s) {
+              html += '<div style="padding-left: 10px; border-left: 2px solid rgba(255,255,255,0.1); font-size: 13px;">' +
+                      '<strong style="color: var(--text-main);">' + s.nama + '</strong> <span style="background: rgba(255,255,255,0.08); color: var(--text-subtle); padding: 2px 6px; border-radius: 4px; font-size: 11px; text-transform: uppercase;">' + s.bentuk + '</span>' +
+                      '<div style="color: var(--text-muted); margin-top: 4px;">Status: ' + s.status + ' | Kecamatan: ' + s.kecamatan + ' | Kabupaten: ' + s.kabupaten + '</div>' +
+                      '<div style="color: var(--text-muted); font-size: 12px; margin-top: 2px;">Alamat: ' + (s.alamat || '-') + '</div>' +
+                      '</div>';
+            });
+            html += '</div></div>';
+          });
+          content.innerHTML = html;
+        } else {
+          content.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">Tidak ada detail data NPSN ganda yang disimpan untuk provinsi ini. Jalankan sync ulang untuk memperbarui detail.</div>';
+        }
+      } catch (e) {
+        content.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--danger);">Gagal memuat detail data: ' + e.message + '</div>';
+      }
+    }
+    
+    function closeDuplicateModal() {
+      document.getElementById('duplicate-modal').style.display = 'none';
+      window.isAutoReloadPaused = false;
+    }
+    
+    window.addEventListener('click', function(event) {
+      const modal = document.getElementById('duplicate-modal');
+      if (event.target === modal) {
+        closeDuplicateModal();
+      }
+    });
+  </script>
+  
+  <!-- Modal Detail NPSN Ganda -->
+  <div id="duplicate-modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.7); backdrop-filter: blur(8px);">
+    <div style="background: rgba(15, 23, 42, 0.95); margin: 8% auto; padding: 26px; border: 1px solid rgba(255,255,255,0.15); width: 90%; max-width: 620px; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); text-align: left; position: relative;">
+      <span style="position: absolute; right: 20px; top: 20px; font-size: 22px; font-weight: bold; cursor: pointer; color: var(--text-muted); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05);" onclick="closeDuplicateModal()">&times;</span>
+      <h3 style="margin-top: 0; font-size: 17px; font-weight: 700; color: var(--text-main); border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; display: flex; align-items: center; gap: 8px;" id="modal-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        Detail NPSN Ganda
+      </h3>
+      <div id="modal-content" style="max-height: 440px; overflow-y: auto; margin-top: 16px;">
+        <!-- Content will be populated by JS -->
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+        
+    return new Response(html, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  } catch (err) {
+    return new Response('Error loading sync dashboard: ' + err.message, { status: 500 });
+  }
+}
