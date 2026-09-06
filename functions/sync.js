@@ -1,6 +1,11 @@
 import { getSupabase } from './lib/db.js';
 import { VALID_BENTUK } from './lib/sync-supabase-core.js';
 
+const cleanName = (name) => {
+  if (!name) return '';
+  return name.replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/^PROVINSI|^PROV/, '');
+};
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -947,7 +952,11 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
       } catch(e) {
         console.error("Gagal mengganti halaman log", e);
       } finally {
-        win    let lastKnownState = null;
+        window.isAutoReloadPaused = false;
+      }
+    }
+
+    let lastKnownState = null;
     let autoReloadTimer = null;
 
     function scheduleNextReload(delay) {
