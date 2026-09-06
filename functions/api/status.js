@@ -1,5 +1,6 @@
 import { getStatusSinkronisasiPublik } from '../lib/status-sinkronisasi.js';
-import { getDb } from '../lib/db.js';
+import { getDb, isSupabase, getSupabase } from '../lib/db.js';
+import { getStatusSinkronisasiSupabase } from '../lib/sekolah-supabase.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json;charset=UTF-8',
@@ -21,8 +22,14 @@ export async function onRequest(context) {
   }
 
   try {
-    const db = getDb(context.env);
-    const pub = await getStatusSinkronisasiPublik(db);
+    let pub;
+    if (isSupabase(context.env)) {
+      const supabase = getSupabase(context.env);
+      pub = await getStatusSinkronisasiSupabase(supabase);
+    } else {
+      const db = getDb(context.env);
+      pub = await getStatusSinkronisasiPublik(db);
+    }
     const body = {
       status: 'success',
       developer: 'Syamsul Bahri',

@@ -1,5 +1,6 @@
-import { getDb } from '../lib/db.js';
+import { getDb, isSupabase } from '../lib/db.js';
 import { getRekapSekolah } from '../lib/sekolah-db.js';
+import rekapPrecomputed from '../../data_rekap.json';
 
 export async function onRequest(context) {
   const headers = {
@@ -14,6 +15,10 @@ export async function onRequest(context) {
   }
 
   try {
+    if (isSupabase(context.env)) {
+      return new Response(JSON.stringify(rekapPrecomputed), { headers });
+    }
+
     const db = getDb(context.env);
     const rows = await getRekapSekolah(db);
     

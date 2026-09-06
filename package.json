@@ -5,11 +5,18 @@
   "scripts": {
     "deploy:cf": "wrangler pages deploy . --project-name=api-sekolah-kita --branch production --commit-dirty=true",
     "deploy": "npm run deploy:cf",
+    "migrate:supabase": "node scripts/migrate-to-supabase.js",
+    "sync:supabase": "node scripts/sync-supabase.js",
     "ship": "node scripts/ship.js",
     "ship:all": "node scripts/ship.js && npm run deploy:cf"
   },
   "devDependencies": {
     "csv-parser": "^3.2.1",
     "wrangler": "^4.92.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.115.0",
+    "dotenv": "^17.4.2",
+    "pg": "^8.23.0"
   }
 }

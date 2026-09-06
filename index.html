@@ -461,7 +461,9 @@
     <!-- All existing scripts preserved but styled to match the new UI -->
     <script>
             (function () {
-                var base = window.location.origin;
+                var base = (window.location.hostname.includes('github.io') || window.location.protocol === 'file:')
+                    ? 'https://api-sekolah-kita.pages.dev'
+                    : window.location.origin;
                 var input = document.getElementById('api-keyword');
                 var link = document.getElementById('try-api');
                 var copyBtn = document.getElementById('copy-api-url');
