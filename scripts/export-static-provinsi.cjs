@@ -77,11 +77,17 @@ async function fetchSchoolsForProvince(provName, expectedTotal = 0) {
   let offset = 0;
   const rows = [];
 
+  // Bangun variasi nama provinsi (fleksibel: 'PROV. GORONTALO', 'GORONTALO', 'PROVINSI GORONTALO')
+  const cleanProv = provName.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
+  const provVariants = cleanProv === 'LUAR NEGERI'
+    ? ['LUAR NEGERI']
+    : [...new Set([provName, `PROV. ${cleanProv}`, `PROVINSI ${cleanProv}`, cleanProv])];
+
   while (true) {
     const { data, error } = await supabase
       .from('sekolah')
       .select('npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan, status_satuan_pendidikan, jenjang_pendidikan, pembina, jalur_pendidikan, nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan')
-      .eq('nama_provinsi', provName)
+      .in('nama_provinsi', provVariants)
       .order('npsn', { ascending: true })
       .range(offset, offset + batchSize - 1);
 
@@ -147,38 +153,55 @@ async function run() {
   const provArg = args.find(a => a.startsWith('--prov='))?.split('=')[1];
 
   // 1. Ambil daftar provinsi & hitungan total sekolah secara cepat tanpa scan berat
-  const provMapCount = new Map();
+  // Baseline dari DAFTAR_PROVINSI_DEFAULT
+  const mergedProvMap = new Map();
+  for (const p of DAFTAR_PROVINSI_DEFAULT) {
+    const clean = p.nama.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
+    mergedProvMap.set(clean, {
+      nama_provinsi: p.nama,
+      total_sekolah: p.total
+    });
+  }
+
+  // Ambil data terbaru dari provinsi_sync_status (menangkap jika ada provinsi baru/tambahan di DB)
   try {
     const { data: statusRows } = await supabase
       .from('provinsi_sync_status')
       .select('nama_provinsi, total_db');
     if (statusRows && statusRows.length > 0) {
       for (const s of statusRows) {
-        const clean = (s.nama_provinsi || '').toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
-        provMapCount.set(clean, s.total_db || 0);
+        if (!s.nama_provinsi) continue;
+        const clean = s.nama_provinsi.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
+        const provNameInDb = clean === 'LUAR NEGERI' ? 'LUAR NEGERI' : `PROV. ${clean}`;
+        const existing = mergedProvMap.get(clean);
+
+        mergedProvMap.set(clean, {
+          nama_provinsi: existing ? existing.nama_provinsi : provNameInDb,
+          total_sekolah: s.total_db !== undefined && s.total_db !== null ? s.total_db : (existing ? existing.total_sekolah : 0)
+        });
       }
     }
   } catch (e) {
     // Fallback aman jika tabel status belum siap
   }
 
-  const provList = DAFTAR_PROVINSI_DEFAULT.map(p => {
-    const clean = p.nama.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
-    return {
-      nama_provinsi: p.nama,
-      total_sekolah: provMapCount.get(clean) || p.total
-    };
-  });
+  // Ambil semua provinsi yang memiliki data (> 0 sekolah)
+  const provList = Array.from(mergedProvMap.values()).filter(p => p.total_sekolah > 0);
 
   let targetProvinces = provList;
 
   if (provArg) {
+    const cleanArg = provArg.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
     targetProvinces = provList.filter(p =>
+      p.nama_provinsi.toUpperCase().includes(cleanArg) ||
       p.nama_provinsi.toLowerCase().includes(provArg.toLowerCase())
     );
-    // Jika tidak cocok dengan nama standar, buat entri langsung dari argumen
+    // Jika tidak ada di daftar, tetap proses langsung menggunakan nama argumen input!
     if (targetProvinces.length === 0) {
-      targetProvinces = [{ nama_provinsi: provArg, total_sekolah: 0 }];
+      targetProvinces = [{
+        nama_provinsi: provArg.toUpperCase().startsWith('PROV') ? provArg : `PROV. ${cleanArg}`,
+        total_sekolah: 0
+      }];
     }
     console.log(`🎯 Memfilter provinsi spesifik: "${provArg}" (${targetProvinces.length} ditemukan)`);
   } else if (isSample) {
@@ -214,6 +237,11 @@ async function run() {
 
     try {
       const schools = await fetchSchoolsForProvince(prov.nama_provinsi, prov.total_sekolah);
+      if (schools.length === 0) {
+        console.log(`\n   ⚠️ 0 baris sekolah ditemukan di database untuk "${prov.nama_provinsi}", melewati penyimpanan file.`);
+        continue;
+      }
+
       const MAX_PER_FILE = 30000;
       const partFiles = [];
 
