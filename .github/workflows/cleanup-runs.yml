@@ -1,0 +1,36 @@
+name: Bersihkan Riwayat Workflow Runs
+
+on:
+  schedule:
+    - cron: '0 17 * * *' # Pukul 00:00 WIB (17:00 UTC) setiap hari
+  workflow_dispatch:
+    inputs:
+      keep_count:
+        description: 'Jumlah riwayat workflow run terbaru yang ingin dipertahankan (default: 4)'
+        required: true
+        default: '4'
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup-runs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Bersihkan Riwayat Workflow Runs Lama
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          KEEP_RUNS_COUNT: ${{ github.event.inputs.keep_count || '4' }}
+        run: node scripts/clean-github-runs.cjs cleanup-history

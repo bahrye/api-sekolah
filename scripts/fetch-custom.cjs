@@ -94,8 +94,44 @@ async function postBatchToWorker(dataList, bentukAktif, offset, isFinished, cust
   return await res.json();
 }
 
+async function cancelQueuedRunsGithub() {
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  const repo = process.env.GITHUB_REPOSITORY;
+  const currentRunId = process.env.GITHUB_RUN_ID ? String(process.env.GITHUB_RUN_ID) : null;
+  if (!token || !repo) return;
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/actions/runs?status=queued`, {
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `Bearer ${token}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'api-sekolah-sync'
+      }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const queuedRuns = (data.workflow_runs || []).filter(r => String(r.id) !== currentRunId);
+    if (queuedRuns.length > 0) {
+      console.log(`🧹 Membatalkan ${queuedRuns.length} antrean workflow menumpuk di GitHub Actions...`);
+      for (const q of queuedRuns) {
+        await fetch(`https://api.github.com/repos/${repo}/actions/runs/${q.id}/cancel`, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/vnd.github+json',
+            'Authorization': `Bearer ${token}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'api-sekolah-sync'
+          }
+        });
+        console.log(`  🗑️ Antrean Run #${q.id} (${q.name}) dibatalkan.`);
+      }
+    }
+  } catch (e) {}
+}
+
 async function fetchCustomData() {
   await loadProvinces();
+  await cancelQueuedRunsGithub();
   
   const argBentuk = process.env.PILIHAN_BENTUK || "Semua";
   const argProvinsi = (process.env.PILIHAN_PROVINSI || "Semua").trim().toUpperCase();
@@ -244,7 +280,7 @@ async function fetchCustomData() {
           // Kuota aman penulisan baris per hari untuk Cloudflare D1 Free.
           const totalApiGlobal = compareJson.data ? compareJson.data.reduce((acc, curr) => acc + (curr.total_api || 0), 0) : 0;
           const dynamicFullSyncLimit = totalApiGlobal > 0 ? Math.ceil(totalApiGlobal / 2) : 250000;
-          const BATAS_AMAN_DATA_PER_HARI = isMandatoryUpdateDay ? dynamicFullSyncLimit : 100000; 
+          const BATAS_AMAN_DATA_PER_HARI = Math.max(100000, isMandatoryUpdateDay ? dynamicFullSyncLimit : 100000); 
           
           let totalDataSaatIni = compareJson.synced_today || 0;
           let finalTargets = [];
@@ -372,6 +408,57 @@ async function fetchCustomData() {
     if (taskIndex > 0 || offset > 0) {
       const t = tasks[Math.min(taskIndex, tasks.length - 1)];
       console.log(`Melanjutkan dari iterasi sebelumnya: Provinsi ${PROVINCES[t.prov] || 'SEMUA'}, Bentuk ${t.bentuk}, Offset ${offset}`);
+    } else {
+      // Periksa posisi sinkronisasi terakhir di server jika ada sesi sebelumnya yang belum selesai
+      try {
+        console.log(`🔍 Memeriksa progres sinkronisasi terakhir dari server (${WORKER_URL}/api/sync-status)...`);
+        const statusRes = await fetch(`${WORKER_URL}/api/sync-status`);
+        if (statusRes.ok) {
+          const statusJson = await statusRes.json();
+          if (statusJson && !statusJson.selesai && statusJson.activeRow) {
+            const act = statusJson.activeRow;
+            const actBentukRaw = act.bentuk_aktif || '';
+            const actOffset = act.offset_terakhir || 0;
+            const actProvince = (statusJson.activeProvince || '').trim().toUpperCase();
+
+            let targetShape = '';
+            let targetProv = actProvince;
+            const shapeMatch = actBentukRaw.match(/^(.*?)\s*\((.*?)\)$/);
+            if (shapeMatch) {
+              targetShape = shapeMatch[1].trim().toLowerCase();
+              if (!targetProv) targetProv = shapeMatch[2].trim().toUpperCase();
+            } else if (actBentukRaw) {
+              targetShape = actBentukRaw.trim().toLowerCase();
+            }
+
+            if (targetProv && targetShape) {
+              const cleanTargetProv = cleanName(targetProv);
+              const foundIdx = tasks.findIndex(t => {
+                const pName = (PROVINCES[t.prov] || '').toUpperCase();
+                return cleanName(pName) === cleanTargetProv && t.bentuk.toLowerCase() === targetShape;
+              });
+
+              if (foundIdx !== -1) {
+                taskIndex = foundIdx;
+                offset = actOffset;
+                console.log(`🔄 Melanjutkan otomatis dari posisi terpotong: Provinsi ${targetProv}, Bentuk [${targetShape.toUpperCase()}], Offset ${offset} (Antrean #${taskIndex + 1}/${tasks.length})`);
+              } else {
+                const provOnlyIdx = tasks.findIndex(t => {
+                  const pName = (PROVINCES[t.prov] || '').toUpperCase();
+                  return cleanName(pName) === cleanTargetProv;
+                });
+                if (provOnlyIdx !== -1) {
+                  taskIndex = provOnlyIdx;
+                  offset = 0;
+                  console.log(`🔄 Melanjutkan otomatis dari provinsi terpotong: ${targetProv} (Antrean #${taskIndex + 1}/${tasks.length})`);
+                }
+              }
+            }
+          }
+        }
+      } catch (errResume) {
+        console.warn('⚠️ Gagal mengambil posisi lanjutan otomatis dari server:', errResume.message);
+      }
     }
   }
 
@@ -388,7 +475,8 @@ async function fetchCustomData() {
 
   const limit = 20;
   const startTime = Date.now();
-  const LAMA_MAKSIMAL = 5 * 60 * 60 * 1000;
+  const maxMinutes = parseInt(process.env.MAX_EXECUTION_MINUTES || '50', 10);
+  const LAMA_MAKSIMAL = maxMinutes * 60 * 1000;
 
   let previousProv = null;
   let currentProvinceStarted = false;
@@ -479,9 +567,13 @@ async function fetchCustomData() {
   }
 
   while (taskIndex < tasks.length) {
-    if (Date.now() - startTime > LAMA_MAKSIMAL) {
-      console.log(`⏱️ Waktu eksekusi mendekati maksimal (${LAMA_MAKSIMAL / 1000 / 60} menit). Berhenti sejenak untuk dilanjutkan pada run berikutnya...`);
-      require('fs').writeFileSync('lanjutkan_custom.json', JSON.stringify({ bentukIndex: taskIndex, offset, waktuMulai }));
+    if (Date.now() - startTime >= LAMA_MAKSIMAL) {
+      console.log(`\n⏱️ Waktu eksekusi mendekati batas (${LAMA_MAKSIMAL / 1000 / 60} menit). Menyimpan status dan berhenti rapi...`);
+      const currentT = tasks[taskIndex];
+      const nextProv = PROVINCES[currentT.prov] || currentT.prov;
+      console.log(`📌 Posisi terpotong berhasil tersimpan di server: Provinsi ${nextProv}, Bentuk [${currentT.bentuk.toUpperCase()}], Offset ${offset}.`);
+      console.log(`➡️ Proses selesai dengan rapi (exit 0) dan akan dilanjutkan otomatis dari titik ini pada giliran berikutnya.`);
+      await cancelQueuedRunsGithub();
       break;
     }
 
@@ -490,6 +582,7 @@ async function fetchCustomData() {
     const namaWilayah = kodeWilayah === "360" ? "SEMUA" : (PROVINCES[kodeWilayah] || kodeWilayah);
     
     if (kodeWilayah !== previousProv) {
+      await cancelQueuedRunsGithub();
       // Hanya benar-benar START BARU jika offset === 0 dan ini adalah bentukPendidikan PERTAMA dari provinsi tersebut!
       const isVeryBeginningOfProvince = (offset === 0) && (taskIndex === tasks.findIndex(t => t.prov === kodeWilayah));
       currentProvinceStarted = !isVeryBeginningOfProvince; 
@@ -634,6 +727,17 @@ async function fetchCustomData() {
 
       const jedaMs = stats.baru === 0 && stats.diperbarui === 0 ? 200 : 1000;
       await new Promise((resolve) => setTimeout(resolve, jedaMs));
+
+      // Cek batas waktu eksekusi agar keluar rapi sebelum runner di-kill paksa
+      if (Date.now() - startTime >= LAMA_MAKSIMAL) {
+        console.log(`\n⏱️ Batas waktu eksekusi run (${maxMinutes} menit) telah tercapai.`);
+        const currentT = tasks[taskIndex];
+        const nextProv = PROVINCES[currentT.prov] || currentT.prov;
+        console.log(`📌 Posisi terpotong berhasil tersimpan di server: Provinsi ${nextProv}, Bentuk [${bentukAktif.toUpperCase()}], Offset ${offset}.`);
+        console.log(`➡️ Proses selesai dengan rapi (exit 0) dan akan dilanjutkan otomatis dari titik ini pada giliran berikutnya.`);
+        await cancelQueuedRunsGithub();
+        break;
+      }
 
     } catch (err) {
       console.error(`Gagal mengambil data dari API untuk bentuk ${bentukAktif}:`, err);

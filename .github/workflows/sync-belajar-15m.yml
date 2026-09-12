@@ -36,10 +36,20 @@ jobs:
           node-version: '20'
           cache: npm
 
+      - name: Periksa & Batalkan Antrean Menumpuk
+        id: check_queue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: node scripts/clean-github-runs.cjs check-running
+
       - name: Install dependencies
+        if: steps.check_queue.outputs.skip_sync != 'true'
         run: npm ci
 
       - name: Jalankan Skrip Sinkronisasi
+        if: steps.check_queue.outputs.skip_sync != 'true'
         env:
           CLOUDFLARE_WORKER_URL: ${{ secrets.CLOUDFLARE_WORKER_URL || 'https://api-sekolah-kita.pages.dev' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET || secrets.SYNC_SECRET }}
@@ -47,4 +57,17 @@ jobs:
           PILIHAN_PROVINSI: ${{ github.event.inputs.pilihan_provinsi || '' }}
           MULAI_DARI_AWAL: ${{ github.event.inputs.mulai_dari_awal || 'false' }}
           IS_CRON_SCHEDULE: ${{ github.event_name == 'schedule' || github.event.inputs.pilihan_provinsi == '' }}
+          MAX_EXECUTION_MINUTES: "50"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: node scripts/fetch-custom.cjs
+
+      - name: Bersihkan Riwayat Workflow Runs (Pertahankan 4 Terakhir)
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          KEEP_RUNS_COUNT: "4"
+        run: node scripts/clean-github-runs.cjs cleanup-history

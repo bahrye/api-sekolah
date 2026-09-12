@@ -456,7 +456,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         }
 
         const dynamicFullSyncLimit = sumTotalApi > 0 ? Math.ceil(sumTotalApi / 2) : 250000;
-        const BATAS_AMAN = isMandatoryUpdateDay ? dynamicFullSyncLimit : 100000;
+        const BATAS_AMAN = Math.max(100000, isMandatoryUpdateDay ? dynamicFullSyncLimit : 100000);
         let syncedToday = 0;
         try {
           const nowWib = new Date(Date.now() + 7 * 60 * 60 * 1000);
