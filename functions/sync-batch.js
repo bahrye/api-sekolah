@@ -186,18 +186,13 @@ export async function onRequestPost(context) {
           waktu_selesai: new Date().toISOString(),
         });
 
-        // Bersihkan otomatis dari database: pertahankan hanya maksimal 5 log terbaru
+        // Bersihkan otomatis dari database: hapus log yang lebih lama dari 3 hari agar riwayat kuota harian tidak hilang
         try {
-          const { data: excessLogs } = await supabase
+          const threeDaysAgoUtc = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+          await supabase
             .from('log_aktivitas_provinsi')
-            .select('id')
-            .order('waktu_selesai', { ascending: false })
-            .range(5, 100);
-
-          if (excessLogs && excessLogs.length > 0) {
-            const deleteIds = excessLogs.map((x) => x.id);
-            await supabase.from('log_aktivitas_provinsi').delete().in('id', deleteIds);
-          }
+            .delete()
+            .lt('waktu_selesai', threeDaysAgoUtc);
         } catch (eCleanLog) {
           console.warn('Gagal membersihkan log lama di sync-batch:', eCleanLog.message);
         }
