@@ -1,13 +1,13 @@
 import { getSupabaseClient } from './supabase-client.js';
 
 export const MISSING_DATABASE_URL_MSG =
-  'Database belum dikonfigurasi. Hubungkan binding DB (Cloudflare D1) atau SUPABASE_URL / SUPABASE_ANON_KEY.';
+  'Database Supabase belum dikonfigurasi. Pastikan SUPABASE_URL dan SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY telah diatur.';
 
 /**
  * @param {Record<string, any>} env
  */
 export function hasDatabaseUrl(env) {
-  return Boolean(env?.DB || env?.SUPABASE_URL || process.env?.SUPABASE_URL);
+  return Boolean(env?.SUPABASE_URL || process.env?.SUPABASE_URL);
 }
 
 /**
@@ -15,17 +15,7 @@ export function hasDatabaseUrl(env) {
  * @param {Record<string, any>} env
  */
 export function isSupabase(env) {
-  return Boolean(env?.SUPABASE_URL || process.env?.SUPABASE_URL);
-}
-
-/**
- * Klien SQL D1 (SQLite) — database D1.
- * @param {{ DB?: import('@cloudflare/workers-types').D1Database }} env
- */
-export function getDb(env) {
-  const db = env?.DB;
-  if (!db) throw new Error(MISSING_DATABASE_URL_MSG);
-  return db;
+  return true;
 }
 
 /**
@@ -38,7 +28,12 @@ export function getSupabase(env) {
   return client;
 }
 
-/** @deprecated gunakan getDb */
+/** @deprecated D1 sudah tidak digunakan, beralih ke getSupabase */
+export function getDb(env) {
+  throw new Error('Cloudflare D1 sudah tidak digunakan. Gunakan Supabase via getSupabase().');
+}
+
+/** @deprecated gunakan getSupabase */
 export function getSql(env) {
   return getDb(env);
 }

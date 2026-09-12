@@ -51,7 +51,7 @@ export async function onRequestGet(context) {
         const cacheAgeMs = cacheRow.updated_at
           ? Date.now() - new Date(cacheRow.updated_at).getTime()
           : Infinity;
-        if (!isForce || cacheAgeMs < 15 * 60 * 1000) {
+        if (!isForce && cacheAgeMs < 15 * 60 * 1000) {
           return new Response(
             JSON.stringify({
               success: true,

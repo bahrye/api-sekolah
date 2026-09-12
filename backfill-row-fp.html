@@ -15,7 +15,7 @@
         <h1 class="text-lg font-bold text-slate-900">Backfill <code class="text-sm bg-violet-100 px-1 rounded">row_fp</code></h1>
         <p class="text-xs text-slate-500 mt-0.5">Pemantauan &amp; pengisian sidik jari baris</p>
       </div>
-      <a href="https://api-sekolah-cron.dunia-sekolah.workers.dev/"
+      <a href="/sync"
          class="shrink-0 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg">
         Status sync
       </a>
@@ -33,8 +33,8 @@
       <p id="rf-counts" class="text-sm text-slate-600 mt-1">—</p>
       <p id="rf-at" class="text-xs text-slate-400 mt-2">Terakhir diukur: —</p>
       <p id="rf-hint" class="text-[11px] text-violet-700 bg-violet-50 border border-violet-100 rounded-lg px-2 py-2 mt-3 text-center leading-relaxed">
-        Cron Worker memproses <strong>~4.000 baris tiap menit</strong> (8×500, await langsung).
-        Status «berjalan» tetap tampil sampai selesai — cek catatan cron di dashboard sync.
+        Proses sinkronisasi otomatis memantau dan mengisi fingerprint data sekolah.
+        Cek status sinkronisasi aktif di dashboard sync.
       </p>
     </div>
 
@@ -63,8 +63,8 @@
 
     <p class="mt-6 text-xs text-slate-500 leading-relaxed">
       Setelah backfill, kartu <strong>row_fp</strong> di
-      <a href="https://api-sekolah-cron.dunia-sekolah.workers.dev/" class="text-emerald-700 underline">dashboard status sync</a>
-      ikut terperbarui (polling ~4 detik, tanpa secret).
+      <a href="/sync" class="text-emerald-700 underline">dashboard status sync</a>
+      ikut terperbarui.
     </p>
     <a href="/" class="inline-block mt-4 text-sm text-blue-600 hover:underline">← Beranda API</a>
   </main>

@@ -69,12 +69,13 @@ export async function syncBatchToSupabase(supabase, dataList = []) {
     .in('npsn', npsnList);
 
   if (fetchErr) {
-    console.warn('Gagal cek fingerprint yang ada di Supabase:', fetchErr.message);
+    console.error('Gagal cek fingerprint yang ada di Supabase:', fetchErr.message);
+    throw new Error('Gagal cek fingerprint yang ada di Supabase: ' + fetchErr.message);
   }
 
   const existingMap = new Map((existingRows || []).map((r) => [r.npsn, r.row_fp]));
 
-  const toUpsert = [];
+  const toUpsertMap = new Map();
   let baru = 0;
   let diperbarui = 0;
   let tidakBerubah = 0;
@@ -93,10 +94,11 @@ export async function syncBatchToSupabase(supabase, dataList = []) {
     }
 
     const { item, rowFp } = entry;
-    toUpsert.push({
+    // Gunakan Map ber-key npsn agar batch selalu deduplikasi unik sebelum dikirim ke PostgreSQL
+    toUpsertMap.set(entry.npsn, {
       npsn: entry.npsn,
       nama: item.nama || '',
-      bentuk_pendidikan: item.bentukPendidikan || null,
+      bentuk_pendidikan: item.bentukPendidikan ? String(item.bentukPendidikan).toUpperCase() : null,
       bentuk_pendidikan_group: item.bentukPendidikanGroup || null,
       jenis_pendidikan: item.jenisPendidikan || null,
       status_satuan_pendidikan: item.statusSatuanPendidikan || null,
@@ -112,6 +114,8 @@ export async function syncBatchToSupabase(supabase, dataList = []) {
       migrated_at: new Date().toISOString(),
     });
   }
+
+  const toUpsert = Array.from(toUpsertMap.values());
 
   if (toUpsert.length > 0) {
     const { error: upsertErr } = await supabase

@@ -1,7 +1,5 @@
-import { getStatusSinkronisasiPublik } from '../lib/status-sinkronisasi.js';
 import { formatDbRowResponse } from '../lib/sekolah-schema.js';
-import { getDb, isSupabase, getSupabase } from '../lib/db.js';
-import { listSekolah, searchSekolah, listSekolahFiltered } from '../lib/sekolah-db.js';
+import { getSupabase } from '../lib/db.js';
 import {
   listSekolahSupabase,
   searchSekolahSupabase,
@@ -39,41 +37,21 @@ export async function onRequest(context) {
   }
 
   try {
+    const supabase = getSupabase(context.env);
+    const sinkron = await getStatusSinkronisasiSupabase(supabase);
     let rows;
-    let sinkron;
 
-    if (isSupabase(context.env)) {
-      const supabase = getSupabase(context.env);
-      sinkron = await getStatusSinkronisasiSupabase(supabase);
-
-      if (provinsi || bentuk) {
-        const filters = {
-          keyword: keyword?.trim() || undefined,
-          provinsi: provinsi?.trim() || undefined,
-          bentuk: bentuk?.trim() || undefined,
-        };
-        rows = await listSekolahFilteredSupabase(supabase, filters, limit, offset);
-      } else {
-        rows = keyword
-          ? await searchSekolahSupabase(supabase, keyword.trim(), limit, offset)
-          : await listSekolahSupabase(supabase, limit, offset);
-      }
+    if (provinsi || bentuk) {
+      const filters = {
+        keyword: keyword?.trim() || undefined,
+        provinsi: provinsi?.trim() || undefined,
+        bentuk: bentuk?.trim() || undefined,
+      };
+      rows = await listSekolahFilteredSupabase(supabase, filters, limit, offset);
     } else {
-      const db = getDb(context.env);
-      sinkron = await getStatusSinkronisasiPublik(db);
-
-      if (provinsi || bentuk) {
-        const filters = {
-          keyword: keyword?.trim() || undefined,
-          provinsi: provinsi?.trim() || undefined,
-          bentuk: bentuk?.trim() || undefined,
-        };
-        rows = await listSekolahFiltered(db, filters, limit, offset);
-      } else {
-        rows = keyword
-          ? await searchSekolah(db, keyword.trim(), limit, offset)
-          : await listSekolah(db, limit, offset);
-      }
+      rows = keyword
+        ? await searchSekolahSupabase(supabase, keyword.trim(), limit, offset)
+        : await listSekolahSupabase(supabase, limit, offset);
     }
 
     const totalSekolah = sinkron.total_sekolah;

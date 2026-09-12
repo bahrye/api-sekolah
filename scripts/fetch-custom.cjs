@@ -612,7 +612,18 @@ async function fetchCustomData() {
   }
   
   if (taskIndex >= tasks.length) {
-    console.log("🎉 SINKRONISASI KHUSUS SELESAI!");
+    console.log("🎉 SINKRONISASI KHUSUS SELESAI! Mengirim status final ke server...");
+    try {
+      await postBatchToWorker([], 'Selesai', 0, true, {
+        namaProvinsi: 'SEMUA',
+        waktuMulai,
+        isStart: false,
+        totalEstimasi: currentTotalEstimasi
+      });
+      console.log("✅ Berhasil memperbarui status penyelesaian sinkronisasi.");
+    } catch (err) {
+      console.warn("Peringatan: Gagal mengirim status final:", err.message);
+    }
   }
 }
 

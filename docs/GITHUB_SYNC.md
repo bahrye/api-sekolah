@@ -1,41 +1,32 @@
-# Sinkron via GitHub Actions
+# Sinkronisasi Otomatis via GitHub Actions & Cloudflare Pages
 
-Cloudflare Cron hanya bisa **1× per menit** dan chunk besar sering memblokir `/tick` berikutnya (~80 baris/menit).
+Sinkronisasi data sekolah berjalan otomatis dari portal resmi `api.data.belajar.id` ke database **Supabase (PostgreSQL)** melalui aplikasi Cloudflare Pages.
 
-GitHub Actions menjalankan **12× `/step`** per menit (jeda 5 detik) → **~240 sekolah/menit** (12 × 20 baris API).
+Tidak ada lagi Worker terpisah (`api-sekolah-cron.dunia-sekolah.workers.dev`) maupun database Cloudflare D1. Seluruh proses sinkronisasi kini terpusat langsung di dalam aplikasi ini.
 
-## Setup
+## Arsitektur
 
-1. GitHub repo → **Settings → Secrets and variables → Actions**
-2. Secret: `SYNC_SECRET` (sama dengan Worker `wrangler secret put SYNC_SECRET`)
-3. Opsional variable: `WORKER_BASE` = `https://api-sekolah-cron....workers.dev`
+1. **GitHub Actions Scheduler** (`.github/workflows/sync-belajar-15m.yml`):
+   - Berjalan terjadwal (cron) secara berkala (atau manual via `workflow_dispatch`).
+   - Menjalankan `node scripts/fetch-custom.cjs`.
+2. **Smart Sync & Batching** (`scripts/fetch-custom.cjs`):
+   - Mengambil data dari API resmi Belajar.id secara bertahap.
+   - Mengirim batch data langsung ke Cloudflare Pages endpoint `/sync-batch`.
+3. **Penyimpanan Supabase** (`functions/sync-batch.js` & `functions/lib/sync-supabase-core.js`):
+   - Menerima batch data, memvalidasi `x-cron-secret`.
+   - Menghitung fingerprint baris (`row_fp`), melakukan deduplikasi NPSN, dan mengeksekusi upsert ke tabel `sekolah`.
+   - Memperbarui tabel `status_sinkronisasi`, `provinsi_sync_status`, dan `npsn_ganda_detail`.
 
-## Mulai sync
+## Konfigurasi Rahasia (GitHub Repository Secrets)
 
-```bash
-# Lanjut dari offset terakhir (disarankan untuk GHA)
-curl -H "X-Sync-Secret: ..." \
-  "https://api-sekolah-cron..../resume?driver=github"
+Atur di **Settings → Secrets and variables → Actions**:
+- `CRON_SECRET` atau `SYNC_SECRET`: Kode rahasia autentikasi sinkronisasi (wajib sama dengan `SYNC_SECRET` di Cloudflare Pages).
+- `CLOUDFLARE_WORKER_URL`: URL aplikasi Cloudflare Pages, default: `https://api-sekolah-kita.pages.dev`.
 
-# Atau mulai dari nol
-curl -H "X-Sync-Secret: ..." \
-  "https://api-sekolah-cron..../run?offset=0&resume=1&driver=github"
-```
+## Menjalankan Sinkronisasi Manual
 
-Atau: **Actions → Sync sekolah (GitHub Actions) → Run workflow** → centang **Mulai dari offset 0**.
-
-## Perilaku
-
-- **Cloudflare Cron Trigger dinonaktifkan** di `wrangler.cron.toml` (tidak ada `/tick` otomatis atau sync bulanan Tanggal 1 01:00 WITA dari CF).
-- `driver=github` → jika Cron diaktifkan lagi, CF tidak memproses chunk sync (hanya backfill).
-- Setiap `/step` = **1 hal API** (20 sekolah), tanpa chunk lock.
-- Workflow `sync-github.yml` jalan **tiap menit** (schedule `* * * * *`).
-
-## Kembali ke Cron Cloudflare
-
-```bash
-curl -H "X-Sync-Secret: ..." \
-  "https://api-sekolah-cron..../run?offset=OFFSET&resume=1&driver=cron"
-```
-
-Nonaktifkan workflow GHA atau biarkan; dengan `driver=cron`, GHA `/step` tetap menulis DB jika dijalankan — sebaiknya **disable** workflow saat pakai cron saja.
+- Di GitHub: Buka tab **Actions** → **Sinkronisasi Data Sekolah Otomatis** → **Run workflow**.
+- Atau jalankan lokal:
+  ```bash
+  npm run sync:belajar
+  ```

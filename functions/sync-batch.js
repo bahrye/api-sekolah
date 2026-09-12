@@ -8,7 +8,7 @@ export async function onRequestPost(context) {
   const secret = url.searchParams.get('secret') || request.headers.get('x-cron-secret');
   const validSecret = env.CRON_SECRET || env.SYNC_SECRET || process.env?.CRON_SECRET || process.env?.SYNC_SECRET;
 
-  if (validSecret && secret !== validSecret) {
+  if (!validSecret || secret !== validSecret) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
@@ -69,8 +69,8 @@ export async function onRequestPost(context) {
     // Update status di Supabase
     await supabase.from('status_sinkronisasi').upsert({
       id: targetId,
-      bentuk_aktif: displayBentuk,
-      offset_terakhir: offset || 0,
+      bentuk_aktif: isFinished && isCustom && bentukAktif === 'Selesai' ? 'Selesai' : displayBentuk,
+      offset_terakhir: isFinished ? 0 : (offset || 0),
       total_baru: totalBaru,
       total_diperbarui: totalDiperbarui,
       total_tidak_berubah: totalTidakBerubah,
@@ -80,7 +80,7 @@ export async function onRequestPost(context) {
       waktu_selesai_terakhir: isFinished ? new Date().toISOString() : (currentStatus?.waktu_selesai_terakhir || null),
     });
 
-    // Jika provinsi selesai, catat ke provinsi_sync_status & log_aktivitas_provinsi
+    // Jika provinsi selesai, catat ke provinsi_sync_status, log_aktivitas_provinsi, dan npsn_ganda_detail
     if (isFinished && body.namaProvinsi && body.namaProvinsi !== 'SEMUA') {
       try {
         await supabase.from('provinsi_sync_status').upsert({
@@ -99,8 +99,18 @@ export async function onRequestPost(context) {
           total_tidak_berubah: stats.tidakBerubah,
           waktu_selesai: new Date().toISOString(),
         });
+
+        // Simpan rincian duplikat ke npsn_ganda_detail jika ada
+        if (customParams.duplicates && Array.isArray(customParams.duplicates) && customParams.duplicates.length > 0) {
+          const dupRecords = customParams.duplicates.map((d) => ({
+            npsn: String(d.npsn),
+            nama_provinsi: body.namaProvinsi,
+            sekolah_detail: typeof d.sekolahList === 'string' ? d.sekolahList : JSON.stringify(d.sekolahList || []),
+          }));
+          await supabase.from('npsn_ganda_detail').upsert(dupRecords, { onConflict: 'npsn,nama_provinsi' });
+        }
       } catch (e) {
-        console.warn('Gagal simpan log provinsi:', e.message);
+        console.warn('Gagal simpan log provinsi / detail duplikat:', e.message);
       }
     }
 

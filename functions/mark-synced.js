@@ -7,7 +7,7 @@ export async function onRequestPost(context) {
   const secret = url.searchParams.get('secret') || request.headers.get('x-cron-secret');
   const validSecret = env.CRON_SECRET || env.SYNC_SECRET || process.env?.CRON_SECRET || process.env?.SYNC_SECRET;
 
-  if (validSecret && secret !== validSecret) {
+  if (!validSecret || secret !== validSecret) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },

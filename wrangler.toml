@@ -1,10 +1,5 @@
 name = "api-sekolah-kita"
 pages_build_output_dir = "./"
 
-# Database utama: Cloudflare D1
-# Lokal: salin ke .dev.vars (lihat .dev.vars.example)
-
-[[d1_databases]]
-binding = "DB"
-database_name = "api-sekolah-db"
-database_id = "9285cac8-f9fc-4aa9-a523-59c603481d0a"
+# Database utama: Supabase (PostgreSQL)
+# Konfigurasi: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY di .dev.vars (lokal) & Cloudflare Pages (produksi)

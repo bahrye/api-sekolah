@@ -50,7 +50,7 @@ export async function onRequest(context) {
         JSON.stringify({
           status: 'error',
           message:
-            'Batas CPU Cloudflare Pages (kode 1102). Coba maxPages=10 atau maxPages=20 jika data sedikit berubah; atau andalkan Cron Worker /tick.',
+            'Batas CPU Cloudflare Pages (kode 1102). Terjadi beban CPU tinggi pada edge function.',
           http_status: response.status,
           retry_after_seconds: 10,
         }),
