@@ -129,6 +129,43 @@
             left: 0;
             z-index: 10;
         }
+
+        /* Running Text / Marquee untuk status sinkronisasi */
+        .sync-marquee-wrapper {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .sync-marquee-wrapper.has-overflow {
+            mask-image: linear-gradient(to right, black 0%, black calc(100% - 24px), transparent 100%);
+            -webkit-mask-image: linear-gradient(to right, black 0%, black calc(100% - 24px), transparent 100%);
+        }
+
+        .sync-marquee-track {
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            will-change: transform;
+        }
+
+        .sync-marquee-track.is-scrolling {
+            animation: sync-marquee-anim var(--marquee-speed, 12s) linear infinite;
+        }
+
+        .sync-marquee-track.is-scrolling:hover {
+            animation-play-state: paused;
+        }
+
+        @keyframes sync-marquee-anim {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-50%);
+            }
+        }
     </style>
 </head>
 
@@ -255,7 +292,9 @@
                 </div>
                 <h3 class="text-slate-400 text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 uppercase tracking-wider">Update Terakhir (WIB)</h3>
                 <p id="last-update-at" class="text-xl sm:text-2xl font-bold text-white mb-1">Memuat…</p>
-                <p id="last-update-iso" class="text-xs text-slate-500 font-mono truncate"></p>
+                <div id="last-update-iso-wrapper" class="sync-marquee-wrapper text-xs text-slate-500 font-mono">
+                    <div id="last-update-iso" class="sync-marquee-track"></div>
+                </div>
             </div>
 
             <div class="glass-panel rounded-2xl p-5 sm:p-6 relative overflow-hidden group min-w-0">
@@ -627,6 +666,71 @@
                     return D + '-' + M + '-' + Y + ' ' + h + ':' + m + ' WIB';
                 }
 
+                var lastStatusState = { is_running: null, bentuk_aktif: null };
+
+                function renderIdleStatus() {
+                    var wrapper = document.getElementById('last-update-iso-wrapper');
+                    if (wrapper) wrapper.classList.remove('has-overflow');
+                    if (lastIso) {
+                        lastIso.className = 'sync-marquee-track text-slate-500';
+                        lastIso.innerHTML = 'Waktu Indonesia Barat (UTC+7)';
+                    }
+                    lastStatusState = { is_running: false, bentuk_aktif: null };
+                }
+
+                function renderRunningStatus(bentukAktif) {
+                    var wrapper = document.getElementById('last-update-iso-wrapper');
+                    if (!wrapper || !lastIso) return;
+
+                    var text = 'Sedang Sinkronisasi ' + (bentukAktif ? '(' + bentukAktif + ')' : '');
+                    var itemHtml = '<span class="inline-flex items-center text-emerald-400 font-medium shrink-0">' +
+                        '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-1.5 inline-block shrink-0"></span>' +
+                        text + '</span>';
+
+                    // Ukur lebar teks terlebih dahulu dengan 1 item statis
+                    wrapper.classList.remove('has-overflow');
+                    lastIso.className = 'sync-marquee-track';
+                    lastIso.style.removeProperty('--marquee-speed');
+                    lastIso.innerHTML = '<div class="sync-marquee-item inline-flex items-center">' + itemHtml + '</div>';
+
+                    // Pengukuran lebar
+                    var itemEl = lastIso.firstElementChild;
+                    var itemWidth = itemEl ? itemEl.offsetWidth : 0;
+                    var wrapperWidth = wrapper.clientWidth;
+
+                    // Jika panjang teks melebihi lebar kartu yang tersedia (baik di layar kecil maupun PC/laptop)
+                    if (itemWidth > wrapperWidth - 16) {
+                        wrapper.classList.add('has-overflow');
+                        // Render 2 item untuk loop teks berjalan tanpa jeda terputus
+                        lastIso.innerHTML = '<div class="sync-marquee-item inline-flex items-center pr-10">' + itemHtml + '</div>' +
+                                            '<div class="sync-marquee-item inline-flex items-center pr-10" aria-hidden="true">' + itemHtml + '</div>';
+
+                        var singleTotal = itemWidth + 40;
+                        var speedSec = Math.max(8, Math.round(singleTotal / 30));
+                        lastIso.style.setProperty('--marquee-speed', speedSec + 's');
+                        lastIso.classList.add('is-scrolling');
+                    } else {
+                        wrapper.classList.remove('has-overflow');
+                        lastIso.classList.remove('is-scrolling');
+                    }
+
+                    lastStatusState = { is_running: true, bentuk_aktif: bentukAktif };
+                }
+
+                window.addEventListener('resize', function () {
+                    if (lastStatusState.is_running) {
+                        renderRunningStatus(lastStatusState.bentuk_aktif);
+                    }
+                });
+
+                if (document.fonts && document.fonts.ready) {
+                    document.fonts.ready.then(function () {
+                        if (lastStatusState.is_running) {
+                            renderRunningStatus(lastStatusState.bentuk_aktif);
+                        }
+                    });
+                }
+
                 function loadStatus() {
                     fetch(base + '/api/status?_t=' + Date.now(), { cache: 'no-store' })
                         .then(function (r) { return r.json(); })
@@ -641,11 +745,13 @@
                             }
                             if (lastIso) {
                                 if (json.is_running) {
-                                    lastIso.innerHTML = '<span class="inline-flex items-center text-emerald-400 font-medium">' +
-                                        '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-1.5 inline-block"></span>' +
-                                        'Sedang Sinkronisasi ' + (json.bentuk_aktif ? '(' + json.bentuk_aktif + ')' : '') + '</span>';
+                                    if (lastStatusState.is_running !== true || lastStatusState.bentuk_aktif !== json.bentuk_aktif) {
+                                        renderRunningStatus(json.bentuk_aktif);
+                                    }
                                 } else {
-                                    lastIso.textContent = 'Waktu Indonesia Barat (UTC+7)';
+                                    if (lastStatusState.is_running !== false) {
+                                        renderIdleStatus();
+                                    }
                                 }
                             }
                             if (totalEl && json.total_data_tersedia != null) {
