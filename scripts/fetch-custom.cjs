@@ -496,6 +496,7 @@ async function fetchCustomData() {
     
     let fullNpsnList = [];
     let unrecognized_shapes = 0;
+    let nonQueryableCount = 0;
     if (provinceStartedCleanly[kodeWilayah]) {
       fullNpsnList = activeNpsnsByProv[kodeWilayah] || [];
       unrecognized_shapes = currentTotalEstimasi - (totalPulledByProv[kodeWilayah] || 0);
@@ -508,8 +509,11 @@ async function fetchCustomData() {
           allSchoolsByProv[kodeWilayah].push(...scanRes.nonQueryableSchools);
         }
         if (scanRes && scanRes.nonQueryableCount > 0) {
+          nonQueryableCount = scanRes.nonQueryableCount;
           unrecognized_shapes -= scanRes.nonQueryableCount;
           if (unrecognized_shapes < 0) unrecognized_shapes = 0;
+        } else if (unrecognized_shapes > 0) {
+          nonQueryableCount = unrecognized_shapes;
         }
       }
     } else {
@@ -554,6 +558,7 @@ async function fetchCustomData() {
         waktuMulai: waktuMulai,
         activeNpsnList: fullNpsnList,
         unrecognized_shapes: unrecognized_shapes,
+        nonQueryableCount: nonQueryableCount,
         totalEstimasi: currentTotalEstimasi,
         duplicates,
         isCleanScan: provinceStartedCleanly[kodeWilayah],

@@ -674,8 +674,28 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
 
         const paginationHtml = '<div style="font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 6px;">Menampilkan maksimal 5 aktivitas sinkronisasi terbaru</div>';
 
+        const pStatusMap = new Map((provStatusList || []).map(p => [cleanName(p.nama_provinsi), p]));
+        const compDataMap = new Map(((compareCache && compareCache.value) || []).map(c => [cleanName(c.nama), c]));
+
         let logHtml = logAktivitasList.length > 0 ? logAktivitasList.map(log => {
-          const totalData = log.total_baru + log.total_diperbarui + log.total_tidak_berubah;
+          const cName = cleanName(log.nama_provinsi);
+          const pStat = pStatusMap.get(cName);
+          const compItem = compDataMap.get(cName);
+
+          const baseProcessed = (log.total_baru || 0) + (log.total_diperbarui || 0) + (log.total_tidak_berubah || 0);
+          const targetTotal = (compItem?.total_db > 0 ? compItem.total_db : (compItem?.total_api || pStat?.total_db || 0));
+
+          let nonQueryable = 0;
+          if (typeof log.total_non_queryable === 'number' && log.total_non_queryable > 0) {
+            nonQueryable = log.total_non_queryable;
+          } else if (pStat?.api_unrecognized_shapes > 0) {
+            nonQueryable = pStat.api_unrecognized_shapes;
+          } else if (targetTotal > baseProcessed) {
+            nonQueryable = targetTotal - baseProcessed;
+          }
+
+          const totalData = baseProcessed + nonQueryable;
+
           return `<div class="log-item-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
               <strong style="color: var(--text-main); font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
@@ -688,10 +708,11 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
               </span>
             </div>
             <div class="log-stats-grid">
-              <div class="log-badge-mini success">+${log.total_baru} Baru</div>
-              <div class="log-badge-mini info">↻ ${log.total_diperbarui} Update</div>
-              <div class="log-badge-mini danger">✕ ${log.total_dihapus} Hapus</div>
-              <div class="log-badge-mini muted">✓ ${log.total_tidak_berubah} Tetap</div>
+              <div class="log-badge-mini success">+${(log.total_baru || 0).toLocaleString('id-ID')} Baru</div>
+              <div class="log-badge-mini info">↻ ${(log.total_diperbarui || 0).toLocaleString('id-ID')} Update</div>
+              <div class="log-badge-mini danger">✕ ${(log.total_dihapus || 0).toLocaleString('id-ID')} Hapus</div>
+              <div class="log-badge-mini muted">✓ ${(log.total_tidak_berubah || 0).toLocaleString('id-ID')} Tetap</div>
+              <div class="log-badge-mini ${nonQueryable > 0 ? 'special' : 'muted'}" title="${nonQueryable > 0 ? 'Bentuk pendidikan khusus / non-queryable di API kementerian' : 'Tidak ada data non-queryable'}">${nonQueryable > 0 ? '★ ' : ''}${nonQueryable.toLocaleString('id-ID')} Non-Queryable</div>
             </div>
             <div style="text-align: left; margin-top: 10px; font-weight: 700; font-size: 13px; color: var(--text-subtle); border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; display: flex; justify-content: space-between;">
               <span>Total Processed</span>
@@ -989,15 +1010,22 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
     .log-item-card:hover { border-color: rgba(99, 102, 241, 0.3); }
 
     .log-stats-grid {
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(75px, 1fr)); gap: 6px; text-align: center;
     }
     .log-badge-mini {
-      padding: 4px 6px; border-radius: 8px; font-size: 12px; font-weight: 700;
+      padding: 4px 6px; border-radius: 8px; font-size: 11px; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .log-badge-mini.success { background: rgba(16, 185, 129, 0.12); color: #34d399; }
     .log-badge-mini.info { background: rgba(6, 182, 212, 0.12); color: #38bdf8; }
     .log-badge-mini.danger { background: rgba(244, 63, 94, 0.12); color: #fb7185; }
     .log-badge-mini.muted { background: rgba(255, 255, 255, 0.05); color: var(--text-muted); }
+    .log-badge-mini.special {
+      background: rgba(168, 85, 247, 0.15);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      box-shadow: 0 0 10px rgba(168, 85, 247, 0.15);
+    }
 
     .pagination-wrapper {
       display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 18px;
@@ -1019,6 +1047,8 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
       .grid { gap: 10px; }
       .stat-box { padding: 14px 8px; }
       .stat-val { font-size: 18px; }
+      .log-stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .log-stats-grid .log-badge-mini:last-child:nth-child(odd) { grid-column: span 2; }
     }
   </style>
   <script>

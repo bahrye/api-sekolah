@@ -166,7 +166,7 @@ export async function onRequestPost(context) {
           terakhir_sukses: new Date().toISOString(),
           api_duplicates: customParams.duplicates?.length || 0,
           api_empty_npsn: totalTanpaNpsn,
-          api_unrecognized_shapes: customParams.unrecognized_shapes || 0,
+          api_unrecognized_shapes: customParams.nonQueryableCount ?? (customParams.unrecognized_shapes || 0),
         };
         if (currentDbCount > 0) {
           provStatusData.total_db = currentDbCount;
@@ -224,7 +224,7 @@ export async function onRequestPost(context) {
               item.terakhir_sukses = new Date().toISOString();
               item.api_duplicates = customParams.duplicates?.length || 0;
               item.api_empty_npsn = totalTanpaNpsn || 0;
-              item.api_unrecognized_shapes = customParams.unrecognized_shapes || 0;
+              item.api_unrecognized_shapes = customParams.nonQueryableCount ?? (customParams.unrecognized_shapes || 0);
               item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);
               item.selisih = item.raw_selisih - (item.api_duplicates || 0);
               if (item.selisih <= 0) {
