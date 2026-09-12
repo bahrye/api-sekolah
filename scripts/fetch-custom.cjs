@@ -78,6 +78,9 @@ async function postBatchToWorker(dataList, bentukAktif, offset, isFinished, cust
     if (customSyncParams.duplicates) {
       payload.duplicates = customSyncParams.duplicates;
     }
+    if (customSyncParams.provStats) {
+      payload.provStats = customSyncParams.provStats;
+    }
   }
   const res = await fetch(`${WORKER_URL}/sync-batch`, {
     method: 'POST',
@@ -394,6 +397,7 @@ async function fetchCustomData() {
   let allSchoolsByProv = {};
 
   let currentBentukEstimasi = 0;
+  let provStats = { baru: 0, diperbarui: 0, tidakBerubah: 0 };
 
   async function performProvinceCleanup(kodeWilayah, namaWilayah) {
     console.log(`✨ Selesai sinkronisasi seluruh bentuk untuk provinsi ${kodeWilayah} (${namaWilayah}). Melakukan pembersihan...`);
@@ -462,7 +466,8 @@ async function fetchCustomData() {
         totalEstimasi: currentTotalEstimasi,
         duplicates,
         isCleanScan: provinceStartedCleanly[kodeWilayah],
-        kodeWilayah
+        kodeWilayah,
+        provStats
       });
       console.log(`🧹 Berhasil membersihkan data lama untuk ${provNameDB}. ${stats?.dihapus || 0} sekolah dihapus dan aktivitas dicatat.`);
     } catch (e) {
@@ -491,6 +496,7 @@ async function fetchCustomData() {
       activeNpsnsByProv[kodeWilayah] = [];
       allSchoolsByProv[kodeWilayah] = [];
       totalPulledByProv[kodeWilayah] = 0;
+      provStats = { baru: 0, diperbarui: 0, tidakBerubah: 0 };
       
       try {
         const totalUrl = `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${kodeWilayah}?limit=1&offset=0`;
@@ -599,6 +605,11 @@ async function fetchCustomData() {
       
       const { stats } = await postBatchToWorker(dataList, bentukAktif, offset, false, customParams);
       currentProvinceStarted = true;
+      if (stats) {
+        provStats.baru += (stats.baru || 0);
+        provStats.diperbarui += (stats.diperbarui || 0);
+        provStats.tidakBerubah += (stats.tidakBerubah || 0);
+      }
       
       console.log(`Offset ${offset - limit} [${bentukAktif}]: ${dataList.length} ditarik — ${stats.tidakBerubah} tetap, ${stats.baru} baru, ${stats.diperbarui} update.`);
 

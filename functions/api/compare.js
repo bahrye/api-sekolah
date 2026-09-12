@@ -101,12 +101,31 @@ export async function onRequestGet(context) {
       rekapLuarNegeri = rekapModule.default?.data?.luar_negeri || {};
     } catch (e) {}
 
+    // Ambil data hitungan riil dari View Supabase v_rekap_provinsi jika tersedia
+    let dbTotalsMap = new Map();
+    try {
+      const { data: vRekap } = await supabase
+        .from('v_rekap_provinsi')
+        .select('*');
+      if (vRekap && vRekap.length > 0) {
+        vRekap.forEach(r => {
+          if (r.nama_provinsi) {
+            dbTotalsMap.set(cleanName(r.nama_provinsi), r.total_sekolah || 0);
+          }
+        });
+      }
+    } catch (e) {}
+
     const compared = apiData.map((item) => {
       const cName = cleanName(item.nama);
       const syncInfo = statusMap.get(cName);
       
       let dbTotal = 0;
-      if (item.nama === 'LUAR NEGERI') {
+      if (dbTotalsMap.has(cName)) {
+        dbTotal = dbTotalsMap.get(cName);
+      } else if (syncInfo && syncInfo.total_db > 0) {
+        dbTotal = syncInfo.total_db;
+      } else if (item.nama === 'LUAR NEGERI') {
         dbTotal = Object.values(rekapLuarNegeri).reduce((total, negaraObj) => {
           return total + Object.values(negaraObj).reduce((sum, count) => sum + count, 0);
         }, 0);

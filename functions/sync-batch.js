@@ -83,20 +83,38 @@ export async function onRequestPost(context) {
     // Jika provinsi selesai, catat ke provinsi_sync_status, log_aktivitas_provinsi, dan npsn_ganda_detail
     if (isFinished && body.namaProvinsi && body.namaProvinsi !== 'SEMUA') {
       try {
-        await supabase.from('provinsi_sync_status').upsert({
+        // Ambil hitungan riil dari DB untuk provinsi ini jika memungkinkan
+        let currentDbCount = 0;
+        try {
+          const { count } = await supabase
+            .from('sekolah')
+            .select('*', { count: 'exact', head: true })
+            .ilike('nama_provinsi', `%${body.namaProvinsi}%`);
+          currentDbCount = count || 0;
+        } catch (e) {}
+
+        const provStatusData = {
           nama_provinsi: body.namaProvinsi,
           terakhir_sukses: new Date().toISOString(),
           api_duplicates: customParams.duplicates?.length || 0,
           api_empty_npsn: totalTanpaNpsn,
           api_unrecognized_shapes: customParams.unrecognized_shapes || 0,
-        });
+        };
+        if (currentDbCount > 0) {
+          provStatusData.total_db = currentDbCount;
+        }
+        await supabase.from('provinsi_sync_status').upsert(provStatusData);
+
+        const finalBaru = customParams.provStats?.baru ?? (totalBaru > 0 ? totalBaru : (currentStatus?.total_baru || 0));
+        const finalDiperbarui = customParams.provStats?.diperbarui ?? (totalDiperbarui > 0 ? totalDiperbarui : (currentStatus?.total_diperbarui || 0));
+        const finalTidakBerubah = customParams.provStats?.tidakBerubah ?? (totalTidakBerubah > 0 ? totalTidakBerubah : (currentStatus?.total_tidak_berubah || 0));
 
         await supabase.from('log_aktivitas_provinsi').insert({
           nama_provinsi: body.namaProvinsi,
-          total_baru: stats.baru,
-          total_diperbarui: stats.diperbarui,
-          total_dihapus: 0,
-          total_tidak_berubah: stats.tidakBerubah,
+          total_baru: finalBaru,
+          total_diperbarui: finalDiperbarui,
+          total_dihapus: customParams.dihapus || 0,
+          total_tidak_berubah: finalTidakBerubah,
           waktu_selesai: new Date().toISOString(),
         });
 

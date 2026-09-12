@@ -20,3 +20,18 @@ SET
   total_estimasi = (SELECT COUNT(*) FROM public.sekolah),
   updated_at = NOW()
 WHERE id = 1;
+
+-- 5. Tambahkan kolom total_db pada tabel provinsi_sync_status (untuk snapshot hitungan saat sinkronisasi)
+ALTER TABLE public.provinsi_sync_status 
+  ADD COLUMN IF NOT EXISTS total_db INT DEFAULT 0;
+
+-- 6. View Rekap Total Sekolah Per Provinsi (Real-time agregat untuk Perbandingan Data Belajar.id vs DB)
+CREATE OR REPLACE VIEW public.v_rekap_provinsi AS
+SELECT 
+  nama_provinsi,
+  COUNT(*)::int AS total_sekolah
+FROM public.sekolah
+GROUP BY nama_provinsi;
+
+-- Berikan izin akses baca view ke semua peran API Supabase
+GRANT SELECT ON public.v_rekap_provinsi TO anon, authenticated, service_role;
