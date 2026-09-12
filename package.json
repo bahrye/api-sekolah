@@ -8,6 +8,7 @@
     "migrate:supabase": "node scripts/migrate-to-supabase.js",
     "sync:supabase": "node scripts/sync-supabase.js",
     "sync:sekolah": "node scripts/fetch-custom.cjs",
+    "reset:sync": "node scripts/reset-sync-status.js",
     "export:static": "node scripts/export-static-provinsi.cjs",
     "ship": "node scripts/ship.js",
     "ship:all": "node scripts/ship.js && npm run deploy:cf"
