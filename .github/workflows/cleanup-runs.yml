@@ -6,9 +6,17 @@ on:
   workflow_dispatch:
     inputs:
       keep_count:
-        description: 'Jumlah riwayat workflow run terbaru yang ingin dipertahankan (default: 4)'
+        description: 'Jumlah riwayat workflow run selesai yang ingin dipertahankan (default: 2)'
         required: true
-        default: '4'
+        default: '2'
+      scope:
+        description: 'Cakupan: "global" (total seluruh repo) atau "per_workflow" (per masing-masing workflow)'
+        required: true
+        type: choice
+        default: 'global'
+        options:
+          - global
+          - per_workflow
 
 permissions:
   actions: write
@@ -32,5 +40,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
-          KEEP_RUNS_COUNT: ${{ github.event.inputs.keep_count || '4' }}
+          KEEP_RUNS_COUNT: ${{ github.event.inputs.keep_count || '2' }}
+          CLEANUP_SCOPE: ${{ github.event.inputs.scope || 'global' }}
         run: node scripts/clean-github-runs.cjs cleanup-history

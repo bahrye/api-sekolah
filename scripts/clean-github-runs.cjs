@@ -19,6 +19,7 @@ const REPO = repoName || 'api-sekolah';
 const TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
 const CURRENT_RUN_ID = process.env.GITHUB_RUN_ID ? String(process.env.GITHUB_RUN_ID) : null;
 const KEEP_COUNT = Math.max(1, parseInt(process.env.KEEP_RUNS_COUNT || '4', 10));
+const CLEANUP_SCOPE = (process.env.CLEANUP_SCOPE || 'global').toLowerCase();
 
 async function githubFetch(endpoint, options = {}) {
   const url = endpoint.startsWith('http') ? endpoint : `https://api.github.com/repos/${OWNER}/${REPO}${endpoint}`;
@@ -147,45 +148,76 @@ async function cleanupOldHistory() {
     return;
   }
 
-  console.log(`\n🧹 Memeriksa riwayat workflow run lama untuk dibersihkan (target per workflow: simpan ${KEEP_COUNT} run terbaru)...`);
+  const isGlobal = CLEANUP_SCOPE === 'global';
+  console.log(`\n🧹 Memeriksa riwayat workflow run lama untuk dibersihkan...`);
+  console.log(`   Mode Cakupan : ${isGlobal ? '🌐 GLOBAL (seluruh repositori)' : '📁 PER WORKFLOW'}`);
+  console.log(`   Target Simpan: ${KEEP_COUNT} run selesai terbaru`);
+
   const allRuns = await getAllRuns();
 
-  // Ambil hanya run yang sudah selesai (completed, cancelled, failure, dll)
+  // Catat run yang sedang berlangsung / antre (TIDAK AKAN DIHAPUS)
+  const activeRuns = allRuns.filter(r => r.status === 'in_progress' || r.status === 'queued');
+  if (activeRuns.length > 0) {
+    console.log(`\n⚡ Ditemukan ${activeRuns.length} proses yang SEDANG BERJALAN / ANTRE (AMAN, tidak akan dihapus):`);
+    activeRuns.forEach(a => console.log(`   - [${a.name}] Run #${a.id} (${a.status})`));
+  }
+
+  // Ambil hanya run yang sudah selesai (completed, cancelled, failure, dll) selain run pembersihan saat ini
   const finishedRuns = allRuns.filter(r => r.status === 'completed' && String(r.id) !== CURRENT_RUN_ID);
 
   if (finishedRuns.length === 0) {
-    console.log('✨ Belum ada riwayat run yang selesai untuk dibersihkan.');
+    console.log('\n✨ Belum ada riwayat run yang selesai untuk dibersihkan.');
     return;
   }
 
-  // Kelompokkan run berdasarkan nama workflow
-  const runsByWorkflow = {};
-  for (const r of finishedRuns) {
-    const wfName = r.name || 'Workflow Lain';
-    if (!runsByWorkflow[wfName]) runsByWorkflow[wfName] = [];
-    runsByWorkflow[wfName].push(r);
-  }
-
   let allRunsToDelete = [];
-  for (const [wfName, runs] of Object.entries(runsByWorkflow)) {
-    // Urutkan dari yang terbaru ke terlama
-    runs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    
-    const toKeep = runs.slice(0, KEEP_COUNT);
-    const toDelete = runs.slice(KEEP_COUNT);
 
-    console.log(`\n📋 Workflow: "${wfName}"`);
-    console.log(`   Total selesai: ${runs.length} | Dipertahankan: ${toKeep.length} | Akan dihapus: ${toDelete.length}`);
+  if (isGlobal) {
+    // Mode GLOBAL: urutkan seluruh run yang sudah selesai secara global dari terbaru ke terlama
+    finishedRuns.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    
+    const toKeep = finishedRuns.slice(0, KEEP_COUNT);
+    const toDelete = finishedRuns.slice(KEEP_COUNT);
+
+    console.log(`\n📋 Ringkasan Pembersihan Global:`);
+    console.log(`   Total selesai di repo : ${finishedRuns.length}`);
+    console.log(`   Dipertahankan         : ${toKeep.length}`);
+    console.log(`   Akan dihapus          : ${toDelete.length}`);
+
     if (toKeep.length > 0) {
-      console.log(`   Daftar yang dipertahankan:`);
-      toKeep.forEach(k => console.log(`     - Run #${k.id} [${k.conclusion || k.status}] (${k.created_at})`));
+      console.log(`   Daftar run yang dipertahankan:`);
+      toKeep.forEach(k => console.log(`     - [${k.name}] Run #${k.id} [${k.conclusion || k.status}] (${k.created_at})`));
     }
 
     allRunsToDelete.push(...toDelete);
+  } else {
+    // Mode PER WORKFLOW: kelompokkan per nama workflow
+    const runsByWorkflow = {};
+    for (const r of finishedRuns) {
+      const wfName = r.name || 'Workflow Lain';
+      if (!runsByWorkflow[wfName]) runsByWorkflow[wfName] = [];
+      runsByWorkflow[wfName].push(r);
+    }
+
+    for (const [wfName, runs] of Object.entries(runsByWorkflow)) {
+      runs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      const toKeep = runs.slice(0, KEEP_COUNT);
+      const toDelete = runs.slice(KEEP_COUNT);
+
+      console.log(`\n📋 Workflow: "${wfName}"`);
+      console.log(`   Total selesai: ${runs.length} | Dipertahankan: ${toKeep.length} | Akan dihapus: ${toDelete.length}`);
+      if (toKeep.length > 0) {
+        console.log(`   Daftar yang dipertahankan:`);
+        toKeep.forEach(k => console.log(`     - Run #${k.id} [${k.conclusion || k.status}] (${k.created_at})`));
+      }
+
+      allRunsToDelete.push(...toDelete);
+    }
   }
 
   if (allRunsToDelete.length === 0) {
-    console.log(`\n✨ Semua workflow sudah bersih (masing-masing <= ${KEEP_COUNT} riwayat).`);
+    console.log(`\n✨ Riwayat workflow sudah bersih (target <= ${KEEP_COUNT} riwayat).`);
     return;
   }
 

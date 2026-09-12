@@ -71,4 +71,5 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           KEEP_RUNS_COUNT: "4"
+          CLEANUP_SCOPE: "per_workflow"
         run: node scripts/clean-github-runs.cjs cleanup-history
