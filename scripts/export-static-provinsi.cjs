@@ -101,6 +101,43 @@ async function fetchSchoolsForProvince(provName, expectedTotal = 0) {
   return rows;
 }
 
+const DAFTAR_PROVINSI_DEFAULT = [
+  { nama: 'LUAR NEGERI', total: 221 },
+  { nama: 'PROV. ACEH', total: 13871 },
+  { nama: 'PROV. BALI', total: 6092 },
+  { nama: 'PROV. BANTEN', total: 20586 },
+  { nama: 'PROV. BENGKULU', total: 4958 },
+  { nama: 'PROV. D.I. YOGYAKARTA', total: 8646 },
+  { nama: 'PROV. D.K.I. JAKARTA', total: 11585 },
+  { nama: 'PROV. GORONTALO', total: 3352 },
+  { nama: 'PROV. JAMBI', total: 9246 },
+  { nama: 'PROV. JAWA BARAT', total: 85424 },
+  { nama: 'PROV. JAWA TENGAH', total: 67113 },
+  { nama: 'PROV. JAWA TIMUR', total: 91670 },
+  { nama: 'PROV. KALIMANTAN BARAT', total: 11697 },
+  { nama: 'PROV. KALIMANTAN SELATAN', total: 10304 },
+  { nama: 'PROV. KALIMANTAN TENGAH', total: 8091 },
+  { nama: 'PROV. KALIMANTAN TIMUR', total: 7024 },
+  { nama: 'PROV. KALIMANTAN UTARA', total: 1690 },
+  { nama: 'PROV. KEPULAUAN BANGKA BELITUNG', total: 2438 },
+  { nama: 'PROV. KEPULAUAN RIAU', total: 3690 },
+  { nama: 'PROV. LAMPUNG', total: 16594 },
+  { nama: 'PROV. MALUKU', total: 5781 },
+  { nama: 'PROV. MALUKU UTARA', total: 4640 },
+  { nama: 'PROV. NUSA TENGGARA BARAT', total: 14835 },
+  { nama: 'PROV. NUSA TENGGARA TIMUR', total: 15219 },
+  { nama: 'PROV. PAPUA', total: 2329 },
+  { nama: 'PROV. RIAU', total: 13849 },
+  { nama: 'PROV. SULAWESI BARAT', total: 4456 },
+  { nama: 'PROV. SULAWESI SELATAN', total: 19964 },
+  { nama: 'PROV. SULAWESI TENGAH', total: 9046 },
+  { nama: 'PROV. SULAWESI TENGGARA', total: 7787 },
+  { nama: 'PROV. SULAWESI UTARA', total: 6779 },
+  { nama: 'PROV. SUMATERA BARAT', total: 12560 },
+  { nama: 'PROV. SUMATERA SELATAN', total: 15801 },
+  { nama: 'PROV. SUMATERA UTARA', total: 30504 }
+];
+
 async function run() {
   console.log('🚀 Memulai ekspor data sekolah ke Static JSON...');
   const t0 = Date.now();
@@ -109,16 +146,29 @@ async function run() {
   const isSample = args.includes('--sample');
   const provArg = args.find(a => a.startsWith('--prov='))?.split('=')[1];
 
-  // 1. Ambil daftar provinsi dari view v_rekap_provinsi
-  const { data: provList, error: provErr } = await supabase
-    .from('v_rekap_provinsi')
-    .select('nama_provinsi, total_sekolah')
-    .order('nama_provinsi');
-
-  if (provErr) {
-    console.error('❌ Gagal mengambil daftar provinsi:', provErr.message);
-    process.exit(1);
+  // 1. Ambil daftar provinsi & hitungan total sekolah secara cepat tanpa scan berat
+  const provMapCount = new Map();
+  try {
+    const { data: statusRows } = await supabase
+      .from('provinsi_sync_status')
+      .select('nama_provinsi, total_db');
+    if (statusRows && statusRows.length > 0) {
+      for (const s of statusRows) {
+        const clean = (s.nama_provinsi || '').toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
+        provMapCount.set(clean, s.total_db || 0);
+      }
+    }
+  } catch (e) {
+    // Fallback aman jika tabel status belum siap
   }
+
+  const provList = DAFTAR_PROVINSI_DEFAULT.map(p => {
+    const clean = p.nama.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
+    return {
+      nama_provinsi: p.nama,
+      total_sekolah: provMapCount.get(clean) || p.total
+    };
+  });
 
   let targetProvinces = provList;
 
@@ -126,6 +176,10 @@ async function run() {
     targetProvinces = provList.filter(p =>
       p.nama_provinsi.toLowerCase().includes(provArg.toLowerCase())
     );
+    // Jika tidak cocok dengan nama standar, buat entri langsung dari argumen
+    if (targetProvinces.length === 0) {
+      targetProvinces = [{ nama_provinsi: provArg, total_sekolah: 0 }];
+    }
     console.log(`🎯 Memfilter provinsi spesifik: "${provArg}" (${targetProvinces.length} ditemukan)`);
   } else if (isSample) {
     // Ambil 2 provinsi dengan jumlah data kecil untuk uji coba cepat
