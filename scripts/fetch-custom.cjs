@@ -229,8 +229,8 @@ async function fetchCustomData() {
   let skippedProvinces = [];
   if (isCronSchedule) {
     try {
-      console.log(`Mengambil data perbandingan (Smart Sync) dari ${WORKER_URL}/api/compare...`);
-      const compareRes = await fetch(`${WORKER_URL}/api/compare`);
+      console.log(`Mengambil data perbandingan terbaru (Smart Sync) dari ${WORKER_URL}/api/compare?refresh=true...`);
+      const compareRes = await fetch(`${WORKER_URL}/api/compare?refresh=true`);
       if (compareRes.ok) {
         const compareJson = await compareRes.json();
         if (compareJson.success && compareJson.data) {
