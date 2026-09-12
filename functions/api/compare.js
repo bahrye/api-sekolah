@@ -140,15 +140,8 @@ export async function onRequestGet(context) {
 
       const raw_selisih = item.total_api - dbTotal;
       let selisih = raw_selisih - (syncInfo?.api_duplicates || 0);
-      let is_sinkron_walau_selisih = false;
+      const is_sinkron_walau_selisih = (selisih === 0);
       const extra_in_db = Math.max(0, dbTotal - item.total_api);
-
-      const todayDateWib = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const isSyncedToday = Boolean(syncInfo?.terakhir_sukses && syncInfo.terakhir_sukses.split(/[ T]/)[0] === todayDateWib);
-
-      if (selisih <= 0 || (raw_selisih <= 0 && isSyncedToday)) {
-        is_sinkron_walau_selisih = true;
-      }
 
       return {
         kode: item.kode,

@@ -100,9 +100,7 @@ export async function onRequestGet(context) {
           item.extra_in_db = Math.max(0, (item.total_db || 0) - (item.total_api || 0));
 
           const isSyncedToday = Boolean(item.terakhir_sukses && item.terakhir_sukses.split(/[ T]/)[0] === todayDateWIB);
-          if (item.selisih <= 0 || (item.raw_selisih <= 0 && isSyncedToday)) {
-            item.is_sinkron_walau_selisih = true;
-          }
+          item.is_sinkron_walau_selisih = (item.selisih === 0);
         });
 
         compareCache = { value: rawCompare, updated_at: cacheRow.updated_at };
@@ -200,8 +198,8 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             }
           });
           compareCache.value.sort((a, b) => {
-            const aDiff = (a.selisih > 0 && !a.is_sinkron_walau_selisih) ? 1 : 0;
-            const bDiff = (b.selisih > 0 && !b.is_sinkron_walau_selisih) ? 1 : 0;
+            const aDiff = (a.selisih !== 0 || a.raw_selisih !== 0) ? 1 : 0;
+            const bDiff = (b.selisih !== 0 || b.raw_selisih !== 0) ? 1 : 0;
             if (aDiff !== bDiff) return bDiff - aDiff;
             return a.nama.localeCompare(b.nama);
           });
@@ -211,28 +209,30 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             const isSyncedToday = d.terakhir_sukses && d.terakhir_sukses.split(/[ T]/)[0] === todayDate;
 
             let selisihColor = 'var(--danger)';
-            let statusIcon = '⚠️ Berbeda';
+            let statusIcon = '⚠️ Belum Sinkron';
             const extraInDb = (d.total_db || 0) - (d.total_api || 0);
             let selisihDisplay = `${d.selisih > 0 ? '+' : ''}${d.selisih.toLocaleString('id-ID')}`;
 
-            if (d.selisih === 0) {
+            if (d.raw_selisih === 0 && d.selisih === 0) {
               selisihColor = 'var(--success)';
               statusIcon = '✅ Sinkron';
               selisihDisplay = '0';
-            } else if (extraInDb > 0 && d.is_sinkron_walau_selisih) {
-              selisihColor = 'var(--success)';
-              statusIcon = '✅ Sinkron';
-              selisihDisplay = `<span style="color: var(--success);" title="Database memiliki ${extraInDb.toLocaleString('id-ID')} data sekolah lebih lengkap dibanding counter global Belajar.id">+${extraInDb.toLocaleString('id-ID')} di DB</span>`;
-            } else if (d.is_sinkron_walau_selisih) {
+            } else if (d.selisih === 0 && (d.api_duplicates || 0) > 0) {
               selisihColor = 'var(--success)';
               statusIcon = '✅ Sinkron';
               selisihDisplay = '0';
+            } else if (extraInDb > 0) {
+              selisihColor = 'var(--warning)';
+              statusIcon = '⚠️ Data Lebih di DB';
+              selisihDisplay = `<span style="color: var(--warning);" title="Database memiliki ${extraInDb.toLocaleString('id-ID')} data sekolah lebih dibanding API Belajar.id">+${extraInDb.toLocaleString('id-ID')} di DB</span>`;
+            } else if (d.selisih > 0) {
+              selisihColor = isSyncedToday ? 'var(--warning)' : 'var(--danger)';
+              statusIcon = isSyncedToday ? '⚠️ Sinkron Terputus' : '⚠️ Belum Sinkron';
+              selisihDisplay = `+${d.selisih.toLocaleString('id-ID')}`;
             } else if (d.selisih < 0) {
               selisihColor = 'var(--warning)';
-              statusIcon = '⚠️ Ada Pengurangan Data';
-            } else if (isSyncedToday) {
-              selisihColor = 'var(--warning)';
-              statusIcon = '⚠️ Terputus / Ada Data Gagal';
+              statusIcon = '⚠️ Ada Selisih';
+              selisihDisplay = `${d.selisih.toLocaleString('id-ID')}`;
             }
 
             const displayStyle = idx >= 5 ? 'display: none;' : '';
