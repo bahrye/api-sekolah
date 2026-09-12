@@ -96,13 +96,15 @@ export async function onRequestPost(context) {
           try {
             let from = 0;
             const dbNpsns = [];
-            const cleanP = cleanName(body.namaProvinsi);
+            let provQuery = (body.namaProvinsi || '').replace(/^PROVINSI|^PROV\.?\s*/i, '').trim();
+            if (provQuery.includes('JAKARTA')) provQuery = 'JAKARTA';
+            if (provQuery.includes('YOGYAKARTA')) provQuery = 'YOGYAKARTA';
 
             while (true) {
               const { data, error: fetchErr } = await supabase
                 .from('sekolah')
                 .select('npsn')
-                .ilike('nama_provinsi', `%${cleanP}%`)
+                .ilike('nama_provinsi', `%${provQuery}%`)
                 .order('npsn')
                 .range(from, from + 999);
 
