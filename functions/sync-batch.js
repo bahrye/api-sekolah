@@ -215,10 +215,8 @@ export async function onRequestPost(context) {
               item.api_unrecognized_shapes = customParams.nonQueryableCount ?? (customParams.unrecognized_shapes || 0);
               item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);
               item.selisih = item.raw_selisih - (item.api_duplicates || 0);
-              if (item.selisih <= 0) {
-                item.selisih = 0;
-                item.is_sinkron_walau_selisih = true;
-              }
+              item.extra_in_db = Math.max(0, (item.total_db || 0) - (item.total_api || 0));
+              item.is_sinkron_walau_selisih = (item.selisih === 0);
               await supabase.from('cache_data').upsert({
                 key: 'perbandingan',
                 value: JSON.stringify(list),
