@@ -60,8 +60,11 @@ export async function onRequestGet(context) {
 
     let isRunning = false;
     if (activeRow.updated_at && !selesai) {
-      const lastUpdated = new Date(activeRow.updated_at);
-      if (Date.now() - lastUpdated.getTime() < 90 * 1000) {
+      let t = new Date(activeRow.updated_at).getTime();
+      if (isNaN(t)) {
+        t = new Date(activeRow.updated_at.replace(' ', 'T')).getTime();
+      }
+      if (!isNaN(t) && (Date.now() - t < 120 * 1000)) {
         isRunning = true;
       }
     }

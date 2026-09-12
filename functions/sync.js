@@ -96,17 +96,20 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           progressPercent = 100;
         }
 
+        let activeProvince = null;
+        if (activeRow.bentuk_aktif) {
+          const match = activeRow.bentuk_aktif.match(/\((.*?)\)/);
+          if (match) activeProvince = match[1];
+        }
+
         let isRunning = false;
         if (activeRow.updated_at && !selesai) {
-          // Ganti spasi dengan T agar formatnya valid ISO 8601, tambahkan +07:00 karena waktu sekarang WIB
-          const safeDateStr = activeRow.updated_at.replace(' ', 'T') + '+07:00';
-          const lastUpdated = new Date(safeDateStr);
-          const now = new Date();
-          const diffMs = now - lastUpdated;
-          if (diffMs < 30 * 1000) { // 30 detik
+          const lastUpdatedMs = parseDateMs(activeRow.updated_at);
+          if (lastUpdatedMs > 0 && (Date.now() - lastUpdatedMs < 120 * 1000)) { // 120 detik (2 menit)
             isRunning = true;
           }
         }
+        const isActive = isRunning;
 
 
 
@@ -260,6 +263,11 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
 
           const hasDiff = Math.abs(d.selisih) > 0 && !d.is_sinkron_walau_selisih;
 
+          // Jika sedang disinkronkan saat ini, selalu sertakan dalam antrean
+          if (activeProvince && cleanName(activeProvince) === cleanName(d.nama)) {
+            return true;
+          }
+
           // Jika sudah tersinkron hari ini dan TIDAK ada selisih, selalu sembunyikan
           if (d.isSyncedToday && !hasDiff) return false;
 
@@ -280,6 +288,18 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             return true;
           }
         }) : [];
+
+        // Pastikan provinsi yang sedang aktif disinkronkan selalu muncul di tabel antrean
+        if (activeProvince && !diffData.some(d => cleanName(d.nama) === cleanName(activeProvince))) {
+          diffData.unshift({
+            nama: activeProvince,
+            total_api: totalEstimasi || 0,
+            total_db: totalSynced || 0,
+            selisih: (totalEstimasi - totalSynced) || 0,
+            isSyncedToday: false,
+            isSyncedRecently: false
+          });
+        }
 
         if (isMandatoryUpdateDay) {
           diffData.sort((a, b) => {
@@ -361,6 +381,16 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           });
         }
 
+        // Posisikan provinsi yang sedang aktif disinkronkan di urutan teratas antrean (#1)
+        if (activeProvince) {
+          const cleanActive = cleanName(activeProvince);
+          diffData.sort((a, b) => {
+            const aActive = cleanName(a.nama) === cleanActive ? 1 : 0;
+            const bActive = cleanName(b.nama) === cleanActive ? 1 : 0;
+            return bActive - aActive;
+          });
+        }
+
         const dynamicFullSyncLimit = sumTotalApi > 0 ? Math.ceil(sumTotalApi / 2) : 250000;
         const BATAS_AMAN = isMandatoryUpdateDay ? dynamicFullSyncLimit : 100000;
         let syncedToday = 0;
@@ -379,27 +409,14 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         } catch (e) { }
 
         if (isCustom && activeRow.updated_at) {
-          const updatedAt = new Date(activeRow.updated_at.replace(' ', 'T') + '+07:00').getTime();
-          if (Date.now() - updatedAt < 5 * 60000) {
+          const updatedAt = parseDateMs(activeRow.updated_at);
+          if (updatedAt > 0 && (Date.now() - updatedAt < 5 * 60000)) {
             const currentRunning = (activeRow.total_baru || 0) + (activeRow.total_diperbarui || 0) + (activeRow.total_tidak_berubah || 0);
             syncedToday += currentRunning;
           }
         }
         const SISA_KUOTA = Math.max(0, BATAS_AMAN - syncedToday);
         let runningTotalEstimasi = 0;
-
-        let activeProvince = null;
-        let isActive = false;
-        if (activeRow && activeRow.updated_at) {
-          const updatedAt = new Date(activeRow.updated_at.replace(' ', 'T') + '+07:00').getTime();
-          if (Date.now() - updatedAt < 5 * 60000) {
-            isActive = true;
-            if (activeRow.bentuk_aktif) {
-              const match = activeRow.bentuk_aktif.match(/\((.*?)\)/);
-              if (match) activeProvince = match[1];
-            }
-          }
-        }
 
         let bannerHtml = '';
         if (isMandatoryUpdateDay) {
@@ -512,9 +529,10 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
 
                     let statusLabel = '';
                     let rowClass = '';
+                    const isThisProvActive = isActive && activeProvince && cleanName(activeProvince) === cleanName(d.nama);
 
-                    if (isActive && activeProvince && cleanName(activeProvince) === cleanName(d.nama)) {
-                      statusLabel = '<span class="status-pill active-sync"><svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Proses Sinkron</span>';
+                    if (isThisProvActive) {
+                      statusLabel = '<span class="status-pill active-sync"><svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Sedang Menyinkronkan</span>';
                       rowClass = 'row-active';
                     } else {
                       if (assignedDayOffset === 0) {
@@ -546,10 +564,19 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
                     const selisihVal = `${d.selisih > 0 ? '+' : ''}${d.selisih.toLocaleString('id-ID')}`;
 
                     return `
-                      <tr class="${rowClass}">
-                        <td style="padding: 12px; text-align: left; font-weight: 700; color: var(--text-subtle); font-size: 13px;">${i + 1}</td>
-                        <td style="padding: 12px; text-align: left; font-weight: 600; color: var(--text-main); font-size: 14px;">${d.nama}</td>
-                        <td style="padding: 12px; text-align: center; color: var(--info); font-weight: 600; font-size: 14px;">${d.total_api.toLocaleString('id-ID')}</td>
+                      <tr class="${rowClass}" data-prov="${cleanName(d.nama)}">
+                        <td style="padding: 12px; text-align: left; font-weight: 700; color: var(--text-subtle); font-size: 13px;">
+                          ${isThisProvActive ? '<span class="spin-icon" style="color: #818cf8; font-size: 14px;">⚡</span>' : (i + 1)}
+                        </td>
+                        <td style="padding: 12px; text-align: left; font-weight: 600; font-size: 14px;">
+                          ${isThisProvActive ? `
+                            <div style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                              <span class="active-prov-glow">${d.nama}</span>
+                              <span class="badge-live-sync"><span class="pulse-dot-mini"></span> SEDANG SINKRON</span>
+                            </div>
+                          ` : `<span style="color: var(--text-main);">${d.nama}</span>`}
+                        </td>
+                        <td style="padding: 12px; text-align: center; color: var(--info); font-weight: 600; font-size: 14px;">${(d.total_api || 0).toLocaleString('id-ID')}</td>
                         <td style="padding: 12px; text-align: center; color: ${selisihColor}; font-weight: 700; font-size: 14px;">${selisihVal}</td>
                         <td style="padding: 12px; text-align: center; font-size: 13px;">${statusLabel}</td>
                       </tr>
@@ -830,14 +857,72 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
     .custom-table td { padding: 13px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
     .custom-table tr:hover { background: rgba(255, 255, 255, 0.025); }
     .custom-table tr.row-active {
-      background: rgba(245, 158, 11, 0.12) !important;
+      background: linear-gradient(90deg, rgba(99, 102, 241, 0.16) 0%, rgba(236, 72, 153, 0.12) 50%, rgba(99, 102, 241, 0.16) 100%) !important;
+      border-left: 3px solid #818cf8 !important;
+      animation: rowPulseGlow 3s ease-in-out infinite alternate;
+    }
+    @keyframes rowPulseGlow {
+      0% {
+        background-color: rgba(99, 102, 241, 0.12);
+        box-shadow: inset 0 0 14px rgba(99, 102, 241, 0.2);
+      }
+      100% {
+        background-color: rgba(236, 72, 153, 0.18);
+        box-shadow: inset 0 0 22px rgba(236, 72, 153, 0.3);
+      }
+    }
+    .custom-table tr.row-active td {
+      border-bottom: 1px solid rgba(129, 140, 248, 0.35) !important;
+    }
+    .badge-live-sync {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 7px;
+      background: rgba(99, 102, 241, 0.25);
+      border: 1px solid rgba(129, 140, 248, 0.5);
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 800;
+      color: #a5b4fc;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.35);
+    }
+    .pulse-dot-mini {
+      width: 7px;
+      height: 7px;
+      background-color: #38bdf8;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 8px #38bdf8;
+      animation: pulse-mini 1.2s infinite ease-in-out;
+    }
+    @keyframes pulse-mini {
+      0%, 100% { transform: scale(0.85); opacity: 0.7; }
+      50% { transform: scale(1.25); opacity: 1; box-shadow: 0 0 10px #38bdf8; }
+    }
+    .active-prov-glow {
+      color: #ffffff;
+      font-weight: 700;
+      text-shadow: 0 0 12px rgba(129, 140, 248, 0.7);
     }
 
     .status-pill {
       display: inline-flex; align-items: center; justify-content: center; gap: 4px;
       padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 700;
     }
-    .status-pill.active-sync { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .status-pill.active-sync {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(236, 72, 153, 0.25));
+      color: #e0e7ff;
+      border: 1px solid rgba(129, 140, 248, 0.5);
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+      padding: 5px 12px;
+    }
+    .status-pill.active-sync .spin-icon {
+      color: #818cf8;
+      filter: drop-shadow(0 0 4px #818cf8);
+    }
     .status-pill.pending { background: rgba(245, 158, 11, 0.15); color: #fb923c; }
     .status-pill.muted { background: rgba(255, 255, 255, 0.06); color: var(--text-muted); }
 
@@ -1108,20 +1193,38 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         // Update info box
         const mainInfo = document.getElementById('main-info');
         if (mainInfo) {
+          var pName = status.activeProvince || (status.bentukBerikutnya && status.bentukBerikutnya.match(/\((.*?)\)/)?.[1]);
           mainInfo.innerHTML = '<div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">' +
             '<span>Bentuk Aktif: <strong style="color: var(--primary-light); text-transform: uppercase;">' + (status.bentukBerikutnya || '-') + '</strong></span>' +
             '<span>Offset Saat Ini: <strong style="color: var(--text-main);">' + (status.offsetBerikutnya || 0) + '</strong></span>' +
             '</div>' +
-            '<div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">' +
+            '<div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">' +
+            '<span>Provinsi Aktif: <strong style="color: #38bdf8; font-weight: 700;">' + (pName ? '📍 ' + pName : '🌐 Semua Wilayah') + '</strong></span>' +
+            '<span style="font-size: 12px; color: var(--text-muted);">' +
             'Update Terakhir: <strong style="color: var(--text-subtle);">' + (status.activeRow?.updated_at || '-') + ' WIB</strong>' +
+            '</span>' +
             '</div>';
         }
+
+        // Update row aktif di Antrean Smart Sync secara dinamis
+        const actProv = (status.isRunning && !status.selesai) ? (status.activeProvince || (status.bentukBerikutnya && status.bentukBerikutnya.match(/\((.*?)\)/)?.[1])) : null;
+        const cleanAct = actProv ? actProv.replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/^PROVINSI|^PROV/, '') : null;
+        const queueRows = document.querySelectorAll('.custom-table tbody tr[data-prov]');
+        queueRows.forEach(tr => {
+          const p = tr.getAttribute('data-prov');
+          if (cleanAct && p === cleanAct) {
+            tr.classList.add('row-active');
+          } else {
+            tr.classList.remove('row-active');
+          }
+        });
 
         // Jika terjadi transisi status (misal selesai, atau ganti provinsi), perbarui tabel log & antrian penuh
         if (lastKnownState) {
           const stateChanged = (lastKnownState.selesai !== status.selesai) ||
                                (lastKnownState.bentukBerikutnya !== status.bentukBerikutnya) ||
-                               (lastKnownState.isRunning !== status.isRunning);
+                               (lastKnownState.isRunning !== status.isRunning) ||
+                               (lastKnownState.activeProvince !== status.activeProvince);
           if (stateChanged) {
             await fetchFullHtml();
           }
@@ -1163,7 +1266,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
     </svg>
 
     <!-- Animated Dual-Ring SVG Loader -->
-    <svg id="loader-icon" class="loader-svg" width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" style="${!isRunning && !selesai ? 'display: none;' : ''} ${selesai ? 'display: none;' : ''}">
+    <svg id="loader-icon" class="loader-svg" width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" style="${!isRunning || selesai ? 'display: none;' : ''}">
       <circle cx="26" cy="26" r="20" stroke="url(#loader-grad-1)" stroke-width="4" stroke-dasharray="75 35" stroke-linecap="round">
         <animateTransform attributeName="transform" type="rotate" from="0 26 26" to="360 26 26" dur="1.1s" repeatCount="indefinite"/>
       </circle>
