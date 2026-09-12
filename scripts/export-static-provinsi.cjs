@@ -24,10 +24,14 @@ for (const file of envFiles) {
 }
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('❌ SUPABASE_URL atau SUPABASE_SERVICE_ROLE_KEY belum dikonfigurasi.');
+  console.error('❌ SUPABASE_URL atau SUPABASE_SERVICE_ROLE_KEY / SUPABASE_KEY belum dikonfigurasi.');
+  console.error('   👉 Jika dijalankan di GitHub Actions, tambahkan Secrets di Settings -> Secrets and variables -> Actions:');
+  console.error('      - SUPABASE_URL');
+  console.error('      - SUPABASE_SERVICE_ROLE_KEY (atau SUPABASE_KEY / SUPABASE_ANON_KEY)');
+  console.error('   👉 Jika dijalankan lokal, pastikan file .env.supabase atau .env sudah terisi.');
   process.exit(1);
 }
 
