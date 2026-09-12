@@ -70,10 +70,9 @@ export async function onRequestGet(context) {
     }
 
     // Hitung kuota harian riil
-    const currentDate = new Date(Date.now() + 7 * 60 * 60 * 1000);
-    const currentDayOfWeek = currentDate.getDay() || 7;
+    const currentDayOfWeek = new Date(Date.now() + 7 * 60 * 60 * 1000).getUTCDay() || 7;
     const isMandatoryUpdateDay = (currentDayOfWeek === 3 || currentDayOfWeek === 4);
-    const batasAman = isMandatoryUpdateDay ? 250000 : 100000;
+    const batasAman = isMandatoryUpdateDay ? 350000 : 100000;
 
     let syncedToday = 0;
     try {

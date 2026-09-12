@@ -39,6 +39,16 @@ const cleanName = (name) => {
   return name.replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/^PROVINSI|^PROV/, '');
 };
 
+const getWibDate = (d = new Date()) => {
+  const dt = new Date(d);
+  return isNaN(dt.getTime()) ? '' : new Date(dt.getTime() + 7 * 3600 * 1000).toISOString().split('T')[0];
+};
+
+const getWibDayOfWeek = (d = new Date()) => {
+  const dt = new Date(d);
+  return new Date(dt.getTime() + 7 * 3600 * 1000).getUTCDay() || 7;
+};
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -77,7 +87,7 @@ export async function onRequestGet(context) {
         const rawCompare = JSON.parse(cacheRow.value);
         const vMap = new Map(vRekapList.map(r => [cleanName(r.nama_provinsi), r.total_sekolah]));
         const pMap = new Map(provStatusList.map(r => [cleanName(r.nama_provinsi), r]));
-        const todayDateWIB = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const todayDateWIB = getWibDate();
 
         rawCompare.forEach(item => {
           const cName = cleanName(item.nama);
@@ -99,7 +109,7 @@ export async function onRequestGet(context) {
           item.selisih = item.raw_selisih - (item.api_duplicates || 0);
           item.extra_in_db = Math.max(0, (item.total_db || 0) - (item.total_api || 0));
 
-          const isSyncedToday = Boolean(item.terakhir_sukses && item.terakhir_sukses.split(/[ T]/)[0] === todayDateWIB);
+          const isSyncedToday = Boolean(item.terakhir_sukses && getWibDate(item.terakhir_sukses) === todayDateWIB);
           item.is_sinkron_walau_selisih = (item.selisih === 0);
         });
 
@@ -164,7 +174,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         const provSyncMap = {};
         provStatusList.forEach(p => {
           if (p.terakhir_sukses) {
-            provSyncMap[cleanName(p.nama_provinsi)] = p.terakhir_sukses.split(/[ T]/)[0];
+            provSyncMap[cleanName(p.nama_provinsi)] = getWibDate(p.terakhir_sukses);
           }
         });
 
@@ -205,8 +215,8 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           });
 
           compareHtml = compareCache.value.map((d, idx) => {
-            const todayDate = new Date(new Date().getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
-            const isSyncedToday = d.terakhir_sukses && d.terakhir_sukses.split(/[ T]/)[0] === todayDate;
+            const todayDate = getWibDate();
+            const isSyncedToday = Boolean(d.terakhir_sukses && getWibDate(d.terakhir_sukses) === todayDate);
 
             let selisihColor = 'var(--danger)';
             let statusIcon = '⚠️ Belum Sinkron';
@@ -302,8 +312,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           compareHtml = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">Belum ada data perbandingan. Jalankan cron terlebih dahulu.</td></tr>';
         }
 
-        const currentDate = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
-        const currentDayOfWeek = currentDate.getDay() || 7;
+        const currentDayOfWeek = getWibDayOfWeek();
         const isMandatoryUpdateDay = (currentDayOfWeek === 3 || currentDayOfWeek === 4);
 
         const SCHEDULE = {
@@ -318,8 +327,8 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         const isTomorrowMandatory = (tomorrowDayOfWeek === 3 || tomorrowDayOfWeek === 4);
         const tomorrowScheduleList = SCHEDULE[tomorrowDayOfWeek] || [];
 
-        const todayDateWIB = currentDate.toISOString().split('T')[0];
-        const yesterdayDateWIB = new Date(currentDate.getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const todayDateWIB = getWibDate();
+        const yesterdayDateWIB = getWibDate(Date.now() - 24 * 60 * 60 * 1000);
         const diffData = compareCache && compareCache.value ? compareCache.value.filter(d => {
           const syncedDate = provSyncMap[cleanName(d.nama)];
           d.isSyncedToday = syncedDate === todayDateWIB;
@@ -455,7 +464,13 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           });
         }
 
-        const dynamicFullSyncLimit = sumTotalApi > 0 ? Math.ceil(sumTotalApi / 2) : 250000;
+        const scheduledTodayTotal = (isMandatoryUpdateDay && SCHEDULE[currentDayOfWeek])
+          ? SCHEDULE[currentDayOfWeek].reduce((sum, name) => {
+              const p = compareCache?.value?.find(d => cleanName(d.nama) === cleanName(name));
+              return sum + (p ? (p.total_api || 0) : 0);
+            }, 0)
+          : 0;
+        const dynamicFullSyncLimit = Math.max(scheduledTodayTotal + 15000, 350000);
         const BATAS_AMAN = Math.max(100000, isMandatoryUpdateDay ? dynamicFullSyncLimit : 100000);
         let syncedToday = 0;
         try {
@@ -580,7 +595,13 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
                       let newOffset = Math.max(minOffset, daysSim[daysSim.length - 1].offset + 1);
                       const nextDaySimulated = (currentDayOfWeek + newOffset - 1) % 7 + 1;
                       const isNextDayMandatory = (nextDaySimulated === 3 || nextDaySimulated === 4);
-                      let newLimit = isNextDayMandatory ? dynamicFullSyncLimit : 100000;
+                      let nextDayScheduledTotal = (isNextDayMandatory && SCHEDULE[nextDaySimulated])
+                        ? SCHEDULE[nextDaySimulated].reduce((sum, name) => {
+                            const p = compareCache?.value?.find(d => cleanName(d.nama) === cleanName(name));
+                            return sum + (p ? (p.total_api || 0) : 0);
+                          }, 0)
+                        : 0;
+                      let newLimit = isNextDayMandatory ? Math.max(nextDayScheduledTotal + 15000, 350000) : 100000;
                       
                       let newDay = { offset: newOffset, used: d.total_api, limit: newLimit, items: 1 };
                       daysSim.push(newDay);

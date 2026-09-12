@@ -30,6 +30,16 @@ const cleanName = (name) => {
   return c.replace(/^PROVINSI|^PROV/, '');
 };
 
+const getWibDate = (d = new Date()) => {
+  const dt = new Date(d);
+  return isNaN(dt.getTime()) ? '' : new Date(dt.getTime() + 7 * 3600 * 1000).toISOString().split('T')[0];
+};
+
+const getWibDayOfWeek = (d = new Date()) => {
+  const dt = new Date(d);
+  return new Date(dt.getTime() + 7 * 3600 * 1000).getUTCDay() || 7;
+};
+
 
 async function loadProvinces() {
   try {
@@ -223,9 +233,7 @@ async function fetchCustomData() {
           // Cek semua provinsi yang ada selisih (selisih != 0)
           // Kita gunakan raw_selisih jika ada (untuk mendeteksi npsn ganda/kosong), atau selisih biasa
           // Kedua hal ini menandakan ketidaksinkronan data.
-          const currentDate = new Date(new Date().getTime() + 7 * 60 * 60 * 1000);
-          const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-          const currentDayOfWeek = currentDate.getDay() || 7;
+          const currentDayOfWeek = getWibDayOfWeek();
           const isMandatoryUpdateDay = (currentDayOfWeek === 3 || currentDayOfWeek === 4);
           
           const SCHEDULE = {
@@ -246,6 +254,7 @@ async function fetchCustomData() {
             }
           }
   
+          const todayDate = getWibDate();
           const diffCodes = compareJson.data.filter(d => {
             if (!kodeWilayahList.includes(d.kode)) return false;
             
@@ -253,9 +262,7 @@ async function fetchCustomData() {
             if (isSynced && !isMandatoryUpdateDay) return false;
             
             if (isCronSchedule && d.terakhir_sukses) {
-              const todayDate = currentDate.toISOString().split('T')[0];
-              const yesterdayDate = new Date(currentDate.getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-              const syncedDate = d.terakhir_sukses.split(' ')[0];
+              const syncedDate = getWibDate(d.terakhir_sukses);
               
               if (isMandatoryUpdateDay) {
                 // Pada hari wajib update (Rabu/Kamis), HANYA abaikan jika sudah disinkronkan HARI INI.
@@ -277,9 +284,18 @@ async function fetchCustomData() {
           });
           const syncedCodes = compareJson.data.filter(d => d.selisih === 0 && (d.raw_selisih || 0) === 0 && kodeWilayahList.includes(d.kode));
   
-          // Kuota aman penulisan baris per hari untuk Cloudflare D1 Free.
-          const totalApiGlobal = compareJson.data ? compareJson.data.reduce((acc, curr) => acc + (curr.total_api || 0), 0) : 0;
-          const dynamicFullSyncLimit = totalApiGlobal > 0 ? Math.ceil(totalApiGlobal / 2) : 250000;
+          // Hitung total estimasi data provinsi yang terjadwal hari ini (Full Sync)
+          const scheduledTodayTotal = (isMandatoryUpdateDay && SCHEDULE[currentDayOfWeek])
+            ? SCHEDULE[currentDayOfWeek].reduce((sum, name) => {
+                const p = compareJson.data.find(d => cleanName(d.nama) === cleanName(name));
+                return sum + (p ? p.total_api : 0);
+              }, 0)
+            : 0;
+
+          // Kuota aman penulisan baris per hari:
+          // Pada hari Full Sync (Rabu & Kamis), alokasikan kuota yang cukup untuk menyelesaikan seluruh provinsi terjadwal (Rabu: ~303k, Kamis: ~252k).
+          // Pada hari biasa (Smart Sync), batasi aman 100.000 data per hari.
+          const dynamicFullSyncLimit = Math.max(scheduledTodayTotal + 15000, 350000);
           const BATAS_AMAN_DATA_PER_HARI = Math.max(100000, isMandatoryUpdateDay ? dynamicFullSyncLimit : 100000); 
           
           let totalDataSaatIni = compareJson.synced_today || 0;
