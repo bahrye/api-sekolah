@@ -41,7 +41,20 @@
       "PROV. SUMATERA SELATAN",
       "PROV. SUMATERA UTARA"
     ],
-    "negara": [],
+    "negara": [
+      "ARAB SAUDI",
+      "BELANDA",
+      "BRUNEI DARUSSALAM",
+      "CINA",
+      "FILIPINA",
+      "JAPAN",
+      "MALAYSIA",
+      "MESIR",
+      "MYANMAR",
+      "SINGAPURA",
+      "TAIWAN",
+      "THAILAND"
+    ],
     "jenjang": [
       "ADI WIDYALAYA",
       "KB",
@@ -1175,6 +1188,71 @@
         "TPA": 48
       }
     },
-    "luar_negeri": {}
+    "luar_negeri": {
+      "MALAYSIA": {
+        "SD": 118,
+        "SMP": 48,
+        "TK": 2,
+        "SMK": 1,
+        "SMA": 2,
+        "PKBM": 3
+      },
+      "THAILAND": {
+        "TK": 1,
+        "SD": 1,
+        "SMP": 1,
+        "SMA": 1
+      },
+      "MYANMAR": {
+        "TK": 1,
+        "SD": 1,
+        "SMP": 1,
+        "SMA": 1
+      },
+      "MESIR": {
+        "TK": 2,
+        "SD": 1,
+        "SMP": 1,
+        "SMA": 1
+      },
+      "ARAB SAUDI": {
+        "TK": 3,
+        "SD": 3,
+        "SMP": 3,
+        "SMA": 3,
+        "PKBM": 2
+      },
+      "BELANDA": {
+        "SMA": 1,
+        "SD": 1,
+        "SMP": 1
+      },
+      "SINGAPURA": {
+        "SD": 1,
+        "SMP": 1,
+        "SMA": 1,
+        "PKBM": 1
+      },
+      "JAPAN": {
+        "SD": 1,
+        "SMP": 1,
+        "SMA": 1,
+        "PKBM": 1
+      },
+      "FILIPINA": {
+        "SD": 1,
+        "SMP": 1,
+        "SMA": 1
+      },
+      "TAIWAN": {
+        "PKBM": 3
+      },
+      "CINA": {
+        "PKBM": 2
+      },
+      "BRUNEI DARUSSALAM": {
+        "PKBM": 1
+      }
+    }
   }
 }
