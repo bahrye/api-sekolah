@@ -6,6 +6,7 @@ import {
   listSekolahFilteredSupabase,
   getStatusSinkronisasiSupabase,
 } from '../lib/sekolah-supabase.js';
+import { handleStaticFallback } from '../lib/sekolah-static-fallback.js';
 
 const DEVELOPER = 'Syamsul Bahri';
 
@@ -91,12 +92,22 @@ export async function onRequest(context) {
 
     return new Response(JSON.stringify(responsePayload), { headers });
   } catch (error) {
-    return new Response(
-      JSON.stringify({
-        status: 'error',
-        message: 'Gagal memproses database: ' + error.message,
-      }),
-      { headers, status: 500 }
-    );
+    console.warn('[FAILOVER] Supabase tidak dapat diakses, beralih ke static fallback:', error.message);
+    try {
+      return await handleStaticFallback(
+        context,
+        { keyword, provinsi, bentuk, limit, offset },
+        error.message
+      );
+    } catch (fallbackError) {
+      return new Response(
+        JSON.stringify({
+          status: 'error',
+          message: 'Gagal memproses database: ' + error.message,
+          fallback_error: fallbackError.message,
+        }),
+        { headers, status: 500 }
+      );
+    }
   }
 }

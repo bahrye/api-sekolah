@@ -1,0 +1,60 @@
+name: Backup Static JSON Cadangan (Mingguan)
+
+on:
+  schedule:
+    # Berjalan setiap hari Minggu pukul 17:00 UTC (00:00 WIB Senin)
+    - cron: '0 17 * * 0'
+  workflow_dispatch:
+    inputs:
+      pilihan_provinsi:
+        description: '(Opsional) Nama provinsi spesifik (misal: GORONTALO). Kosongkan untuk semua provinsi.'
+        type: string
+        default: ''
+
+concurrency:
+  group: backup-static-json
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  export-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Jalankan Ekspor Data Static JSON dari Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PILIHAN_PROVINSI: ${{ github.event.inputs.pilihan_provinsi || '' }}
+        run: |
+          if [ -n "$PILIHAN_PROVINSI" ]; then
+            node scripts/export-static-provinsi.cjs --prov="$PILIHAN_PROVINSI"
+          else
+            node scripts/export-static-provinsi.cjs
+          fi
+
+      - name: Simpan Perubahan ke Repositori
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data_provinsi/
+          if git diff --staged --quiet; then
+            echo "Tidak ada perubahan data statis."
+          else
+            git commit -m "chore(backup): perbarui data cadangan statis provinsi [skip ci]"
+            git push
+          fi
