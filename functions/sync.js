@@ -660,8 +660,8 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           </div>
         `;
 
-        // Fetch Log Aktivitas (Maksimal 10 data terbaru, data terdahulu otomatis dihapus)
-        const limit = 10;
+        // Fetch Log Aktivitas (Maksimal 5 data terbaru, data terdahulu otomatis dihapus)
+        const limit = 5;
         let logAktivitasList = [];
         try {
           const { data: logRes } = await supabase
@@ -671,7 +671,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             .limit(limit);
           logAktivitasList = logRes || [];
 
-          // Pembersihan otomatis data log melebihi 10 baris
+          // Pembersihan otomatis data log melebihi 5 baris
           const { data: excessRows } = await supabase
             .from('log_aktivitas_provinsi')
             .select('id')
@@ -684,7 +684,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           }
         } catch (e) {}
 
-        const paginationHtml = '<div style="font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 6px;">Menampilkan maksimal 10 aktivitas sinkronisasi terbaru</div>';
+        const paginationHtml = '<div style="font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 6px;">Menampilkan maksimal 5 aktivitas sinkronisasi terbaru</div>';
 
         let logHtml = logAktivitasList.length > 0 ? logAktivitasList.map(log => {
           const totalData = log.total_baru + log.total_diperbarui + log.total_tidak_berubah;

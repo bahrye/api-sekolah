@@ -186,13 +186,13 @@ export async function onRequestPost(context) {
           waktu_selesai: new Date().toISOString(),
         });
 
-        // Bersihkan otomatis dari database: pertahankan hanya maksimal 10 log terbaru
+        // Bersihkan otomatis dari database: pertahankan hanya maksimal 5 log terbaru
         try {
           const { data: excessLogs } = await supabase
             .from('log_aktivitas_provinsi')
             .select('id')
             .order('waktu_selesai', { ascending: false })
-            .range(10, 100);
+            .range(5, 100);
 
           if (excessLogs && excessLogs.length > 0) {
             const deleteIds = excessLogs.map((x) => x.id);
