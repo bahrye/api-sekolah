@@ -1,0 +1,2234 @@
+{
+  "last_updated": "2026-09-12T14:08:23.666Z",
+  "total_provinsi": 36,
+  "total_sekolah": 550734,
+  "provinsi": [
+    {
+      "nama": "LUAR NEGERI",
+      "slug": "luar_negeri",
+      "total": 221,
+      "files": [
+        "data_luar_negeri.json"
+      ]
+    },
+    {
+      "nama": "PROV. ACEH",
+      "slug": "aceh",
+      "total": 13871,
+      "files": [
+        "data_aceh.json"
+      ]
+    },
+    {
+      "nama": "PROV. BALI",
+      "slug": "bali",
+      "total": 6092,
+      "files": [
+        "data_bali.json"
+      ]
+    },
+    {
+      "nama": "PROV. BANTEN",
+      "slug": "banten",
+      "total": 20586,
+      "files": [
+        "data_banten.json"
+      ]
+    },
+    {
+      "nama": "PROV. BENGKULU",
+      "slug": "bengkulu",
+      "total": 4958,
+      "files": [
+        "data_bengkulu.json"
+      ]
+    },
+    {
+      "nama": "PROV. D.I. YOGYAKARTA",
+      "slug": "di_yogyakarta",
+      "total": 8646,
+      "files": [
+        "data_di_yogyakarta.json"
+      ]
+    },
+    {
+      "nama": "PROV. D.K.I. JAKARTA",
+      "slug": "dki_jakarta",
+      "total": 11585,
+      "files": [
+        "data_dki_jakarta.json"
+      ]
+    },
+    {
+      "nama": "PROV. GORONTALO",
+      "slug": "gorontalo",
+      "total": 3352,
+      "files": [
+        "data_gorontalo.json"
+      ]
+    },
+    {
+      "nama": "PROV. JAMBI",
+      "slug": "jambi",
+      "total": 9246,
+      "files": [
+        "data_jambi.json"
+      ]
+    },
+    {
+      "nama": "PROV. JAWA BARAT",
+      "slug": "jawa_barat",
+      "total": 85424,
+      "files": [
+        "data_jawa_barat_part1.json",
+        "data_jawa_barat_part2.json",
+        "data_jawa_barat_part3.json"
+      ]
+    },
+    {
+      "nama": "PROV. JAWA TENGAH",
+      "slug": "jawa_tengah",
+      "total": 67113,
+      "files": [
+        "data_jawa_tengah_part1.json",
+        "data_jawa_tengah_part2.json",
+        "data_jawa_tengah_part3.json"
+      ]
+    },
+    {
+      "nama": "PROV. JAWA TIMUR",
+      "slug": "jawa_timur",
+      "total": 91670,
+      "files": [
+        "data_jawa_timur_part1.json",
+        "data_jawa_timur_part2.json",
+        "data_jawa_timur_part3.json",
+        "data_jawa_timur_part4.json"
+      ]
+    },
+    {
+      "nama": "PROV. KALIMANTAN BARAT",
+      "slug": "kalimantan_barat",
+      "total": 11697,
+      "files": [
+        "data_kalimantan_barat.json"
+      ]
+    },
+    {
+      "nama": "PROV. KALIMANTAN SELATAN",
+      "slug": "kalimantan_selatan",
+      "total": 10304,
+      "files": [
+        "data_kalimantan_selatan.json"
+      ]
+    },
+    {
+      "nama": "PROV. KALIMANTAN TENGAH",
+      "slug": "kalimantan_tengah",
+      "total": 8091,
+      "files": [
+        "data_kalimantan_tengah.json"
+      ]
+    },
+    {
+      "nama": "PROV. KALIMANTAN TIMUR",
+      "slug": "kalimantan_timur",
+      "total": 7024,
+      "files": [
+        "data_kalimantan_timur.json"
+      ]
+    },
+    {
+      "nama": "PROV. KALIMANTAN UTARA",
+      "slug": "kalimantan_utara",
+      "total": 1690,
+      "files": [
+        "data_kalimantan_utara.json"
+      ]
+    },
+    {
+      "nama": "PROV. KEPULAUAN BANGKA BELITUNG",
+      "slug": "kepulauan_bangka_belitung",
+      "total": 2438,
+      "files": [
+        "data_kepulauan_bangka_belitung.json"
+      ]
+    },
+    {
+      "nama": "PROV. KEPULAUAN RIAU",
+      "slug": "kepulauan_riau",
+      "total": 3690,
+      "files": [
+        "data_kepulauan_riau.json"
+      ]
+    },
+    {
+      "nama": "PROV. LAMPUNG",
+      "slug": "lampung",
+      "total": 16594,
+      "files": [
+        "data_lampung.json"
+      ]
+    },
+    {
+      "nama": "PROV. MALUKU",
+      "slug": "maluku",
+      "total": 5781,
+      "files": [
+        "data_maluku.json"
+      ]
+    },
+    {
+      "nama": "PROV. MALUKU UTARA",
+      "slug": "maluku_utara",
+      "total": 4640,
+      "files": [
+        "data_maluku_utara.json"
+      ]
+    },
+    {
+      "nama": "PROV. NUSA TENGGARA BARAT",
+      "slug": "nusa_tenggara_barat",
+      "total": 14835,
+      "files": [
+        "data_nusa_tenggara_barat.json"
+      ]
+    },
+    {
+      "nama": "PROV. NUSA TENGGARA TIMUR",
+      "slug": "nusa_tenggara_timur",
+      "total": 15219,
+      "files": [
+        "data_nusa_tenggara_timur.json"
+      ]
+    },
+    {
+      "nama": "PROV. PAPUA",
+      "slug": "papua",
+      "total": 2329,
+      "files": [
+        "data_papua.json"
+      ]
+    },
+    {
+      "nama": "PROV. PAPUA BARAT",
+      "slug": "papua_barat",
+      "total": 1590,
+      "files": [
+        "data_papua_barat.json"
+      ]
+    },
+    {
+      "nama": "PROV. PAPUA SELATAN",
+      "slug": "papua_selatan",
+      "total": 1302,
+      "files": [
+        "data_papua_selatan.json"
+      ]
+    },
+    {
+      "nama": "PROV. RIAU",
+      "slug": "riau",
+      "total": 13849,
+      "files": [
+        "data_riau.json"
+      ]
+    },
+    {
+      "nama": "PROV. SULAWESI BARAT",
+      "slug": "sulawesi_barat",
+      "total": 4456,
+      "files": [
+        "data_sulawesi_barat.json"
+      ]
+    },
+    {
+      "nama": "PROV. SULAWESI SELATAN",
+      "slug": "sulawesi_selatan",
+      "total": 19964,
+      "files": [
+        "data_sulawesi_selatan.json"
+      ]
+    },
+    {
+      "nama": "PROV. SULAWESI TENGAH",
+      "slug": "sulawesi_tengah",
+      "total": 9046,
+      "files": [
+        "data_sulawesi_tengah.json"
+      ]
+    },
+    {
+      "nama": "PROV. SULAWESI TENGGARA",
+      "slug": "sulawesi_tenggara",
+      "total": 7787,
+      "files": [
+        "data_sulawesi_tenggara.json"
+      ]
+    },
+    {
+      "nama": "PROV. SULAWESI UTARA",
+      "slug": "sulawesi_utara",
+      "total": 6779,
+      "files": [
+        "data_sulawesi_utara.json"
+      ]
+    },
+    {
+      "nama": "PROV. SUMATERA BARAT",
+      "slug": "sumatera_barat",
+      "total": 12560,
+      "files": [
+        "data_sumatera_barat.json"
+      ]
+    },
+    {
+      "nama": "PROV. SUMATERA SELATAN",
+      "slug": "sumatera_selatan",
+      "total": 15801,
+      "files": [
+        "data_sumatera_selatan.json"
+      ]
+    },
+    {
+      "nama": "PROV. SUMATERA UTARA",
+      "slug": "sumatera_utara",
+      "total": 30504,
+      "files": [
+        "data_sumatera_utara.json"
+      ]
+    }
+  ],
+  "slug_map": {
+    "luar_negeri": [
+      "data_luar_negeri.json"
+    ],
+    "luar negeri": "data_luar_negeri.json",
+    "papua_selatan": [
+      "data_papua_selatan.json"
+    ],
+    "prov. papua selatan": "data_papua_selatan.json",
+    "aceh": [
+      "data_aceh.json"
+    ],
+    "prov. aceh": "data_aceh.json",
+    "bali": [
+      "data_bali.json"
+    ],
+    "prov. bali": "data_bali.json",
+    "banten": [
+      "data_banten.json"
+    ],
+    "prov. banten": "data_banten.json",
+    "bengkulu": [
+      "data_bengkulu.json"
+    ],
+    "prov. bengkulu": "data_bengkulu.json",
+    "di_yogyakarta": [
+      "data_di_yogyakarta.json"
+    ],
+    "prov. d.i. yogyakarta": "data_di_yogyakarta.json",
+    "dki_jakarta": [
+      "data_dki_jakarta.json"
+    ],
+    "prov. d.k.i. jakarta": "data_dki_jakarta.json",
+    "gorontalo": [
+      "data_gorontalo.json"
+    ],
+    "prov. gorontalo": "data_gorontalo.json",
+    "jambi": [
+      "data_jambi.json"
+    ],
+    "prov. jambi": "data_jambi.json",
+    "jawa_barat": [
+      "data_jawa_barat_part1.json",
+      "data_jawa_barat_part2.json",
+      "data_jawa_barat_part3.json"
+    ],
+    "prov. jawa barat": "data_jawa_barat.json",
+    "jawa_tengah": [
+      "data_jawa_tengah_part1.json",
+      "data_jawa_tengah_part2.json",
+      "data_jawa_tengah_part3.json"
+    ],
+    "prov. jawa tengah": "data_jawa_tengah.json",
+    "jawa_timur": [
+      "data_jawa_timur_part1.json",
+      "data_jawa_timur_part2.json",
+      "data_jawa_timur_part3.json",
+      "data_jawa_timur_part4.json"
+    ],
+    "prov. jawa timur": "data_jawa_timur.json",
+    "kalimantan_barat": [
+      "data_kalimantan_barat.json"
+    ],
+    "prov. kalimantan barat": "data_kalimantan_barat.json",
+    "kalimantan_selatan": [
+      "data_kalimantan_selatan.json"
+    ],
+    "prov. kalimantan selatan": "data_kalimantan_selatan.json",
+    "kalimantan_tengah": [
+      "data_kalimantan_tengah.json"
+    ],
+    "prov. kalimantan tengah": "data_kalimantan_tengah.json",
+    "kalimantan_timur": [
+      "data_kalimantan_timur.json"
+    ],
+    "prov. kalimantan timur": "data_kalimantan_timur.json",
+    "kalimantan_utara": [
+      "data_kalimantan_utara.json"
+    ],
+    "prov. kalimantan utara": "data_kalimantan_utara.json",
+    "kepulauan_bangka_belitung": [
+      "data_kepulauan_bangka_belitung.json"
+    ],
+    "prov. kepulauan bangka belitung": "data_kepulauan_bangka_belitung.json",
+    "kepulauan_riau": [
+      "data_kepulauan_riau.json"
+    ],
+    "prov. kepulauan riau": "data_kepulauan_riau.json",
+    "lampung": [
+      "data_lampung.json"
+    ],
+    "prov. lampung": "data_lampung.json",
+    "maluku": [
+      "data_maluku.json"
+    ],
+    "prov. maluku": "data_maluku.json",
+    "maluku_utara": [
+      "data_maluku_utara.json"
+    ],
+    "prov. maluku utara": "data_maluku_utara.json",
+    "nusa_tenggara_barat": [
+      "data_nusa_tenggara_barat.json"
+    ],
+    "prov. nusa tenggara barat": "data_nusa_tenggara_barat.json",
+    "nusa_tenggara_timur": [
+      "data_nusa_tenggara_timur.json"
+    ],
+    "prov. nusa tenggara timur": "data_nusa_tenggara_timur.json",
+    "papua": [
+      "data_papua.json"
+    ],
+    "prov. papua": "data_papua.json",
+    "papua_barat": [
+      "data_papua_barat.json"
+    ],
+    "prov. papua barat": "data_papua_barat.json",
+    "riau": [
+      "data_riau.json"
+    ],
+    "prov. riau": "data_riau.json",
+    "sulawesi_barat": [
+      "data_sulawesi_barat.json"
+    ],
+    "prov. sulawesi barat": "data_sulawesi_barat.json",
+    "sulawesi_selatan": [
+      "data_sulawesi_selatan.json"
+    ],
+    "prov. sulawesi selatan": "data_sulawesi_selatan.json",
+    "sulawesi_tengah": [
+      "data_sulawesi_tengah.json"
+    ],
+    "prov. sulawesi tengah": "data_sulawesi_tengah.json",
+    "sulawesi_tenggara": [
+      "data_sulawesi_tenggara.json"
+    ],
+    "prov. sulawesi tenggara": "data_sulawesi_tenggara.json",
+    "sulawesi_utara": [
+      "data_sulawesi_utara.json"
+    ],
+    "prov. sulawesi utara": "data_sulawesi_utara.json",
+    "sumatera_barat": [
+      "data_sumatera_barat.json"
+    ],
+    "prov. sumatera barat": "data_sumatera_barat.json",
+    "sumatera_selatan": [
+      "data_sumatera_selatan.json"
+    ],
+    "prov. sumatera selatan": "data_sumatera_selatan.json",
+    "sumatera_utara": [
+      "data_sumatera_utara.json"
+    ],
+    "prov. sumatera utara": "data_sumatera_utara.json"
+  },
+  "npsn_prefix_map": {
+    "100": [
+      "data_aceh.json",
+      "data_jambi.json",
+      "data_lampung.json",
+      "data_riau.json"
+    ],
+    "101": [
+      "data_aceh.json",
+      "data_banten.json",
+      "data_jambi.json",
+      "data_jawa_barat_part1.json",
+      "data_jawa_timur_part1.json",
+      "data_lampung.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "102": [
+      "data_banten.json",
+      "data_maluku.json",
+      "data_riau.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_tengah.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "103": [
+      "data_jambi.json",
+      "data_riau.json",
+      "data_sulawesi_selatan.json",
+      "data_sumatera_barat.json"
+    ],
+    "104": [
+      "data_jambi.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_riau.json"
+    ],
+    "105": [
+      "data_jambi.json",
+      "data_jawa_timur_part1.json",
+      "data_sumatera_selatan.json"
+    ],
+    "106": [
+      "data_jambi.json",
+      "data_jawa_barat_part1.json",
+      "data_kalimantan_selatan.json",
+      "data_lampung.json",
+      "data_sumatera_selatan.json"
+    ],
+    "107": [
+      "data_bengkulu.json",
+      "data_lampung.json"
+    ],
+    "108": [
+      "data_kalimantan_barat.json",
+      "data_lampung.json",
+      "data_riau.json"
+    ],
+    "109": [
+      "data_kepulauan_bangka_belitung.json",
+      "data_riau.json"
+    ],
+    "110": [
+      "data_kepulauan_riau.json",
+      "data_papua_barat.json"
+    ],
+    "112": [
+      "data_sumatera_utara.json"
+    ],
+    "115": [
+      "data_jambi.json"
+    ],
+    "118": [
+      "data_lampung.json"
+    ],
+    "131": [
+      "data_kalimantan_barat.json"
+    ],
+    "140": [
+      "data_riau.json"
+    ],
+    "150": [
+      "data_jambi.json"
+    ],
+    "162": [
+      "data_maluku.json"
+    ],
+    "165": [
+      "data_jambi.json"
+    ],
+    "192": [
+      "data_sumatera_utara.json"
+    ],
+    "201": [
+      "data_dki_jakarta.json",
+      "data_jawa_barat_part1.json",
+      "data_jawa_tengah_part1.json",
+      "data_jawa_timur_part1.json",
+      "data_kalimantan_barat.json"
+    ],
+    "202": [
+      "data_banten.json",
+      "data_dki_jakarta.json",
+      "data_jawa_barat_part1.json",
+      "data_jawa_barat_part2.json",
+      "data_jawa_tengah_part1.json",
+      "data_kalimantan_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "203": [
+      "data_di_yogyakarta.json",
+      "data_jawa_barat_part2.json",
+      "data_jawa_tengah_part1.json",
+      "data_jawa_tengah_part2.json",
+      "data_jawa_timur_part1.json"
+    ],
+    "204": [
+      "data_di_yogyakarta.json",
+      "data_jawa_timur_part1.json",
+      "data_sulawesi_tengah.json"
+    ],
+    "205": [
+      "data_jawa_timur_part1.json",
+      "data_jawa_timur_part2.json"
+    ],
+    "206": [
+      "data_banten.json",
+      "data_jawa_barat_part2.json",
+      "data_jawa_timur_part2.json",
+      "data_sumatera_utara.json"
+    ],
+    "207": [
+      "data_banten.json",
+      "data_di_yogyakarta.json"
+    ],
+    "208": [
+      "data_jawa_barat_part2.json",
+      "data_jawa_tengah_part2.json",
+      "data_jawa_timur_part2.json"
+    ],
+    "210": [
+      "data_jawa_tengah_part2.json",
+      "data_nusa_tenggara_barat.json"
+    ],
+    "211": [
+      "data_dki_jakarta.json"
+    ],
+    "212": [
+      "data_jawa_barat_part2.json"
+    ],
+    "220": [
+      "data_jawa_barat_part2.json"
+    ],
+    "241": [
+      "data_jawa_barat_part2.json"
+    ],
+    "242": [
+      "data_jawa_barat_part2.json"
+    ],
+    "250": [
+      "data_jawa_timur_part2.json"
+    ],
+    "260": [
+      "data_jawa_barat_part2.json"
+    ],
+    "265": [
+      "data_jawa_timur_part2.json"
+    ],
+    "295": [
+      "data_jawa_timur_part2.json"
+    ],
+    "300": [
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json"
+    ],
+    "301": [
+      "data_kalimantan_barat.json",
+      "data_kalimantan_tengah.json"
+    ],
+    "302": [
+      "data_jawa_tengah_part2.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json"
+    ],
+    "303": [
+      "data_jawa_tengah_part2.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_timur.json",
+      "data_kalimantan_utara.json"
+    ],
+    "304": [
+      "data_banten.json",
+      "data_kalimantan_timur.json",
+      "data_kalimantan_utara.json",
+      "data_sulawesi_selatan.json"
+    ],
+    "305": [
+      "data_kalimantan_timur.json",
+      "data_nusa_tenggara_timur.json"
+    ],
+    "306": [
+      "data_kalimantan_barat.json"
+    ],
+    "308": [
+      "data_kalimantan_barat.json"
+    ],
+    "311": [
+      "data_kalimantan_barat.json"
+    ],
+    "322": [
+      "data_kalimantan_tengah.json"
+    ],
+    "331": [
+      "data_kalimantan_barat.json"
+    ],
+    "340": [
+      "data_jawa_tengah_part2.json"
+    ],
+    "400": [
+      "data_banten.json",
+      "data_dki_jakarta.json"
+    ],
+    "401": [
+      "data_kalimantan_barat.json",
+      "data_sulawesi_utara.json"
+    ],
+    "402": [
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json"
+    ],
+    "403": [
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_tenggara.json"
+    ],
+    "404": [
+      "data_gorontalo.json",
+      "data_maluku.json",
+      "data_sulawesi_tenggara.json"
+    ],
+    "405": [
+      "data_gorontalo.json",
+      "data_kepulauan_riau.json"
+    ],
+    "406": [
+      "data_sulawesi_barat.json"
+    ],
+    "408": [
+      "data_sulawesi_selatan.json"
+    ],
+    "413": [
+      "data_sulawesi_selatan.json"
+    ],
+    "418": [
+      "data_jawa_barat_part2.json"
+    ],
+    "423": [
+      "data_sulawesi_selatan.json"
+    ],
+    "430": [
+      "data_sulawesi_selatan.json"
+    ],
+    "450": [
+      "data_gorontalo.json"
+    ],
+    "468": [
+      "data_sulawesi_barat.json"
+    ],
+    "485": [
+      "data_gorontalo.json"
+    ],
+    "493": [
+      "data_sulawesi_selatan.json"
+    ],
+    "501": [
+      "data_bali.json",
+      "data_nusa_tenggara_barat.json"
+    ],
+    "502": [
+      "data_nusa_tenggara_barat.json",
+      "data_nusa_tenggara_timur.json"
+    ],
+    "503": [
+      "data_nusa_tenggara_timur.json"
+    ],
+    "504": [
+      "data_sulawesi_utara.json"
+    ],
+    "505": [
+      "data_jawa_timur_part2.json"
+    ],
+    "507": [
+      "data_nusa_tenggara_timur.json"
+    ],
+    "533": [
+      "data_nusa_tenggara_timur.json"
+    ],
+    "557": [
+      "data_di_yogyakarta.json"
+    ],
+    "575": [
+      "data_jawa_barat_part2.json"
+    ],
+    "585": [
+      "data_di_yogyakarta.json",
+      "data_gorontalo.json",
+      "data_jawa_barat_part2.json",
+      "data_jawa_timur_part2.json",
+      "data_lampung.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_utara.json"
+    ],
+    "601": [
+      "data_bali.json",
+      "data_maluku.json"
+    ],
+    "602": [
+      "data_banten.json",
+      "data_maluku_utara.json"
+    ],
+    "603": [
+      "data_papua.json",
+      "data_papua_selatan.json"
+    ],
+    "604": [
+      "data_papua_barat.json",
+      "data_sulawesi_barat.json"
+    ],
+    "606": [
+      "data_maluku_utara.json"
+    ],
+    "607": [
+      "data_aceh.json",
+      "data_bali.json",
+      "data_banten.json",
+      "data_bengkulu.json",
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_gorontalo.json",
+      "data_jambi.json",
+      "data_jawa_barat_part2.json",
+      "data_jawa_tengah_part2.json",
+      "data_jawa_timur_part2.json",
+      "data_kalimantan_barat.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json",
+      "data_kalimantan_timur.json",
+      "data_kalimantan_utara.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_kepulauan_riau.json",
+      "data_lampung.json",
+      "data_maluku.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_barat.json",
+      "data_nusa_tenggara_timur.json",
+      "data_papua.json",
+      "data_papua_barat.json",
+      "data_papua_selatan.json",
+      "data_riau.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_tenggara.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "611": [
+      "data_maluku.json"
+    ],
+    "640": [
+      "data_papua_barat.json"
+    ],
+    "696": [
+      "data_jawa_timur_part2.json"
+    ],
+    "697": [
+      "data_aceh.json",
+      "data_bali.json",
+      "data_banten.json",
+      "data_bengkulu.json",
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_gorontalo.json",
+      "data_jambi.json",
+      "data_jawa_barat_part2.json",
+      "data_jawa_tengah_part2.json",
+      "data_jawa_timur_part2.json",
+      "data_jawa_timur_part3.json",
+      "data_kalimantan_barat.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json",
+      "data_kalimantan_timur.json",
+      "data_kalimantan_utara.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_kepulauan_riau.json",
+      "data_lampung.json",
+      "data_maluku.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_barat.json",
+      "data_nusa_tenggara_timur.json",
+      "data_papua.json",
+      "data_papua_barat.json",
+      "data_papua_selatan.json",
+      "data_riau.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_tenggara.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "698": [
+      "data_aceh.json",
+      "data_bali.json",
+      "data_banten.json",
+      "data_bengkulu.json",
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_gorontalo.json",
+      "data_jambi.json",
+      "data_jawa_barat_part2.json",
+      "data_jawa_tengah_part2.json",
+      "data_jawa_timur_part3.json",
+      "data_kalimantan_barat.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json",
+      "data_kalimantan_timur.json",
+      "data_kalimantan_utara.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_kepulauan_riau.json",
+      "data_lampung.json",
+      "data_maluku.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_barat.json",
+      "data_nusa_tenggara_timur.json",
+      "data_papua.json",
+      "data_papua_barat.json",
+      "data_papua_selatan.json",
+      "data_riau.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_tenggara.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "699": [
+      "data_luar_negeri.json",
+      "data_aceh.json",
+      "data_bali.json",
+      "data_banten.json",
+      "data_bengkulu.json",
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_gorontalo.json",
+      "data_jambi.json",
+      "data_jawa_barat_part2.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part2.json",
+      "data_jawa_tengah_part3.json",
+      "data_jawa_timur_part3.json",
+      "data_kalimantan_barat.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json",
+      "data_kalimantan_timur.json",
+      "data_kalimantan_utara.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_kepulauan_riau.json",
+      "data_lampung.json",
+      "data_maluku.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_barat.json",
+      "data_nusa_tenggara_timur.json",
+      "data_papua.json",
+      "data_papua_barat.json",
+      "data_papua_selatan.json",
+      "data_riau.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_tenggara.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "700": [
+      "data_luar_negeri.json",
+      "data_aceh.json",
+      "data_bali.json",
+      "data_banten.json",
+      "data_bengkulu.json",
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_gorontalo.json",
+      "data_jambi.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_jawa_timur_part3.json",
+      "data_kalimantan_barat.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json",
+      "data_kalimantan_timur.json",
+      "data_kalimantan_utara.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_kepulauan_riau.json",
+      "data_lampung.json",
+      "data_maluku.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_barat.json",
+      "data_nusa_tenggara_timur.json",
+      "data_papua.json",
+      "data_papua_barat.json",
+      "data_papua_selatan.json",
+      "data_riau.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_tenggara.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "710": [
+      "data_aceh.json",
+      "data_lampung.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "711": [
+      "data_jambi.json",
+      "data_jawa_barat_part3.json",
+      "data_kalimantan_selatan.json",
+      "data_nusa_tenggara_timur.json",
+      "data_papua.json",
+      "data_sulawesi_tengah.json",
+      "data_sumatera_utara.json"
+    ],
+    "712": [
+      "data_jambi.json",
+      "data_jawa_tengah_part3.json",
+      "data_lampung.json",
+      "data_sumatera_barat.json"
+    ],
+    "713": [
+      "data_lampung.json",
+      "data_sulawesi_selatan.json"
+    ],
+    "714": [
+      "data_jawa_barat_part3.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_nusa_tenggara_timur.json"
+    ],
+    "715": [
+      "data_nusa_tenggara_barat.json",
+      "data_sumatera_barat.json"
+    ],
+    "716": [
+      "data_aceh.json",
+      "data_banten.json",
+      "data_jawa_barat_part3.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_utara.json",
+      "data_papua_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "717": [
+      "data_aceh.json",
+      "data_nusa_tenggara_timur.json",
+      "data_riau.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json",
+      "data_sumatera_utara.json"
+    ],
+    "718": [
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_sulawesi_selatan.json"
+    ],
+    "719": [
+      "data_aceh.json",
+      "data_banten.json",
+      "data_sulawesi_selatan.json"
+    ],
+    "720": [
+      "data_aceh.json",
+      "data_banten.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_riau.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "721": [
+      "data_aceh.json",
+      "data_jawa_barat_part3.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_sumatera_utara.json"
+    ],
+    "722": [
+      "data_maluku_utara.json",
+      "data_papua_selatan.json",
+      "data_sumatera_barat.json"
+    ],
+    "723": [
+      "data_jawa_barat_part3.json",
+      "data_papua.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json"
+    ],
+    "724": [
+      "data_kalimantan_barat.json",
+      "data_nusa_tenggara_timur.json",
+      "data_sulawesi_selatan.json"
+    ],
+    "725": [
+      "data_sulawesi_selatan.json"
+    ],
+    "726": [
+      "data_aceh.json",
+      "data_jambi.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_barat.json",
+      "data_papua_selatan.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_utara.json"
+    ],
+    "728": [
+      "data_jambi.json",
+      "data_jawa_timur_part3.json"
+    ],
+    "729": [
+      "data_maluku_utara.json"
+    ],
+    "730": [
+      "data_banten.json",
+      "data_jawa_barat_part3.json",
+      "data_sulawesi_selatan.json",
+      "data_sumatera_barat.json"
+    ],
+    "731": [
+      "data_banten.json",
+      "data_bengkulu.json",
+      "data_nusa_tenggara_barat.json",
+      "data_sumatera_selatan.json"
+    ],
+    "733": [
+      "data_jawa_barat_part3.json",
+      "data_kepulauan_riau.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tenggara.json",
+      "data_sulawesi_utara.json"
+    ],
+    "734": [
+      "data_gorontalo.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_kalimantan_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "735": [
+      "data_jawa_barat_part3.json",
+      "data_kalimantan_timur.json",
+      "data_sumatera_utara.json"
+    ],
+    "736": [
+      "data_kalimantan_selatan.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_selatan.json"
+    ],
+    "737": [
+      "data_maluku.json",
+      "data_sumatera_barat.json"
+    ],
+    "738": [
+      "data_di_yogyakarta.json",
+      "data_jawa_timur_part3.json",
+      "data_lampung.json"
+    ],
+    "739": [
+      "data_bengkulu.json",
+      "data_jambi.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_nusa_tenggara_timur.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_utara.json"
+    ],
+    "740": [
+      "data_jawa_barat_part3.json",
+      "data_nusa_tenggara_barat.json",
+      "data_sulawesi_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "741": [
+      "data_jawa_tengah_part3.json",
+      "data_lampung.json",
+      "data_riau.json",
+      "data_sumatera_utara.json"
+    ],
+    "742": [
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_jawa_timur_part3.json",
+      "data_lampung.json",
+      "data_riau.json",
+      "data_sumatera_utara.json"
+    ],
+    "743": [
+      "data_banten.json",
+      "data_jawa_timur_part3.json",
+      "data_maluku.json",
+      "data_nusa_tenggara_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "744": [
+      "data_aceh.json",
+      "data_di_yogyakarta.json",
+      "data_jawa_timur_part3.json",
+      "data_kalimantan_barat.json",
+      "data_lampung.json",
+      "data_nusa_tenggara_timur.json",
+      "data_sulawesi_selatan.json"
+    ],
+    "745": [
+      "data_di_yogyakarta.json",
+      "data_jawa_barat_part3.json",
+      "data_sulawesi_utara.json"
+    ],
+    "746": [
+      "data_aceh.json",
+      "data_banten.json",
+      "data_jawa_timur_part3.json",
+      "data_nusa_tenggara_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "747": [
+      "data_jawa_barat_part3.json",
+      "data_nusa_tenggara_barat.json",
+      "data_papua_selatan.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "748": [
+      "data_jawa_barat_part3.json",
+      "data_riau.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "749": [
+      "data_jawa_barat_part3.json",
+      "data_nusa_tenggara_timur.json",
+      "data_sulawesi_tengah.json"
+    ],
+    "750": [
+      "data_bali.json",
+      "data_kalimantan_timur.json",
+      "data_sulawesi_tenggara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "751": [
+      "data_aceh.json",
+      "data_banten.json",
+      "data_di_yogyakarta.json",
+      "data_jawa_barat_part3.json",
+      "data_lampung.json",
+      "data_maluku_utara.json",
+      "data_riau.json",
+      "data_sulawesi_selatan.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "752": [
+      "data_jawa_barat_part3.json",
+      "data_jawa_timur_part3.json",
+      "data_sulawesi_utara.json"
+    ],
+    "753": [
+      "data_aceh.json",
+      "data_banten.json",
+      "data_jawa_tengah_part3.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_riau.json"
+    ],
+    "754": [
+      "data_banten.json",
+      "data_di_yogyakarta.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_timur_part3.json",
+      "data_maluku.json"
+    ],
+    "755": [
+      "data_dki_jakarta.json",
+      "data_jawa_tengah_part3.json",
+      "data_kalimantan_timur.json"
+    ],
+    "756": [
+      "data_sumatera_barat.json"
+    ],
+    "757": [
+      "data_jawa_barat_part3.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "758": [
+      "data_banten.json",
+      "data_jambi.json",
+      "data_jawa_barat_part3.json",
+      "data_kalimantan_selatan.json",
+      "data_sulawesi_selatan.json"
+    ],
+    "759": [
+      "data_aceh.json",
+      "data_maluku_utara.json",
+      "data_sulawesi_selatan.json"
+    ],
+    "760": [
+      "data_aceh.json",
+      "data_bengkulu.json",
+      "data_maluku.json",
+      "data_nusa_tenggara_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "761": [
+      "data_jawa_barat_part3.json",
+      "data_riau.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_utara.json"
+    ],
+    "762": [
+      "data_bengkulu.json",
+      "data_sumatera_utara.json"
+    ],
+    "763": [
+      "data_jawa_tengah_part3.json",
+      "data_lampung.json",
+      "data_nusa_tenggara_barat.json",
+      "data_riau.json",
+      "data_sulawesi_tenggara.json",
+      "data_sumatera_selatan.json"
+    ],
+    "764": [
+      "data_maluku.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json"
+    ],
+    "765": [
+      "data_jawa_barat_part3.json",
+      "data_kalimantan_timur.json",
+      "data_lampung.json",
+      "data_nusa_tenggara_barat.json",
+      "data_sulawesi_selatan.json"
+    ],
+    "766": [
+      "data_kalimantan_timur.json",
+      "data_riau.json",
+      "data_sulawesi_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "767": [
+      "data_sumatera_selatan.json"
+    ],
+    "768": [
+      "data_nusa_tenggara_barat.json",
+      "data_sumatera_selatan.json"
+    ],
+    "769": [
+      "data_jawa_barat_part3.json",
+      "data_sulawesi_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "770": [
+      "data_banten.json",
+      "data_jawa_barat_part3.json",
+      "data_sulawesi_selatan.json",
+      "data_sumatera_selatan.json"
+    ],
+    "771": [
+      "data_jawa_timur_part3.json",
+      "data_sumatera_barat.json"
+    ],
+    "772": [
+      "data_aceh.json",
+      "data_banten.json",
+      "data_jawa_barat_part3.json",
+      "data_kepulauan_riau.json",
+      "data_sumatera_utara.json"
+    ],
+    "773": [
+      "data_bali.json",
+      "data_jawa_barat_part3.json",
+      "data_lampung.json",
+      "data_sulawesi_tenggara.json"
+    ],
+    "774": [
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json"
+    ],
+    "775": [
+      "data_bengkulu.json",
+      "data_jawa_timur_part3.json",
+      "data_riau.json",
+      "data_sulawesi_selatan.json"
+    ],
+    "776": [
+      "data_jawa_barat_part3.json",
+      "data_kalimantan_timur.json",
+      "data_maluku_utara.json",
+      "data_sulawesi_tengah.json",
+      "data_sumatera_utara.json"
+    ],
+    "777": [
+      "data_nusa_tenggara_barat.json",
+      "data_sulawesi_tengah.json"
+    ],
+    "778": [
+      "data_banten.json",
+      "data_nusa_tenggara_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "779": [
+      "data_sulawesi_utara.json",
+      "data_sumatera_utara.json"
+    ],
+    "780": [
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_jawa_barat_part3.json",
+      "data_sulawesi_tengah.json"
+    ],
+    "781": [
+      "data_aceh.json",
+      "data_nusa_tenggara_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "782": [
+      "data_aceh.json",
+      "data_di_yogyakarta.json",
+      "data_jawa_barat_part3.json"
+    ],
+    "783": [
+      "data_jawa_timur_part3.json",
+      "data_nusa_tenggara_barat.json",
+      "data_papua_barat.json",
+      "data_sulawesi_tengah.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "784": [
+      "data_maluku.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_utara.json"
+    ],
+    "785": [
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_kalimantan_selatan.json",
+      "data_riau.json",
+      "data_sulawesi_tenggara.json"
+    ],
+    "786": [
+      "data_jawa_barat_part3.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_tengah.json",
+      "data_sumatera_selatan.json"
+    ],
+    "787": [
+      "data_riau.json",
+      "data_sulawesi_tenggara.json",
+      "data_sumatera_utara.json"
+    ],
+    "788": [
+      "data_jawa_timur_part3.json",
+      "data_papua_selatan.json",
+      "data_sulawesi_barat.json",
+      "data_sumatera_barat.json"
+    ],
+    "789": [
+      "data_kalimantan_selatan.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_timur.json",
+      "data_sumatera_utara.json"
+    ],
+    "790": [
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_jawa_timur_part3.json",
+      "data_kalimantan_timur.json"
+    ],
+    "791": [
+      "data_banten.json",
+      "data_sumatera_utara.json"
+    ],
+    "792": [
+      "data_aceh.json",
+      "data_banten.json",
+      "data_jambi.json",
+      "data_jawa_barat_part3.json",
+      "data_nusa_tenggara_timur.json",
+      "data_sumatera_utara.json"
+    ],
+    "793": [
+      "data_jambi.json",
+      "data_jawa_barat_part3.json",
+      "data_kalimantan_tengah.json",
+      "data_nusa_tenggara_timur.json"
+    ],
+    "794": [
+      "data_banten.json",
+      "data_jawa_barat_part3.json",
+      "data_kalimantan_tengah.json",
+      "data_nusa_tenggara_barat.json",
+      "data_sumatera_barat.json"
+    ],
+    "795": [
+      "data_banten.json",
+      "data_jawa_barat_part3.json",
+      "data_maluku_utara.json"
+    ],
+    "796": [
+      "data_banten.json",
+      "data_jawa_tengah_part3.json",
+      "data_sumatera_barat.json"
+    ],
+    "797": [
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_sumatera_utara.json"
+    ],
+    "798": [
+      "data_jawa_barat_part3.json",
+      "data_jawa_timur_part3.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_selatan.json"
+    ],
+    "799": [
+      "data_banten.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_kalimantan_barat.json",
+      "data_papua_selatan.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_utara.json"
+    ],
+    "901": [
+      "data_luar_negeri.json",
+      "data_bali.json",
+      "data_banten.json",
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_jawa_timur_part3.json",
+      "data_kepulauan_riau.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "9LN": [
+      "data_luar_negeri.json"
+    ],
+    "P99": [
+      "data_luar_negeri.json",
+      "data_aceh.json",
+      "data_bali.json",
+      "data_banten.json",
+      "data_bengkulu.json",
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_gorontalo.json",
+      "data_jambi.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_jawa_timur_part4.json",
+      "data_kalimantan_barat.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json",
+      "data_kalimantan_timur.json",
+      "data_kalimantan_utara.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_kepulauan_riau.json",
+      "data_lampung.json",
+      "data_maluku.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_barat.json",
+      "data_nusa_tenggara_timur.json",
+      "data_papua.json",
+      "data_papua_barat.json",
+      "data_papua_selatan.json",
+      "data_riau.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_tenggara.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "K05": [
+      "data_aceh.json",
+      "data_bali.json",
+      "data_banten.json",
+      "data_bengkulu.json",
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_gorontalo.json",
+      "data_jambi.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_jawa_timur_part3.json",
+      "data_kalimantan_barat.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json",
+      "data_kalimantan_timur.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_kepulauan_riau.json",
+      "data_lampung.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_barat.json",
+      "data_papua.json",
+      "data_riau.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tenggara.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "K56": [
+      "data_aceh.json",
+      "data_bali.json",
+      "data_banten.json",
+      "data_bengkulu.json",
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_gorontalo.json",
+      "data_jambi.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_jawa_timur_part3.json",
+      "data_kalimantan_barat.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json",
+      "data_kalimantan_timur.json",
+      "data_kalimantan_utara.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_kepulauan_riau.json",
+      "data_lampung.json",
+      "data_maluku.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_barat.json",
+      "data_nusa_tenggara_timur.json",
+      "data_papua.json",
+      "data_papua_barat.json",
+      "data_papua_selatan.json",
+      "data_riau.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_tenggara.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "K99": [
+      "data_aceh.json",
+      "data_bali.json",
+      "data_banten.json",
+      "data_bengkulu.json",
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_gorontalo.json",
+      "data_jambi.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_jawa_timur_part3.json",
+      "data_jawa_timur_part4.json",
+      "data_kalimantan_barat.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json",
+      "data_kalimantan_timur.json",
+      "data_kalimantan_utara.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_kepulauan_riau.json",
+      "data_lampung.json",
+      "data_maluku.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_barat.json",
+      "data_nusa_tenggara_timur.json",
+      "data_papua.json",
+      "data_papua_barat.json",
+      "data_papua_selatan.json",
+      "data_riau.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_tenggara.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "P29": [
+      "data_aceh.json",
+      "data_bali.json",
+      "data_banten.json",
+      "data_bengkulu.json",
+      "data_di_yogyakarta.json",
+      "data_dki_jakarta.json",
+      "data_gorontalo.json",
+      "data_jambi.json",
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json",
+      "data_jawa_timur_part4.json",
+      "data_kalimantan_barat.json",
+      "data_kalimantan_selatan.json",
+      "data_kalimantan_tengah.json",
+      "data_kalimantan_timur.json",
+      "data_kalimantan_utara.json",
+      "data_kepulauan_bangka_belitung.json",
+      "data_kepulauan_riau.json",
+      "data_lampung.json",
+      "data_maluku.json",
+      "data_maluku_utara.json",
+      "data_nusa_tenggara_barat.json",
+      "data_nusa_tenggara_timur.json",
+      "data_papua.json",
+      "data_papua_barat.json",
+      "data_papua_selatan.json",
+      "data_riau.json",
+      "data_sulawesi_barat.json",
+      "data_sulawesi_selatan.json",
+      "data_sulawesi_tengah.json",
+      "data_sulawesi_tenggara.json",
+      "data_sulawesi_utara.json",
+      "data_sumatera_barat.json",
+      "data_sumatera_selatan.json",
+      "data_sumatera_utara.json"
+    ],
+    "K34": [
+      "data_bali.json"
+    ],
+    "NP1": [
+      "data_bali.json"
+    ],
+    "NP5": [
+      "data_bali.json"
+    ],
+    "NP7": [
+      "data_bali.json",
+      "data_dki_jakarta.json"
+    ],
+    "NP8": [
+      "data_bali.json",
+      "data_dki_jakarta.json",
+      "data_riau.json"
+    ],
+    "K54": [
+      "data_banten.json"
+    ],
+    "P96": [
+      "data_banten.json"
+    ],
+    "K91": [
+      "data_bengkulu.json"
+    ],
+    "P32": [
+      "data_di_yogyakarta.json"
+    ],
+    "P64": [
+      "data_di_yogyakarta.json"
+    ],
+    "P76": [
+      "data_di_yogyakarta.json"
+    ],
+    "K14": [
+      "data_dki_jakarta.json",
+      "data_lampung.json"
+    ],
+    "K17": [
+      "data_dki_jakarta.json"
+    ],
+    "K59": [
+      "data_dki_jakarta.json"
+    ],
+    "NP3": [
+      "data_dki_jakarta.json"
+    ],
+    "NP4": [
+      "data_dki_jakarta.json",
+      "data_sulawesi_tenggara.json"
+    ],
+    "NP9": [
+      "data_dki_jakarta.json",
+      "data_jawa_barat_part3.json"
+    ],
+    "P42": [
+      "data_dki_jakarta.json"
+    ],
+    "P63": [
+      "data_dki_jakarta.json",
+      "data_sulawesi_selatan.json"
+    ],
+    "K21": [
+      "data_jambi.json"
+    ],
+    "P23": [
+      "data_jambi.json"
+    ],
+    "K02": [
+      "data_jawa_barat_part3.json"
+    ],
+    "K03": [
+      "data_jawa_tengah_part3.json"
+    ],
+    "P73": [
+      "data_kalimantan_selatan.json"
+    ],
+    "P27": [
+      "data_kalimantan_tengah.json"
+    ],
+    "P46": [
+      "data_kalimantan_tengah.json"
+    ],
+    "K10": [
+      "data_kalimantan_timur.json"
+    ],
+    "K74": [
+      "data_kepulauan_riau.json"
+    ],
+    "P59": [
+      "data_lampung.json"
+    ],
+    "P15": [
+      "data_maluku_utara.json"
+    ],
+    "P25": [
+      "data_maluku_utara.json",
+      "data_sulawesi_tenggara.json"
+    ],
+    "P35": [
+      "data_maluku_utara.json"
+    ],
+    "P89": [
+      "data_maluku_utara.json",
+      "data_sumatera_utara.json"
+    ],
+    "K47": [
+      "data_nusa_tenggara_barat.json"
+    ],
+    "K77": [
+      "data_nusa_tenggara_barat.json"
+    ],
+    "P14": [
+      "data_nusa_tenggara_barat.json"
+    ],
+    "P53": [
+      "data_nusa_tenggara_barat.json"
+    ],
+    "P97": [
+      "data_nusa_tenggara_barat.json"
+    ],
+    "NP2": [
+      "data_nusa_tenggara_timur.json"
+    ],
+    "P69": [
+      "data_nusa_tenggara_timur.json"
+    ],
+    "P47": [
+      "data_riau.json"
+    ],
+    "P52": [
+      "data_riau.json"
+    ],
+    "P94": [
+      "data_sulawesi_selatan.json"
+    ],
+    "K26": [
+      "data_sulawesi_tengah.json"
+    ],
+    "NP6": [
+      "data_sulawesi_tengah.json"
+    ],
+    "P77": [
+      "data_sulawesi_utara.json"
+    ],
+    "P55": [
+      "data_sumatera_barat.json"
+    ],
+    "P86": [
+      "data_sumatera_barat.json"
+    ],
+    "P66": [
+      "data_sumatera_selatan.json"
+    ],
+    "P13": [
+      "data_sumatera_utara.json"
+    ],
+    "P93": [
+      "data_sumatera_utara.json"
+    ]
+  },
+  "sample_schools": [
+    {
+      "npsn": "69962248",
+      "nama": "SEKOLAH SI JOHOR BAHRU (SIJB) TINGKAT SD",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "JOHOR BAHRU",
+      "nama_kecamatan": "JOHOR BAHRU",
+      "nama_kabupaten": "MALAYSIA",
+      "nama_provinsi": "LUAR NEGERI",
+      "alamat_jalan": "NO 46 JALAN TAAT 80100",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "69962249",
+      "nama": "SEKOLAH SI JOHOR BAHRU (SIJB) TINGKAT SMP",
+      "bentuk_pendidikan": "SMP",
+      "bentuk_pendidikan_group": "SMP SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "JOHOR BAHRU",
+      "nama_kecamatan": "JOHOR BAHRU",
+      "nama_kabupaten": "MALAYSIA",
+      "nama_provinsi": "LUAR NEGERI",
+      "alamat_jalan": "NO 46 JALAN TAAT 80100",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "69971932",
+      "nama": "PAUD SIKK",
+      "bentuk_pendidikan": "TK",
+      "bentuk_pendidikan_group": "TK SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN ANAK USIA DINI",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "SEPANGGAR",
+      "nama_kecamatan": "KOTA KINABALU",
+      "nama_kabupaten": "MALAYSIA",
+      "nama_provinsi": "LUAR NEGERI",
+      "alamat_jalan": "SEPANGGAR",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "69971941",
+      "nama": "CLC SD GEDAU",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "SANDAKAN",
+      "nama_kecamatan": "SANDAKAN",
+      "nama_kabupaten": "MALAYSIA",
+      "nama_provinsi": "LUAR NEGERI",
+      "alamat_jalan": "GEDAU SDN., BHD. P.O. BOX 112, 90701 SANDAKAN (LADANG MILLS)",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "69971967",
+      "nama": "CLC KRETAM SAPAGAYA",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "SWASTA",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "KINABALU",
+      "nama_kecamatan": "KOTA KINABALU",
+      "nama_kabupaten": "MALAYSIA",
+      "nama_provinsi": "LUAR NEGERI",
+      "alamat_jalan": "JL. SUKAU, LADANG SAPAGAYA ESTATE, KINABATANGAN",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "60300529",
+      "nama": "SD YPPK SALOR",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "SWASTA",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "IVIMAHAD",
+      "nama_kecamatan": "KEC. KURIK",
+      "nama_kabupaten": "KAB. MERAUKE",
+      "nama_provinsi": "PROV. PAPUA SELATAN",
+      "alamat_jalan": "SALOR",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "60300530",
+      "nama": "SD YPPK SANGGASE",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "SWASTA",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "SANGGASE",
+      "nama_kecamatan": "KEC. OKABA",
+      "nama_kabupaten": "KAB. MERAUKE",
+      "nama_provinsi": "PROV. PAPUA SELATAN",
+      "alamat_jalan": "SANGGASE",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "60300531",
+      "nama": "SD YPPK SENEGI",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "SWASTA",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "SENEGI",
+      "nama_kecamatan": "KEC. ANIMHA",
+      "nama_kabupaten": "KAB. MERAUKE",
+      "nama_provinsi": "PROV. PAPUA SELATAN",
+      "alamat_jalan": "SENEGI",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "60300534",
+      "nama": "SD YPPK ST FRANSISKUS XAVERIUS 2",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "SWASTA",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "MARO",
+      "nama_kecamatan": "KEC. MERAUKE",
+      "nama_kabupaten": "KAB. MERAUKE",
+      "nama_provinsi": "PROV. PAPUA SELATAN",
+      "alamat_jalan": "JL. RAYA MANDALA NO.36A",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "60300535",
+      "nama": "SD YPPK SABON",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "SWASTA",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "SABON",
+      "nama_kecamatan": "KEC. WAAN",
+      "nama_kabupaten": "KAB. MERAUKE",
+      "nama_provinsi": "PROV. PAPUA SELATAN",
+      "alamat_jalan": "KAMPUNG SABON",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "69962248",
+      "nama": "SEKOLAH SI JOHOR BAHRU (SIJB) TINGKAT SD",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "JOHOR BAHRU",
+      "nama_kecamatan": "JOHOR BAHRU",
+      "nama_kabupaten": "MALAYSIA",
+      "nama_provinsi": "LUAR NEGERI",
+      "alamat_jalan": "NO 46 JALAN TAAT 80100",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "69962249",
+      "nama": "SEKOLAH SI JOHOR BAHRU (SIJB) TINGKAT SMP",
+      "bentuk_pendidikan": "SMP",
+      "bentuk_pendidikan_group": "SMP SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "JOHOR BAHRU",
+      "nama_kecamatan": "JOHOR BAHRU",
+      "nama_kabupaten": "MALAYSIA",
+      "nama_provinsi": "LUAR NEGERI",
+      "alamat_jalan": "NO 46 JALAN TAAT 80100",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "69971932",
+      "nama": "PAUD SIKK",
+      "bentuk_pendidikan": "TK",
+      "bentuk_pendidikan_group": "TK SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN ANAK USIA DINI",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "SEPANGGAR",
+      "nama_kecamatan": "KOTA KINABALU",
+      "nama_kabupaten": "MALAYSIA",
+      "nama_provinsi": "LUAR NEGERI",
+      "alamat_jalan": "SEPANGGAR",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "69971941",
+      "nama": "CLC SD GEDAU",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "SANDAKAN",
+      "nama_kecamatan": "SANDAKAN",
+      "nama_kabupaten": "MALAYSIA",
+      "nama_provinsi": "LUAR NEGERI",
+      "alamat_jalan": "GEDAU SDN., BHD. P.O. BOX 112, 90701 SANDAKAN (LADANG MILLS)",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "69971967",
+      "nama": "CLC KRETAM SAPAGAYA",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "SWASTA",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "KINABALU",
+      "nama_kecamatan": "KOTA KINABALU",
+      "nama_kabupaten": "MALAYSIA",
+      "nama_provinsi": "LUAR NEGERI",
+      "alamat_jalan": "JL. SUKAU, LADANG SAPAGAYA ESTATE, KINABATANGAN",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "10001804",
+      "nama": "SDN LUENG SA",
+      "bentuk_pendidikan": "SD",
+      "bentuk_pendidikan_group": "SD SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "LUENG SATU",
+      "nama_kecamatan": "KEC. MADAT",
+      "nama_kabupaten": "KAB. ACEH TIMUR",
+      "nama_provinsi": "PROV. ACEH",
+      "alamat_jalan": "JLN TANJUNG MINJEI/MEUNASAH ASAN",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "10100101",
+      "nama": "SMP NEGERI 1 DARUL KAMAL",
+      "bentuk_pendidikan": "SMP",
+      "bentuk_pendidikan_group": "SMP SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "NEUSOK",
+      "nama_kecamatan": "KEC. DARUL KAMAL",
+      "nama_kabupaten": "KAB. ACEH BESAR",
+      "nama_provinsi": "PROV. ACEH",
+      "alamat_jalan": "JL. TEUNGKU FAKINAH KM.7",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "10100102",
+      "nama": "SMP NEGERI 2 MONTASIK",
+      "bentuk_pendidikan": "SMP",
+      "bentuk_pendidikan_group": "SMP SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "LAM RAYA",
+      "nama_kecamatan": "KEC. MONTASIK",
+      "nama_kabupaten": "KAB. ACEH BESAR",
+      "nama_provinsi": "PROV. ACEH",
+      "alamat_jalan": "JLN. SEUNEULOP",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "10100103",
+      "nama": "SMP N 2 LHOONG",
+      "bentuk_pendidikan": "SMP",
+      "bentuk_pendidikan_group": "SMP SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "SEUNGKO MULAT",
+      "nama_kecamatan": "KEC. LHOONG",
+      "nama_kabupaten": "KAB. ACEH BESAR",
+      "nama_provinsi": "PROV. ACEH",
+      "alamat_jalan": "JLN. BANDA ACEH MELABOH",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    },
+    {
+      "npsn": "10100104",
+      "nama": "SMP NEGERI 1 LEUPUNG",
+      "bentuk_pendidikan": "SMP",
+      "bentuk_pendidikan_group": "SMP SEDERAJAT",
+      "jenis_pendidikan": "PENDIDIKAN UMUM",
+      "status_satuan_pendidikan": "NEGERI",
+      "jenjang_pendidikan": "PENDIDIKAN DASAR",
+      "pembina": "KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH",
+      "jalur_pendidikan": "FORMAL",
+      "nama_desa": "PULOT",
+      "nama_kecamatan": "KEC. LEUPUNG",
+      "nama_kabupaten": "KAB. ACEH BESAR",
+      "nama_provinsi": "PROV. ACEH",
+      "alamat_jalan": "JLN,B,ACEH-MEULABOH KM.27",
+      "satuan_pendidikan_id": null,
+      "kode_wilayah": null
+    }
+  ]
+}

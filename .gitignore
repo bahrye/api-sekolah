@@ -6,5 +6,4 @@
 .wrangler/
 node_modules/
 sql_imports/
-data_provinsi/
 *.log

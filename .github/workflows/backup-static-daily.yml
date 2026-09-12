@@ -1,9 +1,9 @@
-name: Backup Static JSON Cadangan (Mingguan)
+name: Backup Static JSON Cadangan (Harian)
 
 on:
   schedule:
-    # Berjalan setiap hari Minggu pukul 17:00 UTC (00:00 WIB Senin)
-    - cron: '0 17 * * 0'
+    # Berjalan otomatis setiap hari pukul 17:00 UTC (00:00 WIB tengah malam)
+    - cron: '0 17 * * *'
   workflow_dispatch:
     inputs:
       pilihan_provinsi:
@@ -47,7 +47,7 @@ jobs:
             node scripts/export-static-provinsi.cjs
           fi
 
-      - name: Simpan Perubahan ke Repositori
+      - name: Simpan Perubahan ke Repositori & Deploy ke Pages
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -55,6 +55,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "Tidak ada perubahan data statis."
           else
-            git commit -m "chore(backup): perbarui data cadangan statis provinsi [skip ci]"
+            git commit -m "chore(backup): perbarui data cadangan statis harian"
             git push
           fi
