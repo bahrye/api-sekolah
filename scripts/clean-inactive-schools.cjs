@@ -27,7 +27,9 @@ const PROVINCES_TO_CLEAN = [
   { kode: "170000", nama: "SULAWESI UTARA", provDbKey: "PROV. SULAWESI UTARA", expectedExtra: 5 },
   { kode: "140000", nama: "KALIMANTAN TENGAH", provDbKey: "PROV. KALIMANTAN TENGAH", expectedExtra: 4 },
   { kode: "080000", nama: "SUMATERA BARAT", provDbKey: "PROV. SUMATERA BARAT", expectedExtra: 3 },
-  { kode: "370000", nama: "PAPUA SELATAN", provDbKey: "PROV. PAPUA SELATAN", expectedExtra: 1 },
+  { kode: "150000", nama: "KALIMANTAN SELATAN", provDbKey: "PROV. KALIMANTAN SELATAN", expectedExtra: 26 },
+  { kode: "290000", nama: "KEPULAUAN BANGKA BELITUNG", provDbKey: "PROV. KEPULAUAN BANGKA BELITUNG", expectedExtra: 8 },
+  { kode: "340000", nama: "KALIMANTAN UTARA", provDbKey: "PROV. KALIMANTAN UTARA", expectedExtra: 2 },
 ];
 
 const VALID_SHAPES = [

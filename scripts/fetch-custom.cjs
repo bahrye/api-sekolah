@@ -258,7 +258,7 @@ async function fetchCustomData() {
           const diffCodes = compareJson.data.filter(d => {
             if (!kodeWilayahList.includes(d.kode)) return false;
             
-            const isSynced = (Math.abs(d.selisih) === 0 && d.raw_selisih === 0) || (d.selisih === 0 && (d.api_duplicates || 0) > 0);
+            const isSynced = (Math.abs(d.selisih) === 0 && d.raw_selisih === 0) || (d.selisih === 0 && ((d.api_duplicates || 0) > 0 || (d.api_unrecognized_shapes || 0) > 0));
             if (isSynced && !isMandatoryUpdateDay) return false;
             
             if (isCronSchedule && d.terakhir_sukses) {

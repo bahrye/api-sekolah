@@ -218,7 +218,13 @@ export async function onRequestPost(context) {
               item.api_empty_npsn = totalTanpaNpsn || 0;
               item.api_unrecognized_shapes = customParams.nonQueryableCount ?? (customParams.unrecognized_shapes || 0);
               item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);
-              item.selisih = item.raw_selisih - (item.api_duplicates || 0);
+              let selisihVal = item.raw_selisih;
+              if (item.raw_selisih > 0) {
+                const effDup = (item.api_duplicates || 0);
+                const effUnrec = (item.api_unrecognized_shapes || 0);
+                selisihVal = Math.max(0, item.raw_selisih - effDup - effUnrec);
+              }
+              item.selisih = selisihVal;
               item.extra_in_db = Math.max(0, (item.total_db || 0) - (item.total_api || 0));
               item.is_sinkron_walau_selisih = (item.selisih === 0);
               await supabase.from('cache_data').upsert({

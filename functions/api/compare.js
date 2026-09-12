@@ -139,7 +139,12 @@ export async function onRequestGet(context) {
       }
 
       const raw_selisih = item.total_api - dbTotal;
-      let selisih = raw_selisih - (syncInfo?.api_duplicates || 0);
+      let selisih = raw_selisih;
+      if (raw_selisih > 0) {
+        const effDuplicates = (syncInfo?.api_duplicates || 0);
+        const effUnrecognized = (syncInfo?.api_unrecognized_shapes || 0);
+        selisih = Math.max(0, raw_selisih - effDuplicates - effUnrecognized);
+      }
       const is_sinkron_walau_selisih = (selisih === 0);
       const extra_in_db = Math.max(0, dbTotal - item.total_api);
 

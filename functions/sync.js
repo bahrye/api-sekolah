@@ -106,7 +106,13 @@ export async function onRequestGet(context) {
           }
 
           item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);
-          item.selisih = item.raw_selisih - (item.api_duplicates || 0);
+          let selisihVal = item.raw_selisih;
+          if (item.raw_selisih > 0) {
+            const effDuplicates = (item.api_duplicates || 0);
+            const effUnrecognized = (item.api_unrecognized_shapes || 0);
+            selisihVal = Math.max(0, item.raw_selisih - effDuplicates - effUnrecognized);
+          }
+          item.selisih = selisihVal;
           item.extra_in_db = Math.max(0, (item.total_db || 0) - (item.total_api || 0));
 
           const isSyncedToday = Boolean(item.terakhir_sukses && getWibDate(item.terakhir_sukses) === todayDateWIB);
@@ -208,8 +214,8 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             }
           });
           compareCache.value.sort((a, b) => {
-            const aDiff = (a.selisih !== 0 || a.raw_selisih !== 0) ? 1 : 0;
-            const bDiff = (b.selisih !== 0 || b.raw_selisih !== 0) ? 1 : 0;
+            const aDiff = (!a.is_sinkron_walau_selisih && (a.selisih !== 0 || a.raw_selisih !== 0)) ? 1 : 0;
+            const bDiff = (!b.is_sinkron_walau_selisih && (b.selisih !== 0 || b.raw_selisih !== 0)) ? 1 : 0;
             if (aDiff !== bDiff) return bDiff - aDiff;
             return a.nama.localeCompare(b.nama);
           });
@@ -227,7 +233,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
               selisihColor = 'var(--success)';
               statusIcon = '✅ Sinkron';
               selisihDisplay = '0';
-            } else if (d.selisih === 0 && (d.api_duplicates || 0) > 0) {
+            } else if (d.selisih === 0 && ((d.api_duplicates || 0) > 0 || (d.api_unrecognized_shapes || 0) > 0)) {
               selisihColor = 'var(--success)';
               statusIcon = '✅ Sinkron';
               selisihDisplay = '0';
