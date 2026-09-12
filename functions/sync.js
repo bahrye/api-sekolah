@@ -88,10 +88,10 @@ export async function onRequestGet(context) {
 
           item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);
           item.selisih = item.raw_selisih - (item.api_duplicates || 0);
+          item.extra_in_db = Math.max(0, (item.total_db || 0) - (item.total_api || 0));
 
           const isSyncedToday = Boolean(item.terakhir_sukses && item.terakhir_sukses.split(/[ T]/)[0] === todayDateWIB);
           if (item.selisih <= 0 || (item.raw_selisih <= 0 && isSyncedToday)) {
-            item.selisih = 0;
             item.is_sinkron_walau_selisih = true;
           }
         });
@@ -175,8 +175,9 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         if (compareCache) {
           lastChecked = compareCache.updated_at + ' WIB';
           compareCache.value.forEach(d => {
+            const hasActualDiff = (d.selisih > 0 && !d.is_sinkron_walau_selisih);
             compareMap[d.nama.replace(/[^A-Z]/g, '')] = d.selisih;
-            if (d.selisih !== 0) hasDiffGlobal = true;
+            if (hasActualDiff) hasDiffGlobal = true;
 
             const isGap = (d.raw_selisih > 0) || ((d.total_api || 0) > (d.total_db || 0));
             const effDuplicates = isGap ? (d.api_duplicates || 0) : 0;
@@ -184,12 +185,14 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             sumTotalApi += d.total_api || 0;
             sumTotalDb += d.total_db || 0;
             sumApiDuplicates += effDuplicates;
-            sumAdjustedSelisih += d.selisih || 0;
-            if (d.selisih !== 0) diffCount++;
+            if (hasActualDiff) {
+              sumAdjustedSelisih += d.selisih || 0;
+              diffCount++;
+            }
           });
           compareCache.value.sort((a, b) => {
-            const aDiff = a.selisih !== 0 ? 1 : 0;
-            const bDiff = b.selisih !== 0 ? 1 : 0;
+            const aDiff = (a.selisih > 0 && !a.is_sinkron_walau_selisih) ? 1 : 0;
+            const bDiff = (b.selisih > 0 && !b.is_sinkron_walau_selisih) ? 1 : 0;
             if (aDiff !== bDiff) return bDiff - aDiff;
             return a.nama.localeCompare(b.nama);
           });
@@ -200,10 +203,21 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
 
             let selisihColor = 'var(--danger)';
             let statusIcon = '⚠️ Berbeda';
+            const extraInDb = (d.total_db || 0) - (d.total_api || 0);
+            let selisihDisplay = `${d.selisih > 0 ? '+' : ''}${d.selisih.toLocaleString('id-ID')}`;
 
-            if (d.selisih === 0 || d.is_sinkron_walau_selisih) {
+            if (d.selisih === 0) {
               selisihColor = 'var(--success)';
               statusIcon = '✅ Sinkron';
+              selisihDisplay = '0';
+            } else if (extraInDb > 0 && d.is_sinkron_walau_selisih) {
+              selisihColor = 'var(--success)';
+              statusIcon = '✅ Sinkron';
+              selisihDisplay = `<span style="color: var(--success);" title="Database memiliki ${extraInDb.toLocaleString('id-ID')} data sekolah lebih lengkap dibanding counter global Belajar.id">+${extraInDb.toLocaleString('id-ID')} di DB</span>`;
+            } else if (d.is_sinkron_walau_selisih) {
+              selisihColor = 'var(--success)';
+              statusIcon = '✅ Sinkron';
+              selisihDisplay = '0';
             } else if (d.selisih < 0) {
               selisihColor = 'var(--warning)';
               statusIcon = '⚠️ Ada Pengurangan Data';
@@ -242,7 +256,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
                   <td style="padding: 12px 8px; text-align: center; color: var(--primary-light); font-weight: 600; font-size: 14px;">
                     ${d.total_db.toLocaleString('id-ID')}
                   </td>
-                  <td style="padding: 12px 8px; text-align: center; color: ${selisihColor}; font-weight: bold; font-size: 14px;">${d.selisih > 0 ? '+' : ''}${d.selisih.toLocaleString('id-ID')}</td>
+                  <td style="padding: 12px 8px; text-align: center; color: ${selisihColor}; font-weight: bold; font-size: 14px;">${selisihDisplay}</td>
                   <td style="padding: 12px 8px; text-align: center; color: ${selisihColor}; font-size: 12px; font-weight: 600;">${statusIcon}</td>
                 </tr>
               `;
@@ -596,12 +610,19 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
                     }
 
                     let selisihColor = 'var(--danger)';
+                    const extraInDbQueue = (d.total_db || 0) - (d.total_api || 0);
+                    let selisihVal = `${d.selisih > 0 ? '+' : ''}${d.selisih.toLocaleString('id-ID')}`;
+
                     if (d.selisih === 0) {
                       selisihColor = 'var(--success)';
+                      selisihVal = '0';
+                    } else if (extraInDbQueue > 0 && d.is_sinkron_walau_selisih) {
+                      selisihColor = 'var(--success)';
+                      selisihVal = `+${extraInDbQueue.toLocaleString('id-ID')} di DB`;
                     } else if (d.is_sinkron_walau_selisih) {
-                      selisihColor = 'var(--warning)';
+                      selisihColor = 'var(--success)';
+                      selisihVal = '0';
                     }
-                    const selisihVal = `${d.selisih > 0 ? '+' : ''}${d.selisih.toLocaleString('id-ID')}`;
 
                     return `
                       <tr class="${rowClass}" data-prov="${cleanName(d.nama)}">
