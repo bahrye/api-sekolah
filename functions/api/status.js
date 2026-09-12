@@ -4,7 +4,9 @@ import { getStatusSinkronisasiSupabase } from '../lib/sekolah-supabase.js';
 const jsonHeaders = {
   'Content-Type': 'application/json;charset=UTF-8',
   'Access-Control-Allow-Origin': '*',
-  'Cache-Control': 'public, max-age=1800, s-maxage=3600, stale-while-revalidate=7200',
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
 };
 
 /** GET /api/status — metadata publik (tanpa detail proses sync) */
@@ -29,6 +31,8 @@ export async function onRequest(context) {
       total_data_tersedia: pub.total_sekolah,
       waktu_update_data_terakhir: pub.waktu_selesai_terakhir,
       waktu_update_data_terakhir_iso: pub.waktu_selesai_terakhir_iso,
+      is_running: pub.is_running,
+      bentuk_aktif: pub.bentuk_aktif,
       jadwal_sync: 'Pembaruan berkala dari portal resmi (GitHub Actions)',
     };
 

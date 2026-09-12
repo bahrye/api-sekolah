@@ -6,7 +6,9 @@ export async function onRequest(context) {
     'Content-Type': 'application/json;charset=UTF-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-    'Cache-Control': 'public, max-age=300, s-maxage=600, stale-while-revalidate=86400',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
   };
 
   if (context.request.method === 'OPTIONS') {
@@ -14,12 +16,27 @@ export async function onRequest(context) {
   }
 
   try {
-    // Kloning data precomputed dasar
-    const result = JSON.parse(JSON.stringify(rekapPrecomputed));
+    const supabase = getSupabase(context.env);
+    let result = null;
 
-    // Ambil data Luar Negeri dinamis dari Supabase jika tersedia
+    // 1. Ambil data rekap realtime dari cache_data Supabase jika tersedia
     try {
-      const supabase = getSupabase(context.env);
+      const { data: cacheRow } = await supabase
+        .from('cache_data')
+        .select('value')
+        .eq('key', 'rekap_data')
+        .single();
+      if (cacheRow?.value) {
+        result = typeof cacheRow.value === 'string' ? JSON.parse(cacheRow.value) : cacheRow.value;
+      }
+    } catch (e) {}
+
+    if (!result) {
+      result = JSON.parse(JSON.stringify(rekapPrecomputed));
+    }
+
+    // 2. Ambil data Luar Negeri dinamis dari Supabase jika tersedia
+    try {
       const { data: lnRows, error } = await supabase
         .from('sekolah')
         .select('nama_kabupaten, bentuk_pendidikan')

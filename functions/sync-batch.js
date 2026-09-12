@@ -152,15 +152,14 @@ export async function onRequestPost(context) {
           currentDbCount = count || 0;
         } catch (e) {}
 
-        // Update akumulasi total_dihapus pada status_sinkronisasi jika ada data yang dihapus
-        if (totalDihapus > 0) {
-          try {
-            await supabase.from('status_sinkronisasi').update({
-              total_dihapus: (currentStatus?.total_dihapus || 0) + totalDihapus,
-              updated_at: new Date().toISOString(),
-            }).eq('id', targetId);
-          } catch (eStat) {}
-        }
+        // Update total_sekolah aktual dan akumulasi total_dihapus pada status_sinkronisasi
+        try {
+          const { count: grandCount } = await supabase.from('sekolah').select('*', { count: 'exact', head: true });
+          const statUpdate = { updated_at: new Date().toISOString() };
+          if (grandCount && grandCount > 0) statUpdate.total_sekolah = grandCount;
+          if (totalDihapus > 0) statUpdate.total_dihapus = (currentStatus?.total_dihapus || 0) + totalDihapus;
+          await supabase.from('status_sinkronisasi').update(statUpdate).in('id', [1, 2]);
+        } catch (eStat) {}
 
         const provStatusData = {
           nama_provinsi: body.namaProvinsi,

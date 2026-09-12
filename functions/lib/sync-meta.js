@@ -55,13 +55,26 @@ export async function getLastSyncAt(db) {
  * @param {string} iso
  */
 export function formatSyncTimeWib(iso) {
-  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z');
-  if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat('id-ID', {
-    timeZone: 'Asia/Jakarta',
-    dateStyle: 'long',
-    timeStyle: 'short',
-  }).format(d);
+  if (!iso) return '-';
+  if (typeof iso === 'string' && iso.includes('WIB')) return iso;
+  const s = String(iso).trim();
+  let ms = NaN;
+  if (s.includes('Z') || s.includes('+') || /T.*[+-]\d{2}/.test(s)) {
+    ms = new Date(s).getTime();
+  } else if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s)) {
+    ms = new Date(s.replace(' ', 'T') + 'Z').getTime();
+  } else {
+    ms = new Date(s).getTime();
+  }
+  if (isNaN(ms) || !ms) return iso;
+  const d = new Date(ms + 7 * 60 * 60 * 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  const Y = d.getUTCFullYear();
+  const M = pad(d.getUTCMonth() + 1);
+  const D = pad(d.getUTCDate());
+  const h = pad(d.getUTCHours());
+  const m = pad(d.getUTCMinutes());
+  return `${D}-${M}-${Y} ${h}:${m} WIB`;
 }
 
 /**

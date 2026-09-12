@@ -18,6 +18,7 @@
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -591,8 +592,31 @@
                 var lastIso = document.getElementById('last-update-iso');
                 var totalEl = document.getElementById('total-data-count');
 
+                function formatWIB(dStr) {
+                    if (!dStr) return '-';
+                    if (typeof dStr === 'string' && dStr.includes('WIB')) return dStr;
+                    var s = String(dStr).trim();
+                    var ms = NaN;
+                    if (s.includes('Z') || s.includes('+') || /T.*[+-]\d{2}/.test(s)) {
+                        ms = new Date(s).getTime();
+                    } else if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s)) {
+                        ms = new Date(s.replace(' ', 'T') + 'Z').getTime();
+                    } else {
+                        ms = new Date(s).getTime();
+                    }
+                    if (isNaN(ms) || !ms) return dStr;
+                    var d = new Date(ms + 7 * 3600 * 1000);
+                    var pad = function (n) { return String(n).padStart(2, '0'); };
+                    var D = pad(d.getUTCDate());
+                    var M = pad(d.getUTCMonth() + 1);
+                    var Y = d.getUTCFullYear();
+                    var h = pad(d.getUTCHours());
+                    var m = pad(d.getUTCMinutes());
+                    return D + '-' + M + '-' + Y + ' ' + h + ':' + m + ' WIB';
+                }
+
                 function loadStatus() {
-                    fetch(base + '/api/status')
+                    fetch(base + '/api/status?_t=' + Date.now(), { cache: 'no-store' })
                         .then(function (r) { return r.json(); })
                         .then(function (json) {
                             if (json.status !== 'success') {
@@ -600,10 +624,17 @@
                                 return;
                             }
                             if (lastAt) {
-                                lastAt.textContent = json.waktu_update_data_terakhir || 'Belum tercatat';
+                                var formattedTime = formatWIB(json.waktu_update_data_terakhir_iso || json.waktu_update_data_terakhir);
+                                lastAt.textContent = formattedTime;
                             }
-                            if (lastIso && json.waktu_update_data_terakhir_iso) {
-                                lastIso.textContent = json.waktu_update_data_terakhir_iso;
+                            if (lastIso) {
+                                if (json.is_running) {
+                                    lastIso.innerHTML = '<span class="inline-flex items-center text-emerald-400 font-medium">' +
+                                        '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-1.5 inline-block"></span>' +
+                                        'Sedang Sinkronisasi ' + (json.bentuk_aktif ? '(' + json.bentuk_aktif + ')' : '') + '</span>';
+                                } else {
+                                    lastIso.textContent = 'Waktu Indonesia Barat (UTC+7)';
+                                }
                             }
                             if (totalEl && json.total_data_tersedia != null) {
                                 totalEl.textContent = Number(json.total_data_tersedia).toLocaleString('id-ID');
@@ -615,6 +646,28 @@
                 }
 
                 loadStatus();
+                // Polling otomatis setiap 4 detik agar realtime
+                setInterval(loadStatus, 4000);
+
+                // Supabase Realtime WebSocket listener
+                try {
+                    var SUPABASE_URL = 'https://xikrjtbaqtidnifnkpxd.supabase.co';
+                    var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpa3JqdGJhcXRpZG5pZm5rcHhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMDMxNDcsImV4cCI6MjA5NjU3OTE0N30.ARW-hXikuKeOiYqAwTcBkqXMpyKaPPulPqF4O2hFzXA';
+                    if (window.supabase) {
+                        var sbRealtime = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                        sbRealtime.channel('home-realtime-sync')
+                            .on('postgres_changes', { event: '*', schema: 'public', table: 'status_sinkronisasi' }, function () {
+                                loadStatus();
+                            })
+                            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'log_aktivitas_provinsi' }, function () {
+                                loadStatus();
+                                loadRekap();
+                            })
+                            .subscribe();
+                    }
+                } catch (eRealtime) {
+                    console.warn('Realtime Supabase fallback to polling:', eRealtime);
+                }
 
                 var rekapThead = document.getElementById('rekap-thead');
                 var rekapTbody = document.getElementById('rekap-tbody');

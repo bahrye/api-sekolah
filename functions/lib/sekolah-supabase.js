@@ -1,3 +1,5 @@
+import { formatSyncTimeWib } from './sync-meta.js';
+
 /**
  * Implementasi query database Sekolah menggunakan Supabase (PostgreSQL)
  */
@@ -113,10 +115,31 @@ export async function getStatusSinkronisasiSupabase(supabase) {
       ? row2
       : row1 || row2;
 
+  // Ambil jumlah real-time aktual dari tabel sekolah
+  let totalSekolah = active?.total_sekolah || row1?.total_sekolah || 555008;
+  try {
+    const { count, error: countErr } = await supabase
+      .from('sekolah')
+      .select('*', { count: 'exact', head: true });
+    if (!countErr && count && count > 0) {
+      totalSekolah = count;
+    }
+  } catch (e) {}
+
+  const latestIso = active?.updated_at || active?.waktu_selesai_terakhir || new Date().toISOString();
+  let isRunning = false;
+  if (active?.updated_at) {
+    const t = new Date(active.updated_at).getTime();
+    if (!isNaN(t) && (Date.now() - t < 120000)) {
+      isRunning = true;
+    }
+  }
+
   return {
-    waktu_selesai_terakhir:
-      active?.waktu_selesai_terakhir || row1?.waktu_selesai_terakhir || new Date().toISOString(),
-    waktu_selesai_terakhir_iso: active?.updated_at || new Date().toISOString(),
-    total_sekolah: row1?.total_sekolah || 554819,
+    waktu_selesai_terakhir: formatSyncTimeWib(latestIso),
+    waktu_selesai_terakhir_iso: latestIso,
+    total_sekolah: totalSekolah,
+    is_running: isRunning,
+    bentuk_aktif: active?.bentuk_aktif || null,
   };
 }

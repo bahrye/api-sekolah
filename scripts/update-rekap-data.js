@@ -16,12 +16,6 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 const rekapPath = path.join(__dirname, '..', 'data_rekap.json');
 const rekap = JSON.parse(fs.readFileSync(rekapPath, 'utf8'));
 
-const diffProvs = [
-  'PROV. ACEH', 'PROV. BALI', 'PROV. BANTEN', 'PROV. D.I. YOGYAKARTA',
-  'PROV. D.K.I. JAKARTA', 'PROV. JAMBI', 'PROV. JAWA BARAT', 'PROV. JAWA TIMUR',
-  'PROV. LAMPUNG', 'PROV. RIAU', 'PROV. SULAWESI UTARA', 'PROV. SUMATERA SELATAN'
-];
-
 async function updateAll() {
   console.log('🔄 Memulai pembaruan data_rekap.json dari database Supabase...');
   const startTime = Date.now();
@@ -36,6 +30,15 @@ async function updateAll() {
     rekap.metadata.jenjang.sort();
   }
   const allKnownShapes = rekap.metadata?.jenjang || [];
+
+  const allProvs = Object.keys(rekap.data.indonesia);
+  const diffProvs = allProvs.filter(prov => {
+    const target = vMap.get(prov) || 0;
+    const current = Object.values(rekap.data.indonesia[prov] || {}).reduce((a, b) => a + b, 0);
+    return target !== current;
+  });
+
+  console.log(`📍 Ditemukan ${diffProvs.length} provinsi yang perlu diperbarui:`, diffProvs);
 
   for (const prov of diffProvs) {
     const targetTotal = vMap.get(prov) || 0;
@@ -74,6 +77,18 @@ async function updateAll() {
   // Simpan hasil ke data_rekap.json
   fs.writeFileSync(rekapPath, JSON.stringify(rekap, null, 2), 'utf8');
   console.log(`💾 Berhasil menyimpan data terbaru ke data_rekap.json dalam ${((Date.now() - startTime) / 1000).toFixed(1)}s!`);
+
+  // Simpan juga ke cache_data di Supabase agar realtime
+  try {
+    await supabase.from('cache_data').upsert({
+      key: 'rekap_data',
+      value: JSON.stringify(rekap),
+      updated_at: new Date().toISOString(),
+    });
+    console.log('☁️ Berhasil menyimpan rekap_data ke cache_data Supabase!');
+  } catch (errCache) {
+    console.warn('Gagal simpan ke cache_data:', errCache.message);
+  }
 }
 
 updateAll().catch(err => console.error('Error updating rekap:', err));
