@@ -4,14 +4,24 @@ import { VALID_BENTUK } from './lib/sync-supabase-core.js';
 
 const parseDateMs = (dStr) => {
   if (!dStr) return 0;
-  let t = new Date(dStr).getTime();
-  if (!isNaN(t)) return t;
-  t = new Date(dStr.replace(' ', 'T') + '+07:00').getTime();
+  if (typeof dStr === 'number') return dStr;
+  const s = String(dStr).trim();
+  if (s.includes('Z') || s.includes('+') || /T.*[+-]\d{2}/.test(s)) {
+    const t = new Date(s).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s)) {
+    const iso = s.replace(' ', 'T') + 'Z';
+    const t = new Date(iso).getTime();
+    if (!isNaN(t)) return t;
+  }
+  const t = new Date(s).getTime();
   return isNaN(t) ? 0 : t;
 };
 
 const formatWIB = (dStr) => {
   if (!dStr) return '-';
+  if (typeof dStr === 'string' && dStr.includes('WIB')) return dStr;
   const ms = parseDateMs(dStr);
   if (!ms) return dStr;
   const d = new Date(ms + 7 * 60 * 60 * 1000);
@@ -21,8 +31,7 @@ const formatWIB = (dStr) => {
   const D = pad(d.getUTCDate());
   const h = pad(d.getUTCHours());
   const m = pad(d.getUTCMinutes());
-  const s = pad(d.getUTCSeconds());
-  return `${D}/${M}/${Y}, ${h}.${m}.${s} WIB`;
+  return `${D}-${M}-${Y} ${h}:${m} WIB`;
 };
 
 const cleanName = (name) => {
@@ -173,7 +182,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         let diffCount = 0;
 
         if (compareCache) {
-          lastChecked = compareCache.updated_at + ' WIB';
+          lastChecked = formatWIB(compareCache.updated_at);
           compareCache.value.forEach(d => {
             const hasActualDiff = (d.selisih > 0 && !d.is_sinkron_walau_selisih);
             compareMap[d.nama.replace(/[^A-Z]/g, '')] = d.selisih;
@@ -695,7 +704,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
               </strong>
               <span style="color: var(--text-muted); font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                ${log.waktu_selesai}
+                ${formatWIB(log.waktu_selesai)}
               </span>
             </div>
             <div class="log-stats-grid">
@@ -1191,6 +1200,29 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
       }
     }
 
+    function formatWIBClient(dStr) {
+      if (!dStr) return '-';
+      if (typeof dStr === 'string' && dStr.includes('WIB')) return dStr;
+      var s = String(dStr).trim();
+      var ms = NaN;
+      if (s.includes('Z') || s.includes('+') || /T.*[+-]\d{2}/.test(s)) {
+        ms = new Date(s).getTime();
+      } else if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(s)) {
+        ms = new Date(s.replace(' ', 'T') + 'Z').getTime();
+      } else {
+        ms = new Date(s).getTime();
+      }
+      if (isNaN(ms) || !ms) return dStr;
+      var d = new Date(ms + 7 * 3600 * 1000);
+      var pad = function(n) { return String(n).padStart(2, '0'); };
+      var D = pad(d.getUTCDate());
+      var M = pad(d.getUTCMonth() + 1);
+      var Y = d.getUTCFullYear();
+      var h = pad(d.getUTCHours());
+      var m = pad(d.getUTCMinutes());
+      return D + '-' + M + '-' + Y + ' ' + h + ':' + m + ' WIB';
+    }
+
     function updateDashboardUI(status) {
       if (!status) return;
 
@@ -1249,7 +1281,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           '<div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">' +
           '<span>Provinsi Aktif: <strong style="color: #38bdf8; font-weight: 700;">' + (pName ? '📍 ' + pName : '🌐 Semua Wilayah') + '</strong></span>' +
           '<span style="font-size: 12px; color: var(--text-muted);">' +
-          'Update Terakhir: <strong style="color: var(--text-subtle);">' + (status.activeRow?.updated_at || '-') + ' WIB</strong>' +
+          'Update Terakhir: <strong style="color: var(--text-subtle);">' + formatWIBClient(status.activeRow?.updated_at) + '</strong>' +
           '</span>' +
           '</div>';
       }
