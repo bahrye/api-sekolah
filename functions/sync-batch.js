@@ -84,10 +84,65 @@ export async function onRequestPost(context) {
       waktu_selesai_terakhir: isFinished ? new Date().toISOString() : (currentStatus?.waktu_selesai_terakhir || null),
     });
 
-    // Jika provinsi selesai, catat ke provinsi_sync_status, log_aktivitas_provinsi, dan npsn_ganda_detail
+    // Jika provinsi selesai, jalankan pembersihan data nonaktif, catat ke provinsi_sync_status, log_aktivitas_provinsi, dan npsn_ganda_detail
+    let totalDihapus = 0;
     if (isFinished && body.namaProvinsi && body.namaProvinsi !== 'SEMUA') {
       try {
-        // Ambil hitungan riil dari DB untuk provinsi ini jika memungkinkan
+        const activeList = customParams.activeNpsnList || body.activeNpsnList;
+        const isClean = customParams.isCleanScan || body.isCleanScan;
+
+        // Pembersihan otomatis sekolah non-aktif (yang dihapus dari Belajar.id)
+        if (isClean && Array.isArray(activeList) && activeList.length > 0) {
+          try {
+            // 1. Coba jalankan via PostgreSQL stored procedure (RPC) jika tersedia di Supabase
+            const { data: rpcDeleted, error: rpcErr } = await supabase.rpc('fn_clean_inactive_sekolah', {
+              p_nama_provinsi: body.namaProvinsi,
+              p_active_npsns: activeList,
+            });
+
+            if (!rpcErr && typeof rpcDeleted === 'number') {
+              totalDihapus = rpcDeleted;
+              console.log(`[CLEANUP] Berhasil menghapus ${totalDihapus} sekolah non-aktif via RPC untuk ${body.namaProvinsi}`);
+            } else {
+              // 2. Fallback JavaScript: Ambil seluruh NPSN yang ada di DB untuk provinsi ini dan hapus selisihnya
+              let from = 0;
+              const dbNpsns = [];
+              const provKey = body.namaProvinsi.startsWith('PROV.') ? body.namaProvinsi : `PROV. ${body.namaProvinsi}`;
+
+              while (true) {
+                const { data, error: fetchErr } = await supabase
+                  .from('sekolah')
+                  .select('npsn')
+                  .or(`nama_provinsi.eq."${provKey}",nama_provinsi.eq."${body.namaProvinsi}"`)
+                  .order('npsn')
+                  .range(from, from + 999);
+
+                if (fetchErr || !data || data.length === 0) break;
+                dbNpsns.push(...data.map((d) => String(d.npsn)));
+                if (data.length < 1000) break;
+                from += 1000;
+              }
+
+              if (dbNpsns.length > 0) {
+                const activeSet = new Set(activeList.map((n) => String(n)));
+                const staleNpsns = dbNpsns.filter((n) => n && !activeSet.has(n));
+
+                if (staleNpsns.length > 0) {
+                  console.log(`[CLEANUP] Ditemukan ${staleNpsns.length} sekolah tidak aktif di ${body.namaProvinsi}. Menghapus dari Supabase...`);
+                  for (let i = 0; i < staleNpsns.length; i += 200) {
+                    const chunk = staleNpsns.slice(i, i + 200);
+                    await supabase.from('sekolah').delete().in('npsn', chunk);
+                  }
+                  totalDihapus = staleNpsns.length;
+                }
+              }
+            }
+          } catch (errClean) {
+            console.warn('Gagal membersihkan sekolah non-aktif:', errClean.message);
+          }
+        }
+
+        // Ambil hitungan riil dari DB untuk provinsi ini setelah pembersihan sekolah non-aktif
         let currentDbCount = 0;
         try {
           const { count } = await supabase
@@ -96,6 +151,16 @@ export async function onRequestPost(context) {
             .ilike('nama_provinsi', `%${body.namaProvinsi}%`);
           currentDbCount = count || 0;
         } catch (e) {}
+
+        // Update akumulasi total_dihapus pada status_sinkronisasi jika ada data yang dihapus
+        if (totalDihapus > 0) {
+          try {
+            await supabase.from('status_sinkronisasi').update({
+              total_dihapus: (currentStatus?.total_dihapus || 0) + totalDihapus,
+              updated_at: new Date().toISOString(),
+            }).eq('id', targetId);
+          } catch (eStat) {}
+        }
 
         const provStatusData = {
           nama_provinsi: body.namaProvinsi,
@@ -117,7 +182,7 @@ export async function onRequestPost(context) {
           nama_provinsi: body.namaProvinsi,
           total_baru: finalBaru,
           total_diperbarui: finalDiperbarui,
-          total_dihapus: customParams.dihapus || 0,
+          total_dihapus: totalDihapus,
           total_tidak_berubah: finalTidakBerubah,
           waktu_selesai: new Date().toISOString(),
         });
@@ -174,7 +239,10 @@ export async function onRequestPost(context) {
     return new Response(
       JSON.stringify({
         ok: true,
-        stats,
+        stats: {
+          ...stats,
+          dihapus: totalDihapus,
+        },
         bentukAktif,
         offset,
       }),

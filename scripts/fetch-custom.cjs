@@ -72,6 +72,9 @@ async function postBatchToWorker(dataList, bentukAktif, offset, isFinished, cust
     if (customSyncParams.activeNpsnList) {
       payload.activeNpsnList = customSyncParams.activeNpsnList;
     }
+    if (customSyncParams.isCleanScan !== undefined) {
+      payload.isCleanScan = customSyncParams.isCleanScan;
+    }
     if (customSyncParams.unrecognized_shapes !== undefined) {
       payload.unrecognized_shapes = customSyncParams.unrecognized_shapes;
     }
