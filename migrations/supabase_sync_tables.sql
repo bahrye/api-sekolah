@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS public.log_aktivitas_provinsi (
   total_diperbarui INT DEFAULT 0,
   total_dihapus INT DEFAULT 0,
   total_tidak_berubah INT DEFAULT 0,
+  total_non_queryable INT DEFAULT 0,
   waktu_selesai TIMESTAMPTZ DEFAULT NOW()
 );
 

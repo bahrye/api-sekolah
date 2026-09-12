@@ -165,7 +165,7 @@ export async function onRequestPost(context) {
         const finalDiperbarui = customParams.provStats?.diperbarui ?? (totalDiperbarui > 0 ? totalDiperbarui : (currentStatus?.total_diperbarui || 0));
         const finalTidakBerubah = customParams.provStats?.tidakBerubah ?? (totalTidakBerubah > 0 ? totalTidakBerubah : (currentStatus?.total_tidak_berubah || 0));
 
-        await supabase.from('log_aktivitas_provinsi').insert({
+        const { error: logErr } = await supabase.from('log_aktivitas_provinsi').insert({
           nama_provinsi: body.namaProvinsi,
           total_baru: finalBaru,
           total_diperbarui: finalDiperbarui,
@@ -174,6 +174,9 @@ export async function onRequestPost(context) {
           total_non_queryable: provStatusData.api_unrecognized_shapes || 0,
           waktu_selesai: new Date().toISOString(),
         });
+        if (logErr) {
+          console.error(`[SYNC-BATCH] Gagal mencatat log_aktivitas_provinsi untuk ${body.namaProvinsi}:`, logErr.message);
+        }
 
         // Bersihkan otomatis dari database: hapus log yang lebih lama dari 3 hari agar riwayat kuota harian tidak hilang
         try {
