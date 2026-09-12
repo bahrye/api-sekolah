@@ -186,6 +186,22 @@ export async function onRequestPost(context) {
           waktu_selesai: new Date().toISOString(),
         });
 
+        // Bersihkan otomatis dari database: pertahankan hanya maksimal 10 log terbaru
+        try {
+          const { data: excessLogs } = await supabase
+            .from('log_aktivitas_provinsi')
+            .select('id')
+            .order('waktu_selesai', { ascending: false })
+            .range(10, 100);
+
+          if (excessLogs && excessLogs.length > 0) {
+            const deleteIds = excessLogs.map((x) => x.id);
+            await supabase.from('log_aktivitas_provinsi').delete().in('id', deleteIds);
+          }
+        } catch (eCleanLog) {
+          console.warn('Gagal membersihkan log lama di sync-batch:', eCleanLog.message);
+        }
+
         // Simpan rincian duplikat ke npsn_ganda_detail jika ada
         if (customParams.duplicates && Array.isArray(customParams.duplicates) && customParams.duplicates.length > 0) {
           const dupRecords = customParams.duplicates.map((d) => ({

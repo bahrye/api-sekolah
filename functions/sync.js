@@ -660,39 +660,31 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           </div>
         `;
 
-        // Fetch Log Aktivitas
-        const pageStr = url.searchParams.get('page') || '1';
-        const page = parseInt(pageStr, 10) || 1;
-        const limit = 5;
-        const offset = (page - 1) * limit;
-
+        // Fetch Log Aktivitas (Maksimal 10 data terbaru, data terdahulu otomatis dihapus)
+        const limit = 10;
         let logAktivitasList = [];
-        let totalLogs = 0;
         try {
-          let countRes = [{ total: 0 }];
-        try {
-          const { count } = await supabase.from('log_aktivitas_provinsi').select('*', { count: 'exact', head: true });
-          countRes = [{ total: count || 0 }];
-        } catch (e) {}
-          totalLogs = countRes[0]?.total || 0;
-
-          let logRes = [];
-        try {
-          const { data } = await supabase.from('log_aktivitas_provinsi').select('*').order('waktu_selesai', { ascending: false }).range(offset, offset + limit - 1);
-          logRes = data || [];
-        } catch (e) {}
+          const { data: logRes } = await supabase
+            .from('log_aktivitas_provinsi')
+            .select('*')
+            .order('waktu_selesai', { ascending: false })
+            .limit(limit);
           logAktivitasList = logRes || [];
-        } catch (e) { } // Abaikan jika tabel belum ada
 
-        const totalPages = Math.ceil(totalLogs / limit) || 1;
-        let paginationHtml = '';
-        if (totalPages > 1) {
-          paginationHtml = `<div id="log-pagination" class="pagination-wrapper">
-            ${page > 1 ? `<a href="javascript:void(0)" onclick="changeLogPage(${page - 1})" class="page-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg> Prev</a>` : ''}
-            <span class="page-info">Halaman ${page} dari ${totalPages}</span>
-            ${page < totalPages ? `<a href="javascript:void(0)" onclick="changeLogPage(${page + 1})" class="page-btn">Next <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg></a>` : ''}
-          </div>`;
-        }
+          // Pembersihan otomatis data log melebihi 10 baris
+          const { data: excessRows } = await supabase
+            .from('log_aktivitas_provinsi')
+            .select('id')
+            .order('waktu_selesai', { ascending: false })
+            .range(limit, limit + 50);
+
+          if (excessRows && excessRows.length > 0) {
+            const deleteIds = excessRows.map((r) => r.id);
+            await supabase.from('log_aktivitas_provinsi').delete().in('id', deleteIds);
+          }
+        } catch (e) {}
+
+        const paginationHtml = '<div style="font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 6px;">Menampilkan maksimal 10 aktivitas sinkronisasi terbaru</div>';
 
         let logHtml = logAktivitasList.length > 0 ? logAktivitasList.map(log => {
           const totalData = log.total_baru + log.total_diperbarui + log.total_tidak_berubah;
