@@ -686,12 +686,17 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           const targetTotal = (compItem?.total_db > 0 ? compItem.total_db : (compItem?.total_api || pStat?.total_db || 0));
 
           let nonQueryable = 0;
-          if (typeof log.total_non_queryable === 'number' && log.total_non_queryable > 0) {
-            nonQueryable = log.total_non_queryable;
-          } else if (pStat?.api_unrecognized_shapes > 0) {
-            nonQueryable = pStat.api_unrecognized_shapes;
-          } else if (targetTotal > baseProcessed) {
-            nonQueryable = targetTotal - baseProcessed;
+          if (targetTotal > baseProcessed) {
+            const missing = targetTotal - baseProcessed;
+            const knownNq = (typeof log.total_non_queryable === 'number' && log.total_non_queryable > 0)
+              ? log.total_non_queryable
+              : (pStat?.api_unrecognized_shapes || 0);
+
+            if (knownNq > 0) {
+              nonQueryable = Math.min(missing, knownNq);
+            } else {
+              nonQueryable = missing;
+            }
           }
 
           const totalData = baseProcessed + nonQueryable;
