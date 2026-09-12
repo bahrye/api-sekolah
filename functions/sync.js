@@ -48,8 +48,16 @@ export async function onRequestGet(context) {
     try {
       const { data: provRes } = await supabase
         .from('provinsi_sync_status')
-        .select('nama_provinsi, terakhir_sukses');
+        .select('*');
       provStatusList = provRes || [];
+
+      let vRekapList = [];
+      try {
+        const { data: vRekap } = await supabase
+          .from('v_rekap_provinsi')
+          .select('*');
+        vRekapList = vRekap || [];
+      } catch (eV) {}
 
       const { data: cacheRow } = await supabase
         .from('cache_data')
@@ -57,7 +65,38 @@ export async function onRequestGet(context) {
         .eq('key', 'perbandingan')
         .single();
       if (cacheRow && cacheRow.value) {
-        compareCache = { value: JSON.parse(cacheRow.value), updated_at: cacheRow.updated_at };
+        const rawCompare = JSON.parse(cacheRow.value);
+        const vMap = new Map(vRekapList.map(r => [cleanName(r.nama_provinsi), r.total_sekolah]));
+        const pMap = new Map(provStatusList.map(r => [cleanName(r.nama_provinsi), r]));
+        const todayDateWIB = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        rawCompare.forEach(item => {
+          const cName = cleanName(item.nama);
+          if (vMap.has(cName)) {
+            item.total_db = vMap.get(cName);
+          } else if (pMap.has(cName) && pMap.get(cName).total_db > 0) {
+            item.total_db = pMap.get(cName).total_db;
+          }
+
+          if (pMap.has(cName)) {
+            const p = pMap.get(cName);
+            if (p.terakhir_sukses) item.terakhir_sukses = p.terakhir_sukses;
+            item.api_duplicates = p.api_duplicates || 0;
+            item.api_empty_npsn = p.api_empty_npsn || 0;
+            item.api_unrecognized_shapes = p.api_unrecognized_shapes || 0;
+          }
+
+          item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);
+          item.selisih = item.raw_selisih - (item.api_duplicates || 0);
+
+          const isSyncedToday = Boolean(item.terakhir_sukses && item.terakhir_sukses.split(/[ T]/)[0] === todayDateWIB);
+          if (item.selisih <= 0 || (item.raw_selisih <= 0 && isSyncedToday)) {
+            item.selisih = 0;
+            item.is_sinkron_walau_selisih = true;
+          }
+        });
+
+        compareCache = { value: rawCompare, updated_at: cacheRow.updated_at };
       }
     } catch (e) {}
 let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakhir: 0 };
@@ -118,7 +157,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         const provSyncMap = {};
         provStatusList.forEach(p => {
           if (p.terakhir_sukses) {
-            provSyncMap[cleanName(p.nama_provinsi)] = p.terakhir_sukses.split(' ')[0];
+            provSyncMap[cleanName(p.nama_provinsi)] = p.terakhir_sukses.split(/[ T]/)[0];
           }
         });
 
@@ -157,7 +196,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
 
           compareHtml = compareCache.value.map((d, idx) => {
             const todayDate = new Date(new Date().getTime() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
-            const isSyncedToday = d.terakhir_sukses && d.terakhir_sukses.split(' ')[0] === todayDate;
+            const isSyncedToday = d.terakhir_sukses && d.terakhir_sukses.split(/[ T]/)[0] === todayDate;
 
             let selisihColor = 'var(--danger)';
             let statusIcon = '⚠️ Berbeda';

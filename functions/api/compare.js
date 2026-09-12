@@ -138,7 +138,17 @@ export async function onRequestGet(context) {
         dbTotal = Object.values(provObj).reduce((sum, count) => sum + count, 0);
       }
 
-      const selisih = item.total_api - dbTotal;
+      const raw_selisih = item.total_api - dbTotal;
+      let selisih = raw_selisih - (syncInfo?.api_duplicates || 0);
+      let is_sinkron_walau_selisih = false;
+
+      const todayDateWib = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const isSyncedToday = Boolean(syncInfo?.terakhir_sukses && syncInfo.terakhir_sukses.split(/[ T]/)[0] === todayDateWib);
+
+      if (selisih <= 0 || (raw_selisih <= 0 && isSyncedToday)) {
+        selisih = 0;
+        is_sinkron_walau_selisih = true;
+      }
 
       return {
         kode: item.kode,
@@ -146,6 +156,8 @@ export async function onRequestGet(context) {
         total_api: item.total_api,
         total_db: dbTotal,
         selisih: selisih,
+        raw_selisih: raw_selisih,
+        is_sinkron_walau_selisih: is_sinkron_walau_selisih,
         terakhir_sukses: syncInfo?.terakhir_sukses || null,
         api_duplicates: syncInfo?.api_duplicates || 0,
         api_empty_npsn: syncInfo?.api_empty_npsn || 0,

@@ -1,5 +1,9 @@
 import { getSupabase } from './lib/db.js';
 import { syncBatchToSupabase } from './lib/sync-supabase-core.js';
+const cleanName = (name) => {
+  if (!name) return '';
+  return name.replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/^PROVINSI|^PROV/, '');
+};
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -126,6 +130,41 @@ export async function onRequestPost(context) {
             sekolah_detail: typeof d.sekolahList === 'string' ? d.sekolahList : JSON.stringify(d.sekolahList || []),
           }));
           await supabase.from('npsn_ganda_detail').upsert(dupRecords, { onConflict: 'npsn,nama_provinsi' });
+        }
+
+        // Update cache_data 'perbandingan' seketika agar perbandingan data langsung sinkron tanpa jeda
+        try {
+          const { data: cacheRow } = await supabase
+            .from('cache_data')
+            .select('value')
+            .eq('key', 'perbandingan')
+            .single();
+
+          if (cacheRow?.value) {
+            const list = JSON.parse(cacheRow.value);
+            const cleanP = cleanName(body.namaProvinsi);
+            const item = list.find((x) => cleanName(x.nama) === cleanP);
+            if (item) {
+              item.total_db = currentDbCount > 0 ? currentDbCount : (item.total_db || 0);
+              item.terakhir_sukses = new Date().toISOString();
+              item.api_duplicates = customParams.duplicates?.length || 0;
+              item.api_empty_npsn = totalTanpaNpsn || 0;
+              item.api_unrecognized_shapes = customParams.unrecognized_shapes || 0;
+              item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);
+              item.selisih = item.raw_selisih - (item.api_duplicates || 0);
+              if (item.selisih <= 0) {
+                item.selisih = 0;
+                item.is_sinkron_walau_selisih = true;
+              }
+              await supabase.from('cache_data').upsert({
+                key: 'perbandingan',
+                value: JSON.stringify(list),
+                updated_at: new Date().toISOString(),
+              });
+            }
+          }
+        } catch (errCache) {
+          console.warn('Gagal update cache perbandingan di sync-batch:', errCache.message);
         }
       } catch (e) {
         console.warn('Gagal simpan log provinsi / detail duplikat:', e.message);
