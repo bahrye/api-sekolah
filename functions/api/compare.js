@@ -27,11 +27,14 @@ export async function onRequestGet(context) {
 
     let synced_today = 0;
     try {
-      const todayIso = new Date().toISOString().split('T')[0];
+      const nowWib = new Date(Date.now() + 7 * 60 * 60 * 1000);
+      const wibDateStr = nowWib.toISOString().split('T')[0];
+      const startOfWibDayUtc = new Date(`${wibDateStr}T00:00:00+07:00`).toISOString();
+
       const { data: logs } = await supabase
         .from('log_aktivitas_provinsi')
         .select('total_baru, total_diperbarui, total_tidak_berubah')
-        .gte('waktu_selesai', todayIso);
+        .gte('waktu_selesai', startOfWibDayUtc);
 
       synced_today = (logs || []).reduce(
         (acc, l) => acc + (l.total_baru || 0) + (l.total_diperbarui || 0) + (l.total_tidak_berubah || 0),
@@ -169,6 +172,7 @@ export async function onRequestGet(context) {
       {
         headers: {
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Access-Control-Allow-Origin': '*',
         },
       }

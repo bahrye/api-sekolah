@@ -34,6 +34,8 @@ export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   const supabase = getSupabase(env);
+  const clientSupabaseUrl = env?.SUPABASE_URL || 'https://xikrjtbaqtidnifnkpxd.supabase.co';
+  const clientSupabaseAnonKey = env?.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpa3JqdGJhcXRpZG5pZm5rcHhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMDMxNDcsImV4cCI6MjA5NjU3OTE0N30.ARW-hXikuKeOiYqAwTcBkqXMpyKaPPulPqF4O2hFzXA';
 
   try {
     const { data: results } = await supabase
@@ -395,17 +397,16 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         const BATAS_AMAN = isMandatoryUpdateDay ? dynamicFullSyncLimit : 100000;
         let syncedToday = 0;
         try {
-          let syncedTodayRes = [{ total: 0 }];
-        try {
-          const today = new Date().toISOString().split('T')[0];
+          const nowWib = new Date(Date.now() + 7 * 60 * 60 * 1000);
+          const wibDateStr = nowWib.toISOString().split('T')[0];
+          const startOfWibDayUtc = new Date(`${wibDateStr}T00:00:00+07:00`).toISOString();
+
           const { data: logs } = await supabase
             .from('log_aktivitas_provinsi')
             .select('total_baru, total_diperbarui, total_tidak_berubah')
-            .gte('waktu_selesai', today);
+            .gte('waktu_selesai', startOfWibDayUtc);
           const t = (logs || []).reduce((a, l) => a + (l.total_baru || 0) + (l.total_diperbarui || 0) + (l.total_tidak_berubah || 0), 0);
-          syncedTodayRes = [{ total: t }];
-        } catch (e) {}
-          syncedToday = syncedTodayRes[0]?.total || 0;
+          syncedToday = t;
         } catch (e) { }
 
         if (isCustom && activeRow.updated_at) {
@@ -461,8 +462,8 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
               Sistem secara cerdas mendeteksi provinsi mana yang butuh pembaruan. Provinsi dengan data tidak sinkron akan diprioritaskan, sedangkan yang sudah tersinkron namun berbeda akan digilir ke akhir antrean. 
               Maksimal <strong>~${BATAS_AMAN.toLocaleString('id-ID')} data</strong> disinkronisasi setiap harinya.
               <div style="margin-top: 8px; font-weight: 600;">
-                Kuota Harian Digunakan: <span style="color: ${SISA_KUOTA <= 0 ? 'var(--danger)' : 'var(--warning)'}; font-weight: 700;">${syncedToday.toLocaleString('id-ID')} / ${BATAS_AMAN.toLocaleString('id-ID')}</span>
-                ${SISA_KUOTA <= 0 ? '<span class="tag-alert-danger">KUOTA PENUH, SISA ANTREAN DITUNDA BESOK</span>' : ''}
+                Kuota Harian Digunakan: <span id="kuota-used-val" style="color: ${SISA_KUOTA <= 0 ? 'var(--danger)' : 'var(--warning)'}; font-weight: 700;">${syncedToday.toLocaleString('id-ID')} / ${BATAS_AMAN.toLocaleString('id-ID')}</span>
+                <span id="kuota-full-tag">${SISA_KUOTA <= 0 ? '<span class="tag-alert-danger" style="margin-left: 6px;">KUOTA PENUH, SISA ANTREAN DITUNDA BESOK</span>' : ''}</span>
               </div>
             </div>
             <div id="queue-table-wrapper" style="overflow-x: auto;">
@@ -655,7 +656,8 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sekolah Sync Dashboard (D1)</title>
+  <title>Sekolah Sync Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1129,17 +1131,110 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
       }
     }
 
+    function updateDashboardUI(status) {
+      if (!status) return;
+
+      // 1. Update loader icon
+      const loaderIcon = document.getElementById('loader-icon');
+      if (loaderIcon) {
+        loaderIcon.style.display = (status.isRunning && !status.selesai) ? 'block' : 'none';
+      }
+
+      // 2. Update status badge
+      const statusBadge = document.getElementById('status');
+      if (statusBadge) {
+        if (status.selesai) {
+          statusBadge.className = 'status-badge finished';
+          statusBadge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Sinkronisasi Selesai';
+        } else if (status.isRunning) {
+          statusBadge.className = 'status-badge';
+          var pName = status.activeProvince || (status.bentukBerikutnya && status.bentukBerikutnya.match(/\\((.*?)\\)/)?.[1]);
+          statusBadge.innerHTML = '<span class="pulse-dot"></span> Sedang Menyinkronkan ' + (pName ? '— <strong>' + pName + '</strong>' : '') + '...';
+        } else {
+          statusBadge.className = 'status-badge stopped';
+          statusBadge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Menunggu / Terhenti';
+        }
+      }
+
+      // 3. Update progress bar & text
+      const progFill = document.querySelector('.progress-fill');
+      if (progFill) {
+        progFill.style.width = (status.selesai ? 100 : status.progressPercent) + '%';
+      }
+      const progStats = document.getElementById('progress-stats');
+      if (progStats) {
+        const syncedFormatted = Number(status.totalSynced || 0).toLocaleString('id-ID');
+        const estimasiFormatted = Number(status.totalEstimasi || 0).toLocaleString('id-ID');
+        progStats.innerHTML = '<span>' + (status.progressPercent || 0) + '% Selesai</span><span>Data: ' + syncedFormatted + ' / ' + estimasiFormatted + '</span>';
+      }
+
+      // 4. Update stat boxes
+      const statBaru = document.getElementById('stat-baru');
+      if (statBaru) statBaru.innerText = Number(status.activeRow?.total_baru || 0).toLocaleString('id-ID');
+      const statDiperbarui = document.getElementById('stat-diperbarui');
+      if (statDiperbarui) statDiperbarui.innerText = Number(status.activeRow?.total_diperbarui || 0).toLocaleString('id-ID');
+      const statDihapus = document.getElementById('stat-dihapus');
+      if (statDihapus) statDihapus.innerText = Number(status.activeRow?.total_dihapus || 0).toLocaleString('id-ID');
+      const statTidakBerubah = document.getElementById('stat-tidak-berubah');
+      if (statTidakBerubah) statTidakBerubah.innerText = Number(status.activeRow?.total_tidak_berubah || 0).toLocaleString('id-ID');
+
+      // 5. Update info box
+      const mainInfo = document.getElementById('main-info');
+      if (mainInfo) {
+        var pName = status.activeProvince || (status.bentukBerikutnya && status.bentukBerikutnya.match(/\\((.*?)\\)/)?.[1]);
+        mainInfo.innerHTML = '<div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">' +
+          '<span>Bentuk Aktif: <strong style="color: var(--primary-light); text-transform: uppercase;">' + (status.bentukBerikutnya || '-') + '</strong></span>' +
+          '<span>Offset Saat Ini: <strong style="color: var(--text-main);">' + (status.offsetBerikutnya || 0) + '</strong></span>' +
+          '</div>' +
+          '<div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">' +
+          '<span>Provinsi Aktif: <strong style="color: #38bdf8; font-weight: 700;">' + (pName ? '📍 ' + pName : '🌐 Semua Wilayah') + '</strong></span>' +
+          '<span style="font-size: 12px; color: var(--text-muted);">' +
+          'Update Terakhir: <strong style="color: var(--text-subtle);">' + (status.activeRow?.updated_at || '-') + ' WIB</strong>' +
+          '</span>' +
+          '</div>';
+      }
+
+      // 6. Update Kuota Harian Digunakan secara realtime
+      const kuotaUsedVal = document.getElementById('kuota-used-val');
+      if (kuotaUsedVal && status.syncedToday !== undefined && status.batasAman !== undefined) {
+        const isFull = (status.batasAman - status.syncedToday) <= 0;
+        kuotaUsedVal.style.color = isFull ? 'var(--danger)' : 'var(--warning)';
+        kuotaUsedVal.innerText = Number(status.syncedToday).toLocaleString('id-ID') + ' / ' + Number(status.batasAman).toLocaleString('id-ID');
+        
+        const kuotaFullTag = document.getElementById('kuota-full-tag');
+        if (kuotaFullTag) {
+          kuotaFullTag.innerHTML = isFull ? '<span class="tag-alert-danger" style="margin-left: 6px;">KUOTA PENUH, SISA ANTREAN DITUNDA BESOK</span>' : '';
+        }
+      }
+
+      // 7. Update row aktif di Antrean Smart Sync secara dinamis
+      const actProv = (status.isRunning && !status.selesai) ? (status.activeProvince || (status.bentukBerikutnya && status.bentukBerikutnya.match(/\\((.*?)\\)/)?.[1])) : null;
+      const cleanAct = actProv ? actProv.replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/^PROVINSI|^PROV/, '') : null;
+      const queueRows = document.querySelectorAll('.custom-table tbody tr[data-prov]');
+      queueRows.forEach(tr => {
+        const p = tr.getAttribute('data-prov');
+        if (cleanAct && p === cleanAct) {
+          tr.classList.add('row-active');
+        } else {
+          tr.classList.remove('row-active');
+        }
+      });
+    }
+
+    let isFetchingStatus = false;
     async function doAutoReload() {
       if (window.isAutoReloadPaused) {
+        scheduleNextReload(5000);
+        return;
+      }
+
+      if (document.hidden) {
         scheduleNextReload(10000);
         return;
       }
 
-      // Jangan lakukan polling jika tab sedang di latar belakang (hemat kuota D1)
-      if (document.hidden) {
-        scheduleNextReload(30000);
-        return;
-      }
+      if (isFetchingStatus) return;
+      isFetchingStatus = true;
 
       try {
         const res = await fetch('/api/sync-status?_t=' + Date.now(), { cache: 'no-store' });
@@ -1147,106 +1242,65 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         const status = await res.json();
         if (!status.ok) throw new Error(status.error || 'Unknown error');
 
-        // Update loader icon
-        const loaderIcon = document.getElementById('loader-icon');
-        if (loaderIcon) {
-          loaderIcon.style.display = (status.isRunning && !status.selesai) ? 'block' : 'none';
-        }
+        updateDashboardUI(status);
 
-        // Update status badge
-        const statusBadge = document.getElementById('status');
-        if (statusBadge) {
-          if (status.selesai) {
-            statusBadge.className = 'status-badge finished';
-            statusBadge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Sinkronisasi Selesai';
-          } else if (status.isRunning) {
-            statusBadge.className = 'status-badge';
-            var pName = status.activeProvince || (status.bentukBerikutnya && status.bentukBerikutnya.match(/\((.*?)\)/)?.[1]); statusBadge.innerHTML = '<span class="pulse-dot"></span> Sedang Menyinkronkan ' + (pName ? '— <strong>' + pName + '</strong>' : '') + '...';
-          } else {
-            statusBadge.className = 'status-badge stopped';
-            statusBadge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Menunggu / Terhenti';
-          }
-        }
-
-        // Update progress bar & text
-        const progFill = document.querySelector('.progress-fill');
-        if (progFill) {
-          progFill.style.width = (status.selesai ? 100 : status.progressPercent) + '%';
-        }
-        const progStats = document.getElementById('progress-stats');
-        if (progStats) {
-          const syncedFormatted = Number(status.totalSynced || 0).toLocaleString('id-ID');
-          const estimasiFormatted = Number(status.totalEstimasi || 0).toLocaleString('id-ID');
-          progStats.innerHTML = '<span>' + (status.progressPercent || 0) + '% Selesai</span><span>Data: ' + syncedFormatted + ' / ' + estimasiFormatted + '</span>';
-        }
-
-        // Update stat boxes
-        const statBaru = document.getElementById('stat-baru');
-        if (statBaru) statBaru.innerText = Number(status.activeRow?.total_baru || 0).toLocaleString('id-ID');
-        const statDiperbarui = document.getElementById('stat-diperbarui');
-        if (statDiperbarui) statDiperbarui.innerText = Number(status.activeRow?.total_diperbarui || 0).toLocaleString('id-ID');
-        const statDihapus = document.getElementById('stat-dihapus');
-        if (statDihapus) statDihapus.innerText = Number(status.activeRow?.total_dihapus || 0).toLocaleString('id-ID');
-        const statTidakBerubah = document.getElementById('stat-tidak-berubah');
-        if (statTidakBerubah) statTidakBerubah.innerText = Number(status.activeRow?.total_tidak_berubah || 0).toLocaleString('id-ID');
-
-        // Update info box
-        const mainInfo = document.getElementById('main-info');
-        if (mainInfo) {
-          var pName = status.activeProvince || (status.bentukBerikutnya && status.bentukBerikutnya.match(/\((.*?)\)/)?.[1]);
-          mainInfo.innerHTML = '<div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">' +
-            '<span>Bentuk Aktif: <strong style="color: var(--primary-light); text-transform: uppercase;">' + (status.bentukBerikutnya || '-') + '</strong></span>' +
-            '<span>Offset Saat Ini: <strong style="color: var(--text-main);">' + (status.offsetBerikutnya || 0) + '</strong></span>' +
-            '</div>' +
-            '<div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">' +
-            '<span>Provinsi Aktif: <strong style="color: #38bdf8; font-weight: 700;">' + (pName ? '📍 ' + pName : '🌐 Semua Wilayah') + '</strong></span>' +
-            '<span style="font-size: 12px; color: var(--text-muted);">' +
-            'Update Terakhir: <strong style="color: var(--text-subtle);">' + (status.activeRow?.updated_at || '-') + ' WIB</strong>' +
-            '</span>' +
-            '</div>';
-        }
-
-        // Update row aktif di Antrean Smart Sync secara dinamis
-        const actProv = (status.isRunning && !status.selesai) ? (status.activeProvince || (status.bentukBerikutnya && status.bentukBerikutnya.match(/\((.*?)\)/)?.[1])) : null;
-        const cleanAct = actProv ? actProv.replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/^PROVINSI|^PROV/, '') : null;
-        const queueRows = document.querySelectorAll('.custom-table tbody tr[data-prov]');
-        queueRows.forEach(tr => {
-          const p = tr.getAttribute('data-prov');
-          if (cleanAct && p === cleanAct) {
-            tr.classList.add('row-active');
-          } else {
-            tr.classList.remove('row-active');
-          }
-        });
-
-        // Jika terjadi transisi status (misal selesai, atau ganti provinsi), perbarui tabel log & antrian penuh
+        // Jika terjadi transisi status atau provinsi berubah, perbarui tabel antrean & log penuh
         if (lastKnownState) {
           const stateChanged = (lastKnownState.selesai !== status.selesai) ||
                                (lastKnownState.bentukBerikutnya !== status.bentukBerikutnya) ||
                                (lastKnownState.isRunning !== status.isRunning) ||
-                               (lastKnownState.activeProvince !== status.activeProvince);
+                               (lastKnownState.activeProvince !== status.activeProvince) ||
+                               (lastKnownState.activeRow?.total_dihapus !== status.activeRow?.total_dihapus);
           if (stateChanged) {
             await fetchFullHtml();
           }
         }
         lastKnownState = status;
 
-        // Interval dinamis: 10s saat sync berjalan, 60s saat idle/selesai
-        const nextDelay = status.isRunning ? 10000 : 60000;
+        // Interval cepat: 2 detik saat aktif menyinkronkan, 5 detik saat menunggu
+        const nextDelay = status.isRunning ? 2000 : 5000;
         scheduleNextReload(nextDelay);
       } catch (e) {
-        scheduleNextReload(15000);
+        scheduleNextReload(5000);
+      } finally {
+        isFetchingStatus = false;
       }
     }
 
-    // Tangani perubahan visibilitas tab: aktifkan reload saat tab dibuka kembali
+    // Tangani perubahan visibilitas tab: aktifkan reload langsung saat tab dibuka kembali
     document.addEventListener('visibilitychange', function() {
       if (!document.hidden) {
         doAutoReload();
       }
     });
 
-    scheduleNextReload(10000);
+    // Inisialisasi Supabase Realtime untuk pembaruan tanpa jeda (WebSockets)
+    const clientSupabaseUrl = "${clientSupabaseUrl}";
+    const clientSupabaseAnonKey = "${clientSupabaseAnonKey}";
+
+    if (window.supabase && clientSupabaseUrl && clientSupabaseAnonKey) {
+      try {
+        const sb = window.supabase.createClient(clientSupabaseUrl, clientSupabaseAnonKey);
+        
+        sb.channel('realtime-sync')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'status_sinkronisasi' }, function(payload) {
+            doAutoReload();
+          })
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'log_aktivitas_provinsi' }, function(payload) {
+            doAutoReload();
+            fetchFullHtml();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'provinsi_sync_status' }, function(payload) {
+            fetchFullHtml();
+          })
+          .subscribe();
+      } catch (err) {
+        console.warn("Supabase Realtime fallback to polling:", err);
+      }
+    }
+
+    // Eksekusi pemeriksaan pertama langsung tanpa jeda (300ms setelah halaman dibuka)
+    scheduleNextReload(300);
   </script>
 </head>
 <body>
@@ -1488,7 +1542,12 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
 </html>`;
         
     return new Response(html, {
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
   } catch (err) {
     return new Response('Error loading sync dashboard: ' + err.message, { status: 500 });

@@ -508,6 +508,22 @@ async function fetchCustomData() {
         console.error(`Gagal mendapatkan estimasi total data:`, err);
         currentTotalEstimasi = 0;
       }
+
+      if (isVeryBeginningOfProvince) {
+        try {
+          const provNameDB = kodeWilayah === "360" ? "SEMUA" : (PROVINCES[kodeWilayah] || kodeWilayah);
+          console.log(`🚀 Mengirim status awal sinkronisasi untuk provinsi ${provNameDB} ke server...`);
+          await postBatchToWorker([], currentTask.bentuk, 0, false, {
+            bentukList,
+            namaProvinsi: provNameDB,
+            waktuMulai,
+            isStart: true,
+            totalEstimasi: currentTotalEstimasi
+          });
+        } catch (e) {
+          console.warn(`Peringatan: Gagal mengirim status awal ${namaWilayah}:`, e.message);
+        }
+      }
     }
 
     if (offset === 0) {

@@ -35,3 +35,29 @@ GROUP BY nama_provinsi;
 
 -- Berikan izin akses baca view ke semua peran API Supabase
 GRANT SELECT ON public.v_rekap_provinsi TO anon, authenticated, service_role;
+
+-- 7. Aktifkan Supabase Realtime untuk pembaruan dashboard tanpa jeda (WebSockets)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'status_sinkronisasi'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.status_sinkronisasi;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'log_aktivitas_provinsi'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.log_aktivitas_provinsi;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'provinsi_sync_status'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.provinsi_sync_status;
+  END IF;
+END $$;
+

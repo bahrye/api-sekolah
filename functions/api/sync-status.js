@@ -69,6 +69,38 @@ export async function onRequestGet(context) {
       }
     }
 
+    // Hitung kuota harian riil
+    const currentDate = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    const currentDayOfWeek = currentDate.getDay() || 7;
+    const isMandatoryUpdateDay = (currentDayOfWeek === 3 || currentDayOfWeek === 4);
+    const batasAman = isMandatoryUpdateDay ? 250000 : 100000;
+
+    let syncedToday = 0;
+    try {
+      const nowWib = new Date(Date.now() + 7 * 60 * 60 * 1000);
+      const wibDateStr = nowWib.toISOString().split('T')[0];
+      const startOfWibDayUtc = new Date(`${wibDateStr}T00:00:00+07:00`).toISOString();
+
+      const { data: logs } = await supabase
+        .from('log_aktivitas_provinsi')
+        .select('total_baru, total_diperbarui, total_tidak_berubah')
+        .gte('waktu_selesai', startOfWibDayUtc);
+
+      syncedToday = (logs || []).reduce(
+        (acc, l) => acc + (l.total_baru || 0) + (l.total_diperbarui || 0) + (l.total_tidak_berubah || 0),
+        0
+      );
+    } catch (e) {}
+
+    if (isCustom && activeRow.updated_at) {
+      let t = new Date(activeRow.updated_at).getTime();
+      if (isNaN(t)) t = new Date(activeRow.updated_at.replace(' ', 'T')).getTime();
+      if (!isNaN(t) && (Date.now() - t < 5 * 60000)) {
+        const currentRunning = (activeRow.total_baru || 0) + (activeRow.total_diperbarui || 0) + (activeRow.total_tidak_berubah || 0);
+        syncedToday += currentRunning;
+      }
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,
@@ -82,6 +114,8 @@ export async function onRequestGet(context) {
         totalEstimasi,
         progressPercent,
         activeRow,
+        syncedToday,
+        batasAman,
       }),
       {
         headers: {
