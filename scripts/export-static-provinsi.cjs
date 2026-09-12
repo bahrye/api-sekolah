@@ -156,30 +156,49 @@ async function run() {
 
     try {
       const schools = await fetchSchoolsForProvince(prov.nama_provinsi, prov.total_sekolah);
-      console.log(`\n   💾 Menyimpan ${schools.length} sekolah ke ${fileName}...`);
+      const MAX_PER_FILE = 30000;
+      const partFiles = [];
 
-      // Tulis minified JSON
-      fs.writeFileSync(filePath, JSON.stringify(schools));
+      if (schools.length <= MAX_PER_FILE) {
+        fs.writeFileSync(filePath, JSON.stringify(schools));
+        partFiles.push(fileName);
+        console.log(`\n   💾 Menyimpan ${schools.length} sekolah ke ${fileName}...`);
+      } else {
+        const totalParts = Math.ceil(schools.length / MAX_PER_FILE);
+        for (let p = 0; p < totalParts; p++) {
+          const chunk = schools.slice(p * MAX_PER_FILE, (p + 1) * MAX_PER_FILE);
+          const partName = `data_${slug}_part${p + 1}.json`;
+          fs.writeFileSync(path.join(OUTPUT_DIR, partName), JSON.stringify(chunk));
+          partFiles.push(partName);
+        }
+        console.log(`\n   💾 Menyimpan ${schools.length} sekolah ke ${totalParts} bagian file (max 30.000/file agar < 25 MiB)...`);
+        // Hapus file monolitik lama jika ada
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }
 
       // Catat mapping ke index
       provMap.set(slug, {
         nama: prov.nama_provinsi,
         slug,
-        file: fileName,
+        files: partFiles,
         total: schools.length,
       });
 
-      slugMap[slug] = fileName;
-      slugMap[prov.nama_provinsi.toLowerCase()] = fileName;
+      slugMap[slug] = partFiles;
+      slugMap[prov.nama_provinsi.toLowerCase()] = partFiles;
 
-      // Petakan prefix NPSN (3 digit pertama) untuk pencarian cepat
-      for (const s of schools) {
-        if (s.npsn && s.npsn.length >= 3) {
-          const prefix = s.npsn.substring(0, 3);
-          if (!npsnPrefixMap[prefix]) {
-            npsnPrefixMap[prefix] = [slug];
-          } else if (!npsnPrefixMap[prefix].includes(slug)) {
-            npsnPrefixMap[prefix].push(slug);
+      // Petakan prefix NPSN (3 digit pertama) langsung ke file part
+      for (let p = 0; p < partFiles.length; p++) {
+        const chunk = schools.slice(p * MAX_PER_FILE, (p + 1) * MAX_PER_FILE);
+        const fn = partFiles[p];
+        for (const s of chunk) {
+          if (s.npsn && s.npsn.length >= 3) {
+            const prefix = s.npsn.substring(0, 3);
+            if (!npsnPrefixMap[prefix]) {
+              npsnPrefixMap[prefix] = [fn];
+            } else if (!npsnPrefixMap[prefix].includes(fn)) {
+              npsnPrefixMap[prefix].push(fn);
+            }
           }
         }
       }

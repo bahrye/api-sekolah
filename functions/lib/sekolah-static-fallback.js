@@ -70,21 +70,28 @@ export async function handleStaticFallback(context, params, originalError = '') 
       // 2a. Jika ada filter Provinsi
       const rawProv = provinsi.trim();
       let countryFilter = null;
+      let targetFiles = [];
 
       if (rawProv.toUpperCase() === 'LUAR NEGERI') {
-        targetFile = 'data_luar_negeri.json';
+        targetFiles = ['data_luar_negeri.json'];
       } else if (rawProv.toUpperCase().startsWith('LUAR NEGERI - ')) {
-        targetFile = 'data_luar_negeri.json';
+        targetFiles = ['data_luar_negeri.json'];
         countryFilter = rawProv.substring(14).trim().toUpperCase();
       } else {
         const provSlug = getSlug(rawProv);
-        targetFile = slugMap[provSlug] || slugMap[rawProv.toLowerCase()] || `data_${provSlug}.json`;
+        const mapped = slugMap[provSlug] || slugMap[rawProv.toLowerCase()] || [`data_${provSlug}.json`];
+        targetFiles = Array.isArray(mapped) ? mapped : [mapped];
       }
 
-      const provinceData = await loadAssetJson(context, `/data_provinsi/${targetFile}`);
-      if (Array.isArray(provinceData)) {
-        let list = provinceData;
+      let list = [];
+      for (const fn of targetFiles) {
+        const provinceData = await loadAssetJson(context, `/data_provinsi/${fn}`);
+        if (Array.isArray(provinceData)) {
+          list.push(...provinceData);
+        }
+      }
 
+      if (list.length > 0) {
         if (countryFilter) {
           list = list.filter(r => (r.nama_kabupaten || '').toUpperCase() === countryFilter);
         }
@@ -111,14 +118,15 @@ export async function handleStaticFallback(context, params, originalError = '') 
 
       // Cek apakah berupa NPSN (atau diawali angka 3 digit)
       const prefix = cleanKw.substring(0, 3);
-      const targetSlugs = index.npsn_prefix_map?.[prefix] || (index.provinsi || []).map(p => p.slug);
+      const targetSlugs = index.npsn_prefix_map?.[prefix] || (index.provinsi || []).flatMap(p => p.files || [p.file]);
       const isExactNpsn = /^\d{8}$/.test(cleanKw) || /^[Pp]\d{7}$/.test(cleanKw);
 
       if (targetSlugs.length > 0) {
         if (isExactNpsn) {
           // Exact match NPSN: cari sampai ketemu lalu berhenti
-          for (const slug of targetSlugs) {
-            const pData = await loadAssetJson(context, `/data_provinsi/data_${slug}.json`);
+          for (const item of targetSlugs) {
+            const fn = item.endsWith('.json') ? item : `data_${item}.json`;
+            const pData = await loadAssetJson(context, `/data_provinsi/${fn}`);
             if (Array.isArray(pData)) {
               const exact = pData.find(r => (r.npsn || '').toUpperCase() === cleanKw);
               if (exact) {
@@ -129,8 +137,9 @@ export async function handleStaticFallback(context, params, originalError = '') 
           }
         } else {
           // Partial search: ambil hingga batas limit
-          for (const slug of targetSlugs) {
-            const pData = await loadAssetJson(context, `/data_provinsi/data_${slug}.json`);
+          for (const item of targetSlugs) {
+            const fn = item.endsWith('.json') ? item : `data_${item}.json`;
+            const pData = await loadAssetJson(context, `/data_provinsi/${fn}`);
             if (Array.isArray(pData)) {
               const found = pData.filter(r =>
                 (r.npsn || '').toUpperCase().includes(cleanKw) ||
