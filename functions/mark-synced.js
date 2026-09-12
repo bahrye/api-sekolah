@@ -5,7 +5,8 @@ export async function onRequestPost(context) {
   const url = new URL(request.url);
 
   const secret = url.searchParams.get('secret') || request.headers.get('x-cron-secret');
-  const validSecret = env.CRON_SECRET || env.SYNC_SECRET || process.env?.CRON_SECRET || process.env?.SYNC_SECRET;
+  const proc = typeof process !== 'undefined' ? process.env : undefined;
+  const validSecret = env.CRON_SECRET || env.SYNC_SECRET || proc?.CRON_SECRET || proc?.SYNC_SECRET;
 
   if (!validSecret || secret !== validSecret) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {

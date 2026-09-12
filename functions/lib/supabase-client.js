@@ -7,12 +7,13 @@ let cachedClient = null;
  * @param {Record<string, any>} [env]
  */
 export function getSupabaseClient(env = {}) {
-  const url = env.SUPABASE_URL || process.env?.SUPABASE_URL;
+  const proc = typeof process !== 'undefined' ? process.env : undefined;
+  const url = env.SUPABASE_URL || proc?.SUPABASE_URL;
   const key =
     env.SUPABASE_SERVICE_ROLE_KEY ||
     env.SUPABASE_ANON_KEY ||
-    process.env?.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env?.SUPABASE_ANON_KEY;
+    proc?.SUPABASE_SERVICE_ROLE_KEY ||
+    proc?.SUPABASE_ANON_KEY;
 
   if (!url || !key) {
     return null;

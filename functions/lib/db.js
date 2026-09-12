@@ -7,7 +7,8 @@ export const MISSING_DATABASE_URL_MSG =
  * @param {Record<string, any>} env
  */
 export function hasDatabaseUrl(env) {
-  return Boolean(env?.SUPABASE_URL || process.env?.SUPABASE_URL);
+  const proc = typeof process !== 'undefined' ? process.env : undefined;
+  return Boolean(env?.SUPABASE_URL || proc?.SUPABASE_URL);
 }
 
 /**

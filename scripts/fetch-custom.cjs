@@ -396,13 +396,38 @@ async function fetchCustomData() {
             }
           }
         } else {
-          console.log(`Gagal mem-parsing data Smart Sync. Akan menyinkronkan target secara default.`);
+          console.log(`Gagal mem-parsing data Smart Sync.`);
+          if (isCronSchedule) {
+            console.log(`⚠️ Mode Cron: Menolak sinkronisasi default 39 provinsi karena data Smart Sync gagal diparsing demi keamanan kuota.`);
+            kodeWilayahList = [];
+          }
         }
       } else {
-        console.log(`Gagal menghubungi API Smart Sync. Akan menyinkronkan target secara default.`);
+        console.log(`Gagal menghubungi API Smart Sync (Status: ${compareRes.status}).`);
+        if (isCronSchedule) {
+          // Coba fallback cek kuota via /api/sync-status sebelum memutuskan
+          try {
+            const fallbackStatusRes = await fetch(`${WORKER_URL}/api/sync-status`);
+            if (fallbackStatusRes.ok) {
+              const fsJson = await fallbackStatusRes.json();
+              if (fsJson.syncedToday >= fsJson.batasAman) {
+                console.log(`🛑 Kuota harian sudah penuh (${fsJson.syncedToday?.toLocaleString('id-ID')} / ${fsJson.batasAman?.toLocaleString('id-ID')}). Membatalkan sinkronisasi.`);
+                kodeWilayahList = [];
+              }
+            }
+          } catch (eFallback) {}
+          if (kodeWilayahList.length > 0) {
+            console.log(`⚠️ Mode Cron: Membatalkan sinkronisasi seluruh 39 provinsi karena API perbandingan Smart Sync tidak dapat dihubungi.`);
+            kodeWilayahList = [];
+          }
+        }
       }
     } catch (e) {
-      console.log(`Error saat mengecek Smart Sync: ${e.message}. Akan menyinkronkan target secara default.`);
+      console.log(`Error saat mengecek Smart Sync: ${e.message}.`);
+      if (isCronSchedule) {
+        console.log(`⚠️ Mode Cron: Membatalkan sinkronisasi untuk mencegah habisnya kuota akibat error Smart Sync.`);
+        kodeWilayahList = [];
+      }
     }
   } else {
     console.log(`🌟 Sinkronisasi manual terdeteksi (Mode Cron: false). Melewati filter Smart Sync untuk menarik ulang data secara penuh.`);
@@ -435,42 +460,59 @@ async function fetchCustomData() {
         const statusRes = await fetch(`${WORKER_URL}/api/sync-status`);
         if (statusRes.ok) {
           const statusJson = await statusRes.json();
-          if (statusJson && !statusJson.selesai && statusJson.activeRow) {
-            const act = statusJson.activeRow;
-            const actBentukRaw = act.bentuk_aktif || '';
-            const actOffset = act.offset_terakhir || 0;
-            const actProvince = (statusJson.activeProvince || '').trim().toUpperCase();
-
-            let targetShape = '';
-            let targetProv = actProvince;
-            const shapeMatch = actBentukRaw.match(/^(.*?)\s*\((.*?)\)$/);
-            if (shapeMatch) {
-              targetShape = shapeMatch[1].trim().toLowerCase();
-              if (!targetProv) targetProv = shapeMatch[2].trim().toUpperCase();
-            } else if (actBentukRaw) {
-              targetShape = actBentukRaw.trim().toLowerCase();
+          if (statusJson) {
+            // Guard kuota harian sebelum me-resume
+            if (isCronSchedule && statusJson.syncedToday && statusJson.batasAman && statusJson.syncedToday >= statusJson.batasAman) {
+              console.log(`🛑 Kuota harian sudah penuh (${statusJson.syncedToday.toLocaleString('id-ID')} / ${statusJson.batasAman.toLocaleString('id-ID')}). Tidak melanjutkan antrean.`);
+              return;
             }
 
-            if (targetProv && targetShape) {
-              const cleanTargetProv = cleanName(targetProv);
-              const foundIdx = tasks.findIndex(t => {
-                const pName = (PROVINCES[t.prov] || '').toUpperCase();
-                return cleanName(pName) === cleanTargetProv && t.bentuk.toLowerCase() === targetShape;
-              });
+            if (!statusJson.selesai && statusJson.activeRow) {
+              const act = statusJson.activeRow;
+              const actBentukRaw = act.bentuk_aktif || '';
+              const actOffset = act.offset_terakhir || 0;
+              let actProvince = (statusJson.activeProvince || '').trim().toUpperCase();
 
-              if (foundIdx !== -1) {
-                taskIndex = foundIdx;
-                offset = actOffset;
-                console.log(`🔄 Melanjutkan otomatis dari posisi terpotong: Provinsi ${targetProv}, Bentuk [${targetShape.toUpperCase()}], Offset ${offset} (Antrean #${taskIndex + 1}/${tasks.length})`);
-              } else {
-                const provOnlyIdx = tasks.findIndex(t => {
+              let targetShape = '';
+              let targetProv = actProvince;
+              const shapeMatch = actBentukRaw.match(/^(.*?)\s*\((.*?)\)$/);
+              if (shapeMatch) {
+                targetShape = shapeMatch[1].trim().toLowerCase();
+                if (!targetProv) targetProv = shapeMatch[2].trim().toUpperCase();
+              } else if (actBentukRaw) {
+                targetShape = actBentukRaw.trim().toLowerCase();
+              }
+
+              if (targetProv) {
+                const cleanTargetProv = cleanName(targetProv);
+                // Jangan resume jika provinsi ini sebenarnya sudah sinkron hari ini
+                if (skippedProvinces.some(k => cleanName(PROVINCES[k]) === cleanTargetProv)) {
+                  console.log(`✅ Provinsi terpotong [${targetProv}] sudah tersinkronisasi penuh hari ini. Tidak perlu di-resume.`);
+                  targetProv = '';
+                }
+              }
+
+              if (targetProv && targetShape) {
+                const cleanTargetProv = cleanName(targetProv);
+                const foundIdx = tasks.findIndex(t => {
                   const pName = (PROVINCES[t.prov] || '').toUpperCase();
-                  return cleanName(pName) === cleanTargetProv;
+                  return cleanName(pName) === cleanTargetProv && t.bentuk.toLowerCase() === targetShape;
                 });
-                if (provOnlyIdx !== -1) {
-                  taskIndex = provOnlyIdx;
-                  offset = 0;
-                  console.log(`🔄 Melanjutkan otomatis dari provinsi terpotong: ${targetProv} (Antrean #${taskIndex + 1}/${tasks.length})`);
+
+                if (foundIdx !== -1) {
+                  taskIndex = foundIdx;
+                  offset = actOffset;
+                  console.log(`🔄 Melanjutkan otomatis dari posisi terpotong: Provinsi ${targetProv}, Bentuk [${targetShape.toUpperCase()}], Offset ${offset} (Antrean #${taskIndex + 1}/${tasks.length})`);
+                } else {
+                  const provOnlyIdx = tasks.findIndex(t => {
+                    const pName = (PROVINCES[t.prov] || '').toUpperCase();
+                    return cleanName(pName) === cleanTargetProv;
+                  });
+                  if (provOnlyIdx !== -1) {
+                    taskIndex = provOnlyIdx;
+                    offset = 0;
+                    console.log(`🔄 Melanjutkan otomatis dari provinsi terpotong: ${targetProv} (Antrean #${taskIndex + 1}/${tasks.length})`);
+                  }
                 }
               }
             }
