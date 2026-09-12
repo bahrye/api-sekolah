@@ -111,7 +111,19 @@
             scrollbar-width: thin;
         }
 
-        /* Table sticky header fixes for dark theme */
+        html,
+        body {
+            overflow-x: hidden;
+            width: 100%;
+            max-width: 100vw;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
         .table-sticky-col {
             position: sticky;
             left: 0;
@@ -121,7 +133,7 @@
 </head>
 
 <body
-    class="bg-[#0b1120] text-slate-300 font-sans antialiased selection:bg-brand-500 selection:text-white hero-bg min-h-screen flex flex-col relative overflow-x-hidden">
+    class="bg-[#0b1120] text-slate-300 font-sans antialiased selection:bg-brand-500 selection:text-white hero-bg min-h-screen flex flex-col relative overflow-x-hidden w-full max-w-full">
 
     <!-- Ambient background effect -->
     <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
@@ -130,50 +142,50 @@
     </div>
 
     <!-- Header -->
-    <header class="sticky top-0 z-50 glass-panel border-b-0 border-white/10 shadow-lg">
-        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center">
-            <div class="flex items-center gap-3">
+    <header class="sticky top-0 z-50 glass-panel border-b-0 border-white/10 shadow-lg w-full max-w-full">
+        <div class="max-w-6xl mx-auto px-3.5 sm:px-6 py-3 sm:py-4 flex justify-between items-center gap-2">
+            <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
                 <div
-                    class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-purple-600 p-[1px] shadow-lg shadow-brand-500/20">
+                    class="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-xl bg-gradient-to-br from-brand-400 to-purple-600 p-[1px] shadow-lg shadow-brand-500/20">
                     <div class="w-full h-full bg-slate-900 rounded-xl flex items-center justify-center">
-                        <img src="/favicon.svg" alt="" class="w-6 h-6">
+                        <img src="/favicon.svg" alt="" class="w-5 h-5 sm:w-6 sm:h-6">
                     </div>
                 </div>
-                <div>
-                    <h1 class="text-xl font-bold text-white tracking-tight">EduAPI <span
+                <div class="min-w-0">
+                    <h1 class="text-base sm:text-xl font-bold text-white tracking-tight truncate">EduAPI <span
                             class="text-brand-400">Indonesia</span></h1>
-                    <p class="text-[11px] text-slate-400 font-medium tracking-wide uppercase">Data Satuan Pendidikan</p>
+                    <p class="text-[10px] sm:text-[11px] text-slate-400 font-medium tracking-wide uppercase truncate">Data Satuan Pendidikan</p>
                 </div>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
                 <a href="/sync"
-                    class="group flex items-center gap-2 px-3.5 py-2 rounded-full bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 text-xs font-semibold text-brand-300 hover:text-white transition-all shadow-sm">
-                    <span class="relative flex h-2 w-2">
+                    class="group flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-full bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 text-[11px] sm:text-xs font-semibold text-brand-300 hover:text-white transition-all shadow-sm whitespace-nowrap">
+                    <span class="relative flex h-2 w-2 shrink-0">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                    Status Sinkronisasi
+                    <span class="hidden xs:inline sm:inline">Status </span>Sync
                 </a>
                 <a href="https://github.com/bahrye" target="_blank" rel="noopener noreferrer"
-                    class="group flex items-center gap-2 px-4 py-2 rounded-full glass-panel hover:bg-white/10 transition-all border border-white/5 hover:border-white/20 text-sm font-medium text-white shadow-sm">
-                    <svg class="w-5 h-5 text-slate-300 group-hover:text-white transition-colors" fill="currentColor"
+                    class="group flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full glass-panel hover:bg-white/10 transition-all border border-white/5 hover:border-white/20 text-xs sm:text-sm font-medium text-white shadow-sm shrink-0">
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-slate-300 group-hover:text-white transition-colors" fill="currentColor"
                         viewBox="0 0 24 24">
                         <path
                             d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z">
                         </path>
                     </svg>
-                    v1.0.0
+                    <span class="hidden sm:inline">v1.0.0</span>
                 </a>
             </div>
         </div>
     </header>
 
-    <main class="flex-grow w-full max-w-6xl mx-auto px-4 sm:px-6 py-12 relative z-10">
+    <main class="flex-grow w-full max-w-6xl mx-auto px-3.5 sm:px-6 py-8 sm:py-12 relative z-10 min-w-0 max-w-full">
 
         <!-- Hero Section -->
-        <section class="mb-16 text-center max-w-3xl mx-auto">
+        <section class="mb-12 sm:mb-16 text-center max-w-3xl mx-auto min-w-0">
             <div
-                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-xs font-semibold uppercase tracking-wider mb-6">
+                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-xs font-semibold uppercase tracking-wider mb-5 sm:mb-6">
                 <span class="relative flex h-2 w-2">
                     <span
                         class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
@@ -181,37 +193,37 @@
                 </span>
                 Cloudflare Edge Serverless
             </div>
-            <h2 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight mb-6 leading-tight">
+            <h2 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight mb-4 sm:mb-6 leading-tight break-words">
                 API Data Master <br class="hidden sm:block" />
                 <span class="gradient-text">Pendidikan Indonesia</span>
             </h2>
-            <p class="text-slate-400 text-lg sm:text-xl leading-relaxed mb-10">
+            <p class="text-slate-400 text-sm sm:text-lg lg:text-xl leading-relaxed mb-8 sm:mb-10 max-w-2xl mx-auto">
                 Gateway API super cepat untuk mengakses ratusan ribu data master satuan pendidikan di seluruh Indonesia.
                 Terintegrasi langsung dengan sumber resmi.
             </p>
 
             <!-- Interactive API Try Section -->
-            <div class="relative group">
+            <div class="relative group max-w-full">
                 <div
                     class="absolute -inset-1 bg-gradient-to-r from-brand-500 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200">
                 </div>
-                <div class="relative glass-panel rounded-2xl p-2 flex flex-col sm:flex-row items-center gap-2">
+                <div class="relative glass-panel rounded-2xl p-2 flex flex-col sm:flex-row items-center gap-2 max-w-full min-w-0">
                     <div
-                        class="flex-1 w-full flex items-center bg-slate-900/50 rounded-xl border border-white/5 px-4 py-3 focus-within:border-brand-500/50 focus-within:bg-slate-900 transition-colors">
-                        <svg class="w-5 h-5 text-slate-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="flex-1 w-full flex items-center bg-slate-900/50 rounded-xl border border-white/5 px-3.5 sm:px-4 py-2.5 sm:py-3 focus-within:border-brand-500/50 focus-within:bg-slate-900 transition-colors min-w-0">
+                        <svg class="w-5 h-5 text-slate-500 mr-2.5 sm:mr-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                         </svg>
                         <input type="text" id="api-keyword" name="keyword" autocomplete="off" inputmode="numeric"
                             pattern="\d*" maxlength="8" oninput="this.value = this.value.replace(/[^0-9]/g, '');"
                             placeholder="Ketik 8 digit NPSN..."
-                            class="w-full bg-transparent border-none text-white placeholder-slate-500 focus:outline-none focus:ring-0 text-lg font-mono">
+                            class="w-full bg-transparent border-none text-white placeholder-slate-500 focus:outline-none focus:ring-0 text-base sm:text-lg font-mono min-w-0">
                     </div>
                     <div class="flex items-center gap-2 w-full sm:w-auto">
                         <button type="button" id="copy-api-url"
-                            class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium transition-all border border-white/10 active:scale-95"
+                            class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs sm:text-sm font-medium transition-all border border-white/10 active:scale-95 whitespace-nowrap"
                             aria-label="Salin URL API">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
                                 </path>
@@ -219,9 +231,9 @@
                             <span id="copy-api-label">Salin Link</span>
                         </button>
                         <a id="try-api" href="/api/sekolah?limit=5" target="_blank"
-                            class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold transition-all shadow-lg shadow-brand-500/25 active:scale-95">
+                            class="flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-8 py-2.5 sm:py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs sm:text-sm font-bold transition-all shadow-lg shadow-brand-500/25 active:scale-95 whitespace-nowrap">
                             Coba API
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-4 h-4 sm:w-5 sm:h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                             </svg>
@@ -232,8 +244,8 @@
         </section>
 
         <!-- Status Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-            <div class="glass-panel rounded-2xl p-6 relative overflow-hidden group">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-12 sm:mb-16 min-w-0 max-w-full">
+            <div class="glass-panel rounded-2xl p-5 sm:p-6 relative overflow-hidden group min-w-0">
                 <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                     <svg class="w-16 h-16 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -241,12 +253,12 @@
                         </path>
                     </svg>
                 </div>
-                <h3 class="text-slate-400 text-sm font-medium mb-2 uppercase tracking-wider">Update Terakhir (WIB)</h3>
-                <p id="last-update-at" class="text-2xl font-bold text-white mb-1">Memuat…</p>
+                <h3 class="text-slate-400 text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 uppercase tracking-wider">Update Terakhir (WIB)</h3>
+                <p id="last-update-at" class="text-xl sm:text-2xl font-bold text-white mb-1">Memuat…</p>
                 <p id="last-update-iso" class="text-xs text-slate-500 font-mono truncate"></p>
             </div>
 
-            <div class="glass-panel rounded-2xl p-6 relative overflow-hidden group">
+            <div class="glass-panel rounded-2xl p-5 sm:p-6 relative overflow-hidden group min-w-0">
                 <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                     <svg class="w-16 h-16 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -254,92 +266,92 @@
                         </path>
                     </svg>
                 </div>
-                <h3 class="text-slate-400 text-sm font-medium mb-2 uppercase tracking-wider">Total Data Sekolah</h3>
-                <p id="total-data-count" class="text-2xl font-bold text-white mb-1">Memuat…</p>
+                <h3 class="text-slate-400 text-xs sm:text-sm font-medium mb-1.5 sm:mb-2 uppercase tracking-wider">Total Data Sekolah</h3>
+                <p id="total-data-count" class="text-xl sm:text-2xl font-bold text-white mb-1">Memuat…</p>
                 <p class="text-xs text-slate-500">Terindeks di database</p>
             </div>
 
             <a href="/sync"
-                class="glass-panel rounded-2xl p-6 flex flex-col justify-center items-center text-center hover:bg-white/5 transition-colors border border-brand-500/20 hover:border-brand-500/50 group">
+                class="glass-panel rounded-2xl p-5 sm:p-6 flex flex-col justify-center items-center text-center hover:bg-white/5 transition-colors border border-brand-500/20 hover:border-brand-500/50 group min-w-0">
                 <div
-                    class="w-12 h-12 rounded-full bg-brand-500/20 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform group-hover:bg-brand-500/30">
-                    <svg class="w-6 h-6 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-500/20 flex items-center justify-center mb-2.5 sm:mb-3 group-hover:scale-110 transition-transform group-hover:bg-brand-500/30">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                     </svg>
                 </div>
-                <h3 class="text-white font-bold text-lg mb-1">Status Sinkronisasi</h3>
-                <p class="text-sm text-slate-400">Lihat log pembaruan dari belajar.id</p>
+                <h3 class="text-white font-bold text-base sm:text-lg mb-1">Status Sinkronisasi</h3>
+                <p class="text-xs sm:text-sm text-slate-400">Lihat log pembaruan dari belajar.id</p>
             </a>
         </div>
 
         <!-- Documentation & Demo -->
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-16">
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 sm:gap-8 mb-12 sm:mb-16 min-w-0 max-w-full">
             <!-- Documentation -->
-            <div class="space-y-6">
-                <div class="glass-panel rounded-2xl overflow-hidden border border-white/10">
-                    <div class="px-6 py-4 border-b border-white/10 bg-white/5">
-                        <h3 class="font-bold text-white text-lg">Endpoint Utama</h3>
+            <div class="space-y-6 min-w-0 max-w-full">
+                <div class="glass-panel rounded-2xl overflow-hidden border border-white/10 min-w-0">
+                    <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-white/10 bg-white/5">
+                        <h3 class="font-bold text-white text-base sm:text-lg">Endpoint Utama</h3>
                     </div>
-                    <div class="p-6">
+                    <div class="p-4 sm:p-6">
                         <div
-                            class="flex items-center gap-3 bg-slate-900/80 p-4 rounded-xl font-mono text-sm border border-white/5">
+                            class="flex items-center gap-2.5 sm:gap-3 bg-slate-900/80 p-3 sm:p-4 rounded-xl font-mono text-xs sm:text-sm border border-white/5 min-w-0">
                             <span
-                                class="bg-brand-500/20 text-brand-400 px-2 py-1 rounded text-xs font-bold uppercase tracking-wider">GET</span>
-                            <span class="text-slate-300 break-all">/api/sekolah</span>
+                                class="bg-brand-500/20 text-brand-400 px-2 py-0.5 sm:py-1 rounded text-[10px] sm:text-xs font-bold uppercase tracking-wider shrink-0">GET</span>
+                            <span class="text-slate-300 break-all font-mono">/api/sekolah</span>
                         </div>
-                        <p class="mt-4 text-slate-400 leading-relaxed">
+                        <p class="mt-3 sm:mt-4 text-xs sm:text-sm text-slate-400 leading-relaxed">
                             Mengembalikan daftar sekolah dalam format JSON. Gunakan parameter di bawah untuk pencarian
                             dan paginasi yang spesifik.
                         </p>
                     </div>
                 </div>
 
-                <div class="glass-panel rounded-2xl overflow-hidden border border-white/10">
-                    <div class="px-6 py-4 border-b border-white/10 bg-white/5">
-                        <h3 class="font-bold text-white text-lg">Parameter Query</h3>
+                <div class="glass-panel rounded-2xl overflow-hidden border border-white/10 min-w-0">
+                    <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-white/10 bg-white/5">
+                        <h3 class="font-bold text-white text-base sm:text-lg">Parameter Query</h3>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left">
-                            <thead class="text-xs text-slate-400 uppercase bg-black/20">
+                    <div class="overflow-x-auto w-full max-w-full api-url-scroll">
+                        <table class="w-full text-xs sm:text-sm text-left min-w-[340px]">
+                            <thead class="text-[10px] sm:text-xs text-slate-400 uppercase bg-black/20">
                                 <tr>
-                                    <th scope="col" class="px-6 py-4">Parameter</th>
-                                    <th scope="col" class="px-6 py-4">Deskripsi</th>
-                                    <th scope="col" class="px-6 py-4">Contoh</th>
+                                    <th scope="col" class="px-3 sm:px-6 py-3 sm:py-4">Parameter</th>
+                                    <th scope="col" class="px-3 sm:px-6 py-3 sm:py-4">Deskripsi</th>
+                                    <th scope="col" class="px-3 sm:px-6 py-3 sm:py-4">Contoh</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/5 text-slate-300">
                                 <tr class="hover:bg-white/5 transition-colors">
-                                    <td class="px-6 py-4 font-mono text-brand-400 font-medium">keyword</td>
-                                    <td class="px-6 py-4">Mencari berdasarkan NPSN spesifik.</td>
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center gap-2">
-                                            <span class="bg-slate-800 rounded px-2 py-1 font-mono text-xs border border-white/5">?keyword=60723552</span>
-                                            <button type="button" class="copy-param-btn p-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors" data-param="?keyword=60723552" title="Salin link lengkap">
+                                    <td class="px-3 sm:px-6 py-3 sm:py-4 font-mono text-brand-400 font-medium whitespace-nowrap">keyword</td>
+                                    <td class="px-3 sm:px-6 py-3 sm:py-4">Mencari berdasarkan NPSN spesifik.</td>
+                                    <td class="px-3 sm:px-6 py-3 sm:py-4">
+                                        <div class="flex items-center gap-1.5 sm:gap-2">
+                                            <span class="bg-slate-800 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 font-mono text-[11px] sm:text-xs border border-white/5 whitespace-nowrap">?keyword=60723552</span>
+                                            <button type="button" class="copy-param-btn p-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors shrink-0" data-param="?keyword=60723552" title="Salin link lengkap">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                             </button>
                                         </div>
                                     </td>
                                 </tr>
                                 <tr class="hover:bg-white/5 transition-colors">
-                                    <td class="px-6 py-4 font-mono text-brand-400 font-medium">limit</td>
-                                    <td class="px-6 py-4">Jumlah data per halaman (default 20, maks 50).</td>
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center gap-2">
-                                            <span class="bg-slate-800 rounded px-2 py-1 font-mono text-xs border border-white/5">?limit=50</span>
-                                            <button type="button" class="copy-param-btn p-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors" data-param="?limit=50" title="Salin link lengkap">
+                                    <td class="px-3 sm:px-6 py-3 sm:py-4 font-mono text-brand-400 font-medium whitespace-nowrap">limit</td>
+                                    <td class="px-3 sm:px-6 py-3 sm:py-4">Jumlah data per halaman (default 20, maks 50).</td>
+                                    <td class="px-3 sm:px-6 py-3 sm:py-4">
+                                        <div class="flex items-center gap-1.5 sm:gap-2">
+                                            <span class="bg-slate-800 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 font-mono text-[11px] sm:text-xs border border-white/5 whitespace-nowrap">?limit=50</span>
+                                            <button type="button" class="copy-param-btn p-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors shrink-0" data-param="?limit=50" title="Salin link lengkap">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                             </button>
                                         </div>
                                     </td>
                                 </tr>
                                 <tr class="hover:bg-white/5 transition-colors">
-                                    <td class="px-6 py-4 font-mono text-brand-400 font-medium">offset</td>
-                                    <td class="px-6 py-4">Titik mulai paginasi (default 0).</td>
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center gap-2">
-                                            <span class="bg-slate-800 rounded px-2 py-1 font-mono text-xs border border-white/5">?offset=20</span>
-                                            <button type="button" class="copy-param-btn p-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors" data-param="?offset=20" title="Salin link lengkap">
+                                    <td class="px-3 sm:px-6 py-3 sm:py-4 font-mono text-brand-400 font-medium whitespace-nowrap">offset</td>
+                                    <td class="px-3 sm:px-6 py-3 sm:py-4">Titik mulai paginasi (default 0).</td>
+                                    <td class="px-3 sm:px-6 py-3 sm:py-4">
+                                        <div class="flex items-center gap-1.5 sm:gap-2">
+                                            <span class="bg-slate-800 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 font-mono text-[11px] sm:text-xs border border-white/5 whitespace-nowrap">?offset=20</span>
+                                            <button type="button" class="copy-param-btn p-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-colors shrink-0" data-param="?offset=20" title="Salin link lengkap">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                             </button>
                                         </div>
@@ -352,7 +364,7 @@
             </div>
 
             <!-- Code Preview -->
-            <div class="glass-panel rounded-2xl overflow-hidden border border-white/10 flex flex-col h-full shadow-2xl">
+            <div class="glass-panel rounded-2xl overflow-hidden border border-white/10 flex flex-col h-full shadow-2xl min-w-0 max-w-full">
                 <div class="px-4 py-3 border-b border-white/10 bg-black/40 flex justify-between items-center">
                     <div class="flex gap-2">
                         <div class="w-3 h-3 rounded-full bg-rose-500/80"></div>
@@ -362,8 +374,8 @@
                     <span class="text-xs font-mono text-slate-400">response.json</span>
                 </div>
                 <div
-                    class="p-6 overflow-auto flex-grow bg-slate-900/60 font-mono text-sm leading-relaxed text-slate-300">
-                    <pre><code class="language-json" id="json-preview"><span class="text-brand-300">{</span>
+                    class="p-3.5 sm:p-6 overflow-x-auto flex-grow bg-slate-900/60 font-mono text-xs sm:text-sm leading-relaxed text-slate-300 max-w-full api-url-scroll">
+                    <pre class="overflow-x-auto max-w-full"><code class="language-json" id="json-preview"><span class="text-brand-300">{</span>
   <span class="text-purple-400">"status"</span>: <span class="text-emerald-400">"success"</span>,
   <span class="text-purple-400">"source"</span>: <span class="text-emerald-400">"API Sekolah Mandiri"</span>,
   <span class="text-purple-400">"developer"</span>: <span class="text-emerald-400">"Syamsul Bahri"</span>,
@@ -393,25 +405,25 @@
         </div>
 
         <!-- Rekap Data Table Section -->
-        <section class="glass-panel rounded-2xl overflow-hidden border border-white/10 shadow-xl mb-10">
+        <section class="glass-panel rounded-2xl overflow-hidden border border-white/10 shadow-xl mb-10 min-w-0 max-w-full">
             <div
-                class="px-6 py-5 border-b border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                class="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-4">
                 <div>
-                    <h3 class="font-bold text-white text-xl">Pemetaan Data Sekolah</h3>
-                    <p class="text-sm text-slate-400 mt-1">Berdasarkan Bentuk Pendidikan & Wilayah</p>
+                    <h3 class="font-bold text-white text-lg sm:text-xl">Pemetaan Data Sekolah</h3>
+                    <p class="text-xs sm:text-sm text-slate-400 mt-0.5 sm:mt-1">Berdasarkan Bentuk Pendidikan & Wilayah</p>
                 </div>
-                <div class="flex p-1 bg-slate-900/80 rounded-xl border border-white/10" id="rekap-tabs">
+                <div class="flex p-1 bg-slate-900/80 rounded-xl border border-white/10 w-fit self-start sm:self-auto shrink-0" id="rekap-tabs">
                     <button
-                        class="px-4 py-2 text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-lg"
+                        class="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-lg"
                         id="tab-id">INDONESIA</button>
                     <button
-                        class="px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white hover:bg-white/5"
+                        class="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white hover:bg-white/5"
                         id="tab-ln">LUAR NEGERI</button>
                 </div>
             </div>
 
-            <div class="p-0 overflow-x-auto api-url-scroll max-h-[600px] overflow-y-auto relative bg-slate-900/30">
-                <table class="w-full text-sm text-left text-slate-300 min-w-[800px] border-collapse" id="rekap-table">
+            <div class="p-0 overflow-x-auto api-url-scroll max-h-[600px] overflow-y-auto relative bg-slate-900/30 w-full max-w-full">
+                <table class="w-full text-xs sm:text-sm text-left text-slate-300 min-w-[700px] sm:min-w-[800px] border-collapse" id="rekap-table">
                     <thead
                         class="text-xs text-slate-400 uppercase bg-slate-900 border-b border-white/10 sticky top-0 z-20"
                         id="rekap-thead">
@@ -788,16 +800,16 @@
                     tabId.addEventListener('click', function () {
                         if (currentTab === 'indonesia') return;
                         currentTab = 'indonesia';
-                        tabId.className = 'px-4 py-2 text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-lg';
-                        tabLn.className = 'px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white hover:bg-white/5';
+                        tabId.className = 'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-lg';
+                        tabLn.className = 'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white hover:bg-white/5';
                         renderRekap();
                     });
 
                     tabLn.addEventListener('click', function () {
                         if (currentTab === 'luar_negeri') return;
                         currentTab = 'luar_negeri';
-                        tabLn.className = 'px-4 py-2 text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-lg';
-                        tabId.className = 'px-4 py-2 text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white hover:bg-white/5';
+                        tabLn.className = 'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all bg-brand-600 text-white shadow-lg';
+                        tabId.className = 'px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all text-slate-400 hover:text-white hover:bg-white/5';
                         renderRekap();
                     });
                 }
