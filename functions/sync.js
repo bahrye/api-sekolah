@@ -566,75 +566,109 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
                   let daysSim = [{ offset: 0, used: syncedToday, limit: BATAS_AMAN, items: 0 }];
                   let queueCounters = {};
 
-                  return diffData.map((d, i) => {
+                  const assignedList = diffData.map((d) => {
+                    const isThisProvActive = Boolean(isActive && activeProvince && cleanName(activeProvince) === cleanName(d.nama));
+                    
+                    if (isThisProvActive) {
+                      return {
+                        ...d,
+                        assignedDayOffset: 0,
+                        queueNumber: 0,
+                        isThisProvActive: true
+                      };
+                    }
+
                     let assignedDayOffset = -1;
                     let assigned = false;
-                    
                     let minOffset = d.isSyncedToday ? 1 : 0;
-                    
+
                     for (let j = 0; j < daysSim.length; j++) {
                       let day = daysSim[j];
                       if (day.offset < minOffset) continue;
                       
-                      if (day.used + d.total_api <= day.limit) {
-                        day.used += d.total_api;
+                      if (day.used + (d.total_api || 0) <= day.limit) {
+                        day.used += (d.total_api || 0);
                         day.items++;
                         assignedDayOffset = day.offset;
                         assigned = true;
                         break;
                       } else if (day.items === 0 && day.used === 0) {
-                        day.used += d.total_api;
+                        day.used += (d.total_api || 0);
                         day.items++;
                         assignedDayOffset = day.offset;
                         assigned = true;
                         break;
                       }
                     }
-                    
+
                     if (!assigned) {
                       let newOffset = Math.max(minOffset, daysSim[daysSim.length - 1].offset + 1);
                       const nextDaySimulated = (currentDayOfWeek + newOffset - 1) % 7 + 1;
                       const isNextDayMandatory = (nextDaySimulated === 3 || nextDaySimulated === 4);
                       let nextDayScheduledTotal = (isNextDayMandatory && SCHEDULE[nextDaySimulated])
                         ? SCHEDULE[nextDaySimulated].reduce((sum, name) => {
-                            const p = compareCache?.value?.find(d => cleanName(d.nama) === cleanName(name));
+                            const p = compareCache?.value?.find(item => cleanName(item.nama) === cleanName(name));
                             return sum + (p ? (p.total_api || 0) : 0);
                           }, 0)
                         : 0;
                       let newLimit = isNextDayMandatory ? Math.max(nextDayScheduledTotal + 15000, 350000) : 100000;
                       
-                      let newDay = { offset: newOffset, used: d.total_api, limit: newLimit, items: 1 };
+                      let newDay = { offset: newOffset, used: (d.total_api || 0), limit: newLimit, items: 1 };
                       daysSim.push(newDay);
                       daysSim.sort((a,b) => a.offset - b.offset);
                       assignedDayOffset = newOffset;
                     }
-                    
-                    queueCounters[assignedDayOffset] = (queueCounters[assignedDayOffset] || 0) + 1;
 
+                    queueCounters[assignedDayOffset] = (queueCounters[assignedDayOffset] || 0) + 1;
+                    const queueNumber = queueCounters[assignedDayOffset];
+
+                    return {
+                      ...d,
+                      assignedDayOffset,
+                      queueNumber,
+                      isThisProvActive: false
+                    };
+                  });
+
+                  // Urutkan antrean:
+                  // 1. Yang aktif menyinkronkan selalu di urutan paling atas (#1 / ⚡)
+                  // 2. Berdasarkan harinya secara kronologis (assignedDayOffset: 0 (Hari Ini) -> 1 (Besok) -> 2 (Lusa) dst)
+                  // 3. Di dalam hari yang sama, urutkan berdasarkan nomor antrean di hari tersebut (queueNumber: #1, #2, #3 dst)
+                  assignedList.sort((a, b) => {
+                    if (a.isThisProvActive && !b.isThisProvActive) return -1;
+                    if (!a.isThisProvActive && b.isThisProvActive) return 1;
+
+                    if (a.assignedDayOffset !== b.assignedDayOffset) {
+                      return a.assignedDayOffset - b.assignedDayOffset;
+                    }
+
+                    return a.queueNumber - b.queueNumber;
+                  });
+
+                  return assignedList.map((d, i) => {
                     let statusLabel = '';
                     let rowClass = '';
-                    const isThisProvActive = isActive && activeProvince && cleanName(activeProvince) === cleanName(d.nama);
 
-                    if (isThisProvActive) {
+                    if (d.isThisProvActive) {
                       statusLabel = '<span class="status-pill active-sync"><svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Sedang Menyinkronkan</span>';
                       rowClass = 'row-active';
                     } else {
-                      if (assignedDayOffset === 0) {
+                      if (d.assignedDayOffset === 0) {
                         if (isMandatoryUpdateDay && todaySchedule.includes(d.nama)) {
-                          statusLabel = `<span class="status-pill pending">Antrian ke #${queueCounters[assignedDayOffset]}</span>`;
+                          statusLabel = `<span class="status-pill pending">Antrian ke #${d.queueNumber}</span>`;
                         } else {
-                          statusLabel = '<span class="status-pill pending">Dieksekusi Hari Ini</span>';
+                          statusLabel = `<span class="status-pill pending">Dieksekusi Hari Ini #${d.queueNumber}</span>`;
                         }
                       } else {
-                        const scheduledDayOfWeek = (currentDayOfWeek + assignedDayOffset - 1) % 7 + 1;
+                        const scheduledDayOfWeek = (currentDayOfWeek + d.assignedDayOffset - 1) % 7 + 1;
                         const isScheduledMandatory = (scheduledDayOfWeek === 3 || scheduledDayOfWeek === 4);
                         const dayNameMap = {1: 'Senin', 2: 'Selasa', 3: 'Rabu', 4: 'Kamis', 5: "Jum'at", 6: 'Sabtu', 7: 'Minggu'};
                         const scheduledDayName = dayNameMap[scheduledDayOfWeek];
                         
                         if (isScheduledMandatory) {
-                          statusLabel = `<span class="status-pill muted">Full Sync (${scheduledDayName}) #${queueCounters[assignedDayOffset]}</span>`;
+                          statusLabel = `<span class="status-pill muted">Full Sync (${scheduledDayName}) #${d.queueNumber}</span>`;
                         } else {
-                          statusLabel = `<span class="status-pill muted">Smart Sync (${scheduledDayName}) #${queueCounters[assignedDayOffset]}</span>`;
+                          statusLabel = `<span class="status-pill muted">Smart Sync (${scheduledDayName}) #${d.queueNumber}</span>`;
                         }
                       }
                     }
@@ -657,10 +691,10 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
                     return `
                       <tr class="${rowClass}" data-prov="${cleanName(d.nama)}">
                         <td style="padding: 12px; text-align: left; font-weight: 700; color: var(--text-subtle); font-size: 13px;">
-                          ${isThisProvActive ? '<span class="spin-icon" style="color: #818cf8; font-size: 14px;">⚡</span>' : (i + 1)}
+                          ${d.isThisProvActive ? '<span class="spin-icon" style="color: #818cf8; font-size: 14px;">⚡</span>' : (i + 1)}
                         </td>
                         <td style="padding: 12px; text-align: left; font-weight: 600; font-size: 14px;">
-                          ${isThisProvActive ? `
+                          ${d.isThisProvActive ? `
                             <div style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                               <span class="active-prov-glow">${d.nama}</span>
                               <span class="badge-live-sync"><span class="pulse-dot-mini"></span> SEDANG SINKRON</span>
