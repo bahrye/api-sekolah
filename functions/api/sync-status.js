@@ -101,6 +101,51 @@ export async function onRequestGet(context) {
       }
     }
 
+    let totalNonQueryable = 0;
+    try {
+      let targetProvince = activeProvince;
+      if (!targetProvince) {
+        const { data: lastLog } = await supabase
+          .from('log_aktivitas_provinsi')
+          .select('total_non_queryable, nama_provinsi')
+          .order('waktu_selesai', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (lastLog) {
+          if (typeof lastLog.total_non_queryable === 'number' && lastLog.total_non_queryable > 0) {
+            totalNonQueryable = lastLog.total_non_queryable;
+          } else {
+            targetProvince = lastLog.nama_provinsi;
+          }
+        }
+      }
+
+      if (!totalNonQueryable && targetProvince) {
+        const cleanP = targetProvince.replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/^PROVINSI|^PROV/, '');
+        const { data: pss } = await supabase
+          .from('provinsi_sync_status')
+          .select('api_unrecognized_shapes')
+          .ilike('nama_provinsi', `%${cleanP}%`)
+          .maybeSingle();
+        if (pss?.api_unrecognized_shapes) {
+          totalNonQueryable = pss.api_unrecognized_shapes;
+        } else {
+          const { data: cRow } = await supabase
+            .from('cache_data')
+            .select('value')
+            .eq('key', 'perbandingan')
+            .single();
+          if (cRow && cRow.value) {
+            const list = JSON.parse(cRow.value);
+            const found = list.find(item => item.nama && item.nama.replace(/[^A-Z0-9]/gi, '').toUpperCase().includes(cleanP));
+            if (found && typeof found.api_unrecognized_shapes === 'number') {
+              totalNonQueryable = found.api_unrecognized_shapes;
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
     return new Response(
       JSON.stringify({
         ok: true,
@@ -108,6 +153,7 @@ export async function onRequestGet(context) {
         isRunning,
         selesai,
         activeProvince,
+        total_non_queryable: totalNonQueryable,
         bentukBerikutnya,
         offsetBerikutnya,
         totalSynced,

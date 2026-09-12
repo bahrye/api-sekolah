@@ -721,6 +721,32 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           </div>`;
         }).join('') : '<div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px;">Belum ada log aktivitas.</div>';
 
+        let activeNonQueryable = 0;
+        if (activeProvince) {
+          const cName = cleanName(activeProvince);
+          const pStat = pStatusMap.get(cName);
+          const compItem = compDataMap.get(cName);
+          if (pStat && typeof pStat.api_unrecognized_shapes === 'number' && pStat.api_unrecognized_shapes > 0) {
+            activeNonQueryable = pStat.api_unrecognized_shapes;
+          } else if (compItem && typeof compItem.api_unrecognized_shapes === 'number') {
+            activeNonQueryable = compItem.api_unrecognized_shapes;
+          }
+        } else if (logAktivitasList && logAktivitasList.length > 0) {
+          const latestLog = logAktivitasList[0];
+          if (typeof latestLog.total_non_queryable === 'number' && latestLog.total_non_queryable > 0) {
+            activeNonQueryable = latestLog.total_non_queryable;
+          } else {
+            const cName = cleanName(latestLog.nama_provinsi);
+            const pStat = pStatusMap.get(cName);
+            const compItem = compDataMap.get(cName);
+            if (pStat && typeof pStat.api_unrecognized_shapes === 'number' && pStat.api_unrecognized_shapes > 0) {
+              activeNonQueryable = pStat.api_unrecognized_shapes;
+            } else if (compItem && typeof compItem.api_unrecognized_shapes === 'number') {
+              activeNonQueryable = compItem.api_unrecognized_shapes;
+            }
+          }
+        }
+
         const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -826,7 +852,15 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
     
     .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 24px; }
     @media (min-width: 600px) {
-      .grid { grid-template-columns: repeat(4, 1fr); }
+      .grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (min-width: 860px) {
+      .grid { grid-template-columns: repeat(5, 1fr); }
+    }
+    @media (max-width: 599px) {
+      .grid .stat-box:last-child:nth-child(odd) {
+        grid-column: span 2;
+      }
     }
     
     .stat-box {
@@ -848,6 +882,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
     .stat-icon-wrapper.info { background: rgba(6, 182, 212, 0.15); color: #38bdf8; }
     .stat-icon-wrapper.danger { background: rgba(244, 63, 94, 0.15); color: #fb7185; }
     .stat-icon-wrapper.subtle { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+    .stat-icon-wrapper.special { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
 
     .stat-val { font-size: 22px; font-weight: 800; color: var(--text-main); line-height: 1.1; }
     .stat-label { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-top: 6px; }
@@ -1279,6 +1314,10 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
       if (statDihapus) statDihapus.innerText = Number(status.activeRow?.total_dihapus || 0).toLocaleString('id-ID');
       const statTidakBerubah = document.getElementById('stat-tidak-berubah');
       if (statTidakBerubah) statTidakBerubah.innerText = Number(status.activeRow?.total_tidak_berubah || 0).toLocaleString('id-ID');
+      const statNonQueryable = document.getElementById('stat-non-queryable');
+      if (statNonQueryable && status.total_non_queryable !== undefined) {
+        statNonQueryable.innerText = Number(status.total_non_queryable).toLocaleString('id-ID');
+      }
 
       // 5. Update info box
       const mainInfo = document.getElementById('main-info');
@@ -1497,6 +1536,13 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         </div>
         <div id="stat-tidak-berubah" class="stat-val">${activeRow.total_tidak_berubah || 0}</div>
         <div class="stat-label">Tidak Berubah</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-icon-wrapper special">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+        </div>
+        <div id="stat-non-queryable" class="stat-val" style="color: #c084fc;">${(activeNonQueryable || 0).toLocaleString('id-ID')}</div>
+        <div class="stat-label">Non-Queryable</div>
       </div>
     </div>
     

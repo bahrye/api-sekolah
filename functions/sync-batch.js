@@ -171,6 +171,7 @@ export async function onRequestPost(context) {
           total_diperbarui: finalDiperbarui,
           total_dihapus: totalDihapus,
           total_tidak_berubah: finalTidakBerubah,
+          total_non_queryable: provStatusData.api_unrecognized_shapes || 0,
           waktu_selesai: new Date().toISOString(),
         });
 
