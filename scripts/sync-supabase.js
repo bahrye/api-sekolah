@@ -3,6 +3,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { getDataSourceUrl } from '../functions/lib/source-config.js';
+
+const API_BASE = getDataSourceUrl(process.env);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,7 +40,7 @@ async function syncProvinsi(kode, namaProvinsi, total) {
   let synced = 0;
 
   while (offset < total) {
-    const url = `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/360?limit=${FETCH_LIMIT}&offset=${offset}&kodeWilayah=${kode}`;
+    const url = `${API_BASE}/360?limit=${FETCH_LIMIT}&offset=${offset}&kodeWilayah=${kode}`;
     try {
       const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
       const json = await res.json();
@@ -95,7 +98,7 @@ async function main() {
   for (let i = 1; i <= 40; i++) {
     const kode = i.toString().padStart(2, '0') + '0000';
     try {
-      const testUrl = `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/360?limit=1&offset=0&kodeWilayah=${kode}`;
+      const testUrl = `${API_BASE}/360?limit=1&offset=0&kodeWilayah=${kode}`;
       const testRes = await fetch(testUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
       const testJson = await testRes.json();
       const total = testJson.meta?.total || 0;

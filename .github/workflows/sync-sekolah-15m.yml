@@ -52,6 +52,7 @@ jobs:
         if: steps.check_queue.outputs.skip_sync != 'true'
         env:
           CLOUDFLARE_WORKER_URL: ${{ secrets.CLOUDFLARE_WORKER_URL || 'https://api-sekolah-kita.pages.dev' }}
+          DATA_SOURCE_URL: ${{ secrets.DATA_SOURCE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET || secrets.SYNC_SECRET }}
           PILIHAN_BENTUK: "Semua"
           PILIHAN_PROVINSI: ${{ github.event.inputs.pilihan_provinsi || '' }}

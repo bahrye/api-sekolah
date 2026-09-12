@@ -320,7 +320,7 @@
                     </svg>
                 </div>
                 <h3 class="text-white font-bold text-base sm:text-lg mb-1">Status Sinkronisasi</h3>
-                <p class="text-xs sm:text-sm text-slate-400">Lihat log pembaruan dari belajar.id</p>
+                <p class="text-xs sm:text-sm text-slate-400">Lihat log pembaruan dari server pusat</p>
             </a>
         </div>
 
@@ -505,7 +505,7 @@
                     <span class="font-bold text-white">EduAPI</span>
                 </div>
                 <p class="text-sm text-slate-400 max-w-md">
-                    Data tersinkronisasi dari portal resmi belajar.id secara berkala.
+                    Data tersinkronisasi dari portal data pendidikan nasional secara berkala.
                 </p>
             </div>
             <div class="flex flex-col items-center md:items-end gap-2">
@@ -766,26 +766,6 @@
                 loadStatus();
                 // Polling otomatis setiap 4 detik agar realtime
                 setInterval(loadStatus, 4000);
-
-                // Supabase Realtime WebSocket listener
-                try {
-                    var SUPABASE_URL = 'https://xikrjtbaqtidnifnkpxd.supabase.co';
-                    var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpa3JqdGJhcXRpZG5pZm5rcHhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMDMxNDcsImV4cCI6MjA5NjU3OTE0N30.ARW-hXikuKeOiYqAwTcBkqXMpyKaPPulPqF4O2hFzXA';
-                    if (window.supabase) {
-                        var sbRealtime = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                        sbRealtime.channel('home-realtime-sync')
-                            .on('postgres_changes', { event: '*', schema: 'public', table: 'status_sinkronisasi' }, function () {
-                                loadStatus();
-                            })
-                            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'log_aktivitas_provinsi' }, function () {
-                                loadStatus();
-                                loadRekap();
-                            })
-                            .subscribe();
-                    }
-                } catch (eRealtime) {
-                    console.warn('Realtime Supabase fallback to polling:', eRealtime);
-                }
 
                 var rekapThead = document.getElementById('rekap-thead');
                 var rekapTbody = document.getElementById('rekap-tbody');

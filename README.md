@@ -7,7 +7,7 @@
 
 **EduAPI Indonesia** adalah gateway API super cepat berbasis *Edge Serverless* untuk mengakses ratusan ribu data master satuan pendidikan di seluruh Indonesia (dan sekolah luar negeri di bawah pembinaan Indonesia). 
 
-Data pada API ini disinkronisasikan secara berkala dari portal resmi **belajar.id** melalui proses otomatisasi scraper di GitHub Actions menuju database **Cloudflare D1**.
+Data pada API ini disinkronisasikan secara berkala dari portal data induk pendidikan nasional melalui proses otomatisasi di GitHub Actions menuju database **Supabase (PostgreSQL)** dengan cadangan replika statis di Edge CDN.
 
 ---
 

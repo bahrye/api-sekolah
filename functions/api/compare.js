@@ -1,4 +1,5 @@
 import { getSupabase } from '../lib/db.js';
+import { getDataSourceUrl } from '../lib/source-config.js';
 
 const PROVINCES = {
   '010000': 'DKI JAKARTA', '020000': 'JAWA BARAT', '030000': 'JAWA TENGAH', '040000': 'DI YOGYAKARTA',
@@ -80,11 +81,12 @@ export async function onRequestGet(context) {
 
     const statusMap = new Map((statusRows || []).map((s) => [cleanName(s.nama_provinsi), s]));
 
-    // Query Belajar.id
+    // Query data pusat
+    const apiBase = getDataSourceUrl(context.env);
     const promises = Object.keys(PROVINCES).map(async (kode) => {
       try {
         const res = await fetch(
-          `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${kode}?limit=1&offset=0`
+          `${apiBase}/${kode}?limit=1&offset=0`
         );
         const json = await res.json();
         return { kode, nama: PROVINCES[kode], total_api: json.meta ? json.meta.total : 0 };

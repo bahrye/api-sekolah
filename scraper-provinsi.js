@@ -1,6 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import { getDataSourceUrl } from './functions/lib/source-config.js';
+
+dotenv.config();
+const API_BASE = getDataSourceUrl(process.env);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,7 +26,7 @@ async function jalankanAutomasi() {
     
     try {
       // Cek apakah kode wilayah ini valid (ada datanya)
-      const testUrl = `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/360?limit=1&offset=0&kodeWilayah=${kode}`;
+      const testUrl = `${API_BASE}/360?limit=1&offset=0&kodeWilayah=${kode}`;
       const testRes = await fetch(testUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } });
       const testJson = await testRes.json();
       
@@ -58,7 +63,7 @@ async function jalankanAutomasi() {
           break;
         }
 
-        const url = `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/360?limit=${limit}&offset=${offset}&kodeWilayah=${kode}`;
+        const url = `${API_BASE}/360?limit=${limit}&offset=${offset}&kodeWilayah=${kode}`;
         
         try {
           const response = await fetch(url, {

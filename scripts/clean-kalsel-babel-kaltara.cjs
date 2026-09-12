@@ -1,7 +1,13 @@
 require('dotenv').config({ path: '.env.supabase' });
 const { Client } = require('pg');
+const { getDataSourceUrl } = require('./source-config.cjs');
 
-const connectionString = 'postgresql://postgres.xikrjtbaqtidnifnkpxd:Andhika9619@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres';
+const API_BASE = getDataSourceUrl();
+const connectionString = process.env.SUPABASE_DB_URL;
+if (!connectionString) {
+  console.error('SUPABASE_DB_URL belum diatur.');
+  process.exit(1);
+}
 const pgClient = new Client({ connectionString });
 
 const TARGETS = [
@@ -32,7 +38,7 @@ async function fetchAllApiNpsns(kodeWilayah, bentuk, totalApi) {
     while (curr < offsets.length) {
       const offset = offsets[curr++];
       try {
-        const res = await fetch(`https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${kodeWilayah}?limit=${limit}&offset=${offset}&bentukPendidikan=${bentuk}`);
+        const res = await fetch(`${API_BASE}/${kodeWilayah}?limit=${limit}&offset=${offset}&bentukPendidikan=${bentuk}`);
         if (res.ok) {
           const j = await res.json();
           (j.data || []).forEach(d => { if (d.npsn) set.add(String(d.npsn)); });
@@ -56,7 +62,7 @@ async function run() {
 
     for (const shape of t.shapesToCheck) {
       // 1. Ambil meta total di API
-      const apiRes = await fetch(`https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${t.kode}?limit=1&offset=0&bentukPendidikan=${shape}`);
+      const apiRes = await fetch(`${API_BASE}/${t.kode}?limit=1&offset=0&bentukPendidikan=${shape}`);
       const apiJson = await apiRes.json();
       const apiTotal = apiJson.meta?.total || 0;
 
@@ -97,7 +103,7 @@ async function run() {
     // Periksa kembali total aktual di DB untuk tiap provinsi
     for (const t of TARGETS) {
       const dbRes = await pgClient.query(`SELECT count(*) FROM sekolah WHERE nama_provinsi ILIKE $1`, [`%${t.nama}%`]);
-      const gRes = await fetch(`https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${t.kode}?limit=1&offset=0`);
+      const gRes = await fetch(`${API_BASE}/${t.kode}?limit=1&offset=0`);
       const gJson = await gRes.json();
       const apiMeta = gJson.meta?.total || 0;
       const dbCount = parseInt(dbRes.rows[0].count);

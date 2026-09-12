@@ -1,8 +1,19 @@
-const { Client } = require('pg');
-const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config({ path: '.env.supabase' });
+if (!process.env.SUPABASE_URL) require('dotenv').config({ path: '.dev.vars' });
+if (!process.env.SUPABASE_URL) require('dotenv').config();
 
-const SUPABASE_URL = 'https://xikrjtbaqtidnifnkpxd.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpa3JqdGJhcXRpZG5pZm5rcHhkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTAwMzE0NywiZXhwIjoyMDk2NTc5MTQ3fQ.I_Rebr5NNX-MXZqCGUHRe-ojSPGEr_f_cHHppHm3gwQ';
+const { createClient } = require('@supabase/supabase-js');
+const { getDataSourceUrl } = require('./source-config.cjs');
+
+const API_BASE = getDataSourceUrl();
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('SUPABASE_URL atau SUPABASE_KEY belum dikonfigurasi.');
+  process.exit(1);
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const PROVINCES = {
@@ -31,10 +42,10 @@ async function refreshCache() {
   const { data: statusRows } = await supabase.from('provinsi_sync_status').select('*');
   const statusMap = new Map((statusRows || []).map(s => [cleanName(s.nama_provinsi), s]));
 
-  // 2. Query Belajar.id untuk 38 provinsi
+  // 2. Query data untuk 38 provinsi
   const apiPromises = Object.keys(PROVINCES).map(async (kode) => {
     try {
-      const res = await fetch(`https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${kode}?limit=1&offset=0`);
+      const res = await fetch(`${API_BASE}/${kode}?limit=1&offset=0`);
       const json = await res.json();
       return { kode, nama: PROVINCES[kode], total_api: json.meta ? json.meta.total : 0 };
     } catch (e) {

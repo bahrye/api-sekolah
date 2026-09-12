@@ -1,4 +1,5 @@
 import { maybeRecordLastSync } from './sync-meta.js';
+import { getDataSourceUrl } from './source-config.js';
 import {
   fingerprintRows,
   getPageFingerprintsBatch,
@@ -30,10 +31,9 @@ export {
   shouldStepDownChunk,
 };
 
-const API_URL =
-  'https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/360';
+const API_URL = `${getDataSourceUrl()}/360`;
 
-/** API belajar.id memakai maks ~20 baris per request (limit=200 tetap mengembalikan 20) */
+/** API data pusat memakai maks ~20 baris per request (limit=200 tetap mengembalikan 20) */
 export const PAGE_SIZE = 20;
 
 export { mapFromApi };

@@ -1,5 +1,5 @@
 -- ===================================================================
--- Stored Procedure Pembersihan Sekolah Non-Aktif (Dihapus dari Belajar.id)
+-- Stored Procedure Pembersihan Sekolah Non-Aktif (Dihapus dari Sumber Data)
 -- Jalankan di: Dashboard Supabase -> SQL Editor -> New query -> Run
 -- ===================================================================
 

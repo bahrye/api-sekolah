@@ -25,7 +25,7 @@ WHERE id = 1;
 ALTER TABLE public.provinsi_sync_status 
   ADD COLUMN IF NOT EXISTS total_db INT DEFAULT 0;
 
--- 6. View Rekap Total Sekolah Per Provinsi (Real-time agregat untuk Perbandingan Data Belajar.id vs DB)
+-- 6. View Rekap Total Sekolah Per Provinsi (Real-time agregat untuk Perbandingan Data Sumber vs DB)
 CREATE OR REPLACE VIEW public.v_rekap_provinsi AS
 SELECT 
   nama_provinsi,

@@ -1,9 +1,11 @@
+import { getDataSourceUrl } from '../lib/source-config.js';
+
 export async function onRequest(context) {
     const { searchParams } = new URL(context.request.url);
     // Ambil data start dari URL, kalau tidak ada mulai dari 0
     let offset = parseInt(searchParams.get('start')) || 0; 
     
-    const limitPusat = 20; // Tetap gunakan limit 20 sesuai aturan belajar.id
+    const limitPusat = 20; // Tetap gunakan limit 20
     let semuaData = [];
   
     const headers = {
@@ -13,19 +15,20 @@ export async function onRequest(context) {
   
     try {
       // 1. Ambil data lama yang sudah tersimpan di KV
-      const dataLamaRaw = await context.env.DATA_SEKOLAH_KV.get("list_sekolah");
+      const dataLamaRaw = await context.env.DATA_SEKOLAH_KV?.get?.("list_sekolah");
       if (dataLamaRaw) {
         semuaData = JSON.parse(dataLamaRaw);
       }
   
-      // 2. Hanya lakukan SATU kali fetch ke belajar.id (0 looping)
-      const targetUrl = `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/360?limit=${limitPusat}&offset=${offset}`;
+      // 2. Hanya lakukan SATU kali fetch ke pusat (0 looping)
+      const apiBase = getDataSourceUrl(context.env);
+      const targetUrl = `${apiBase}/360?limit=${limitPusat}&offset=${offset}`;
       
       const response = await fetch(targetUrl, {
         headers: { 'User-Agent': 'Mozilla/5.0 CloudflarePagesFetch' }
       });
       
-      if (!response.ok) throw new Error(`Server belajar.id menolak request pada offset ${offset}`);
+      if (!response.ok) throw new Error(`Server pusat menolak request pada offset ${offset}`);
       
       const jsonResult = await response.json();
       const dataMataIni = jsonResult.data?.rows || jsonResult.data || [];

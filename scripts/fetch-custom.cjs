@@ -1,5 +1,9 @@
 require('dotenv').config();
 const fs = require('fs');
+const { getDataSourceUrl, getDataSourceJumlahUrl } = require('./source-config.cjs');
+
+const API_BASE = getDataSourceUrl();
+const API_JUMLAH_BASE = getDataSourceJumlahUrl();
 
 const WORKER_URL = process.env.CLOUDFLARE_WORKER_URL || 'https://api-sekolah-kita.pages.dev';
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -43,8 +47,8 @@ const getWibDayOfWeek = (d = new Date()) => {
 
 async function loadProvinces() {
   try {
-    console.log("Mengambil referensi kode wilayah provinsi dari API Belajar.id...");
-    const res = await fetch('https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/jumlah-data-induk/360?limit=100&offset=0');
+    console.log("Mengambil referensi kode wilayah provinsi dari API Pusat...");
+    const res = await fetch(`${API_JUMLAH_BASE}/360?limit=100&offset=0`);
     const result = await res.json();
     if (result && result.data) {
       result.data.forEach(p => {
@@ -616,7 +620,7 @@ async function fetchCustomData() {
       provStats = { baru: 0, diperbarui: 0, tidakBerubah: 0 };
       
       try {
-        const totalUrl = `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${kodeWilayah}?limit=1&offset=0`;
+        const totalUrl = `${API_BASE}/${kodeWilayah}?limit=1&offset=0`;
         const totalRes = await fetch(totalUrl);
         const totalJson = await totalRes.json();
         currentTotalEstimasi = totalJson.meta ? totalJson.meta.total : 0;
@@ -648,7 +652,7 @@ async function fetchCustomData() {
     }
 
     const bentukAktif = currentTask.bentuk;
-    let url = `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${kodeWilayah}?limit=${limit}&offset=${offset}&sortBy=npsn`;
+    let url = `${API_BASE}/${kodeWilayah}?limit=${limit}&offset=${offset}&sortBy=npsn`;
     if (bentukAktif !== 'ALL') {
       url += `&bentukPendidikan=${bentukAktif}`;
     }
@@ -809,7 +813,7 @@ async function runDiscoveryScan(kodeWilayah, bentukList, totalEstimasi, fullNpsn
   
   const fetchPage = async (offset) => {
     if (isAborted) return [];
-    const url = `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${kodeWilayah}?limit=${limit}&offset=${offset}&sortBy=npsn`;
+    const url = `${API_BASE}/${kodeWilayah}?limit=${limit}&offset=${offset}&sortBy=npsn`;
     try {
       const res = await fetch(url);
       const json = await res.json();
@@ -841,7 +845,7 @@ async function runDiscoveryScan(kodeWilayah, bentukList, totalEstimasi, fullNpsn
         if (!testingShapes.has(bNormalized)) {
           const testPromise = (async () => {
             if (isAborted) return false;
-            const testUrl = `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${kodeWilayah}?limit=1&offset=0&bentukPendidikan=${bNormalized}`;
+            const testUrl = `${API_BASE}/${kodeWilayah}?limit=1&offset=0&bentukPendidikan=${bNormalized}`;
             try {
               const testRes = await fetch(testUrl);
               const testText = await testRes.text();

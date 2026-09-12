@@ -91,7 +91,7 @@ export async function onRequestPost(context) {
         const activeList = customParams.activeNpsnList || body.activeNpsnList;
         const isClean = customParams.isCleanScan || body.isCleanScan;
 
-        // Pembersihan otomatis sekolah non-aktif (yang dihapus dari Belajar.id)
+        // Pembersihan otomatis sekolah non-aktif (yang dihapus dari data pusat)
         if (isClean && Array.isArray(activeList) && activeList.length > 0) {
           try {
             let from = 0;

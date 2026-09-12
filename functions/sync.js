@@ -53,8 +53,8 @@ export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   const supabase = getSupabase(env);
-  const clientSupabaseUrl = env?.SUPABASE_URL || 'https://xikrjtbaqtidnifnkpxd.supabase.co';
-  const clientSupabaseAnonKey = env?.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpa3JqdGJhcXRpZG5pZm5rcHhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMDMxNDcsImV4cCI6MjA5NjU3OTE0N30.ARW-hXikuKeOiYqAwTcBkqXMpyKaPPulPqF4O2hFzXA';
+  const clientSupabaseUrl = env?.SUPABASE_URL || '';
+  const clientSupabaseAnonKey = env?.SUPABASE_ANON_KEY || '';
 
   try {
     const { data: results } = await supabase
@@ -240,7 +240,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             } else if (extraInDb > 0) {
               selisihColor = 'var(--warning)';
               statusIcon = '⚠️ Data Lebih di DB';
-              selisihDisplay = `<span style="color: var(--warning);" title="Database memiliki ${extraInDb.toLocaleString('id-ID')} data sekolah lebih dibanding API Belajar.id">+${extraInDb.toLocaleString('id-ID')} di DB</span>`;
+              selisihDisplay = `<span style="color: var(--warning);" title="Database memiliki ${extraInDb.toLocaleString('id-ID')} data sekolah lebih dibanding API Pusat">+${extraInDb.toLocaleString('id-ID')} di DB</span>`;
             } else if (d.selisih > 0) {
               selisihColor = isSyncedToday ? 'var(--warning)' : 'var(--danger)';
               statusIcon = isSyncedToday ? '⚠️ Sinkron Terputus' : '⚠️ Belum Sinkron';
@@ -1632,7 +1632,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         <div>
           <h2 style="font-size: 17px; color: var(--text-main); font-weight: 700; margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-            Perbandingan Data (Belajar.id vs DB)
+            Perbandingan Data (Pusat vs DB)
           </h2>
           <div id="compare-last-checked" style="font-size: 12px; color: var(--text-muted);">Terakhir dicek: ${lastChecked}</div>
         </div>
@@ -1643,7 +1643,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
            <thead>
              <tr>
                <th style="padding: 14px 12px; text-align: left;">Provinsi</th>
-               <th style="padding: 14px 12px; text-align: center;">Belajar.id</th>
+               <th style="padding: 14px 12px; text-align: center;">Data Pusat</th>
                <th style="padding: 14px 12px; text-align: center;">Database</th>
                <th style="padding: 14px 12px; text-align: center;">Selisih</th>
                <th style="padding: 14px 12px; text-align: center;">Status</th>

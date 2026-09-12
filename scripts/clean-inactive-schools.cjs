@@ -1,7 +1,11 @@
 require('dotenv').config({ path: '.env.supabase' });
+if (!process.env.SUPABASE_URL) require('dotenv').config({ path: '.dev.vars' });
+if (!process.env.SUPABASE_URL) require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
+const { getDataSourceUrl } = require('./source-config.cjs');
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://xikrjtbaqtidnifnkpxd.supabase.co';
+const API_BASE = getDataSourceUrl();
+const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_KEY) {
@@ -49,7 +53,7 @@ const cleanName = (name) => {
 async function getApiCount(kodeWilayah, bentuk) {
   try {
     const res = await fetch(
-      `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${kodeWilayah}?limit=1&offset=0&bentukPendidikan=${bentuk}`
+      `${API_BASE}/${kodeWilayah}?limit=1&offset=0&bentukPendidikan=${bentuk}`
     );
     if (!res.ok) return -1;
     const j = await res.json();
@@ -73,7 +77,7 @@ async function fetchAllApiNpsnsForShape(kodeWilayah, bentuk, totalApi) {
       const offset = offsets[curr++];
       try {
         const res = await fetch(
-          `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/${kodeWilayah}?limit=${limit}&offset=${offset}&bentukPendidikan=${bentuk}`
+          `${API_BASE}/${kodeWilayah}?limit=${limit}&offset=${offset}&bentukPendidikan=${bentuk}`
         );
         if (res.ok) {
           const j = await res.json();

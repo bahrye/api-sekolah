@@ -1,4 +1,4 @@
-/** Kolom tabel sekolah — selaras dengan API belajar.id */
+/** Kolom tabel sekolah — selaras dengan API data induk */
 
 export const FIELDS = [
   'NPSN',

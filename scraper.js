@@ -1,4 +1,8 @@
 const fs = require('fs');
+require('dotenv').config();
+const { getDataSourceUrl } = require('./scripts/source-config.cjs');
+
+const API_BASE = getDataSourceUrl();
 
 async function jalankanAutomasi() {
   let offset = 0;
@@ -10,7 +14,7 @@ async function jalankanAutomasi() {
 
   while (running) {
     try {
-      const url = `https://api.data.belajar.id/data-portal-backend/v2/master-data/satuan-pendidikan/daftar-data-induk/360?limit=${limit}&offset=${offset}`;
+      const url = `${API_BASE}/360?limit=${limit}&offset=${offset}`;
       
       const response = await fetch(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }

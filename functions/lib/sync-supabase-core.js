@@ -1,5 +1,5 @@
 /**
- * Core fungsi sinkronisasi data dari portal belajar.id ke Supabase
+ * Core fungsi sinkronisasi data dari portal data induk ke Supabase
  */
 
 export const VALID_BENTUK = [
@@ -37,7 +37,7 @@ export async function buildRowFingerprint(item) {
 }
 
 /**
- * Memproses batch data dari belajar.id langsung ke Supabase
+ * Memproses batch data dari data pusat langsung ke Supabase
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {Array<Record<string, any>>} dataList
  */
