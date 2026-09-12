@@ -94,47 +94,35 @@ export async function onRequestPost(context) {
         // Pembersihan otomatis sekolah non-aktif (yang dihapus dari Belajar.id)
         if (isClean && Array.isArray(activeList) && activeList.length > 0) {
           try {
-            // 1. Coba jalankan via PostgreSQL stored procedure (RPC) jika tersedia di Supabase
-            const { data: rpcDeleted, error: rpcErr } = await supabase.rpc('fn_clean_inactive_sekolah', {
-              p_nama_provinsi: body.namaProvinsi,
-              p_active_npsns: activeList,
-            });
+            let from = 0;
+            const dbNpsns = [];
+            const cleanP = cleanName(body.namaProvinsi);
 
-            if (!rpcErr && typeof rpcDeleted === 'number') {
-              totalDihapus = rpcDeleted;
-              console.log(`[CLEANUP] Berhasil menghapus ${totalDihapus} sekolah non-aktif via RPC untuk ${body.namaProvinsi}`);
-            } else {
-              // 2. Fallback JavaScript: Ambil seluruh NPSN yang ada di DB untuk provinsi ini dan hapus selisihnya
-              let from = 0;
-              const dbNpsns = [];
-              const provKey = body.namaProvinsi.startsWith('PROV.') ? body.namaProvinsi : `PROV. ${body.namaProvinsi}`;
+            while (true) {
+              const { data, error: fetchErr } = await supabase
+                .from('sekolah')
+                .select('npsn')
+                .ilike('nama_provinsi', `%${cleanP}%`)
+                .order('npsn')
+                .range(from, from + 999);
 
-              while (true) {
-                const { data, error: fetchErr } = await supabase
-                  .from('sekolah')
-                  .select('npsn')
-                  .or(`nama_provinsi.eq."${provKey}",nama_provinsi.eq."${body.namaProvinsi}"`)
-                  .order('npsn')
-                  .range(from, from + 999);
+              if (fetchErr || !data || data.length === 0) break;
+              dbNpsns.push(...data.map((d) => String(d.npsn)));
+              if (data.length < 1000) break;
+              from += 1000;
+            }
 
-                if (fetchErr || !data || data.length === 0) break;
-                dbNpsns.push(...data.map((d) => String(d.npsn)));
-                if (data.length < 1000) break;
-                from += 1000;
-              }
+            if (dbNpsns.length > 0) {
+              const activeSet = new Set(activeList.map((n) => String(n)));
+              const staleNpsns = dbNpsns.filter((n) => n && !activeSet.has(n));
 
-              if (dbNpsns.length > 0) {
-                const activeSet = new Set(activeList.map((n) => String(n)));
-                const staleNpsns = dbNpsns.filter((n) => n && !activeSet.has(n));
-
-                if (staleNpsns.length > 0) {
-                  console.log(`[CLEANUP] Ditemukan ${staleNpsns.length} sekolah tidak aktif di ${body.namaProvinsi}. Menghapus dari Supabase...`);
-                  for (let i = 0; i < staleNpsns.length; i += 200) {
-                    const chunk = staleNpsns.slice(i, i + 200);
-                    await supabase.from('sekolah').delete().in('npsn', chunk);
-                  }
-                  totalDihapus = staleNpsns.length;
+              if (staleNpsns.length > 0) {
+                console.log(`[CLEANUP] Ditemukan ${staleNpsns.length} sekolah tidak aktif di ${body.namaProvinsi}. Menghapus dari Supabase...`);
+                for (let i = 0; i < staleNpsns.length; i += 100) {
+                  const chunk = staleNpsns.slice(i, i + 100);
+                  await supabase.from('sekolah').delete().in('npsn', chunk);
                 }
+                totalDihapus = staleNpsns.length;
               }
             }
           } catch (errClean) {
