@@ -667,6 +667,21 @@
                 }
 
                 var lastStatusState = { is_running: null, bentuk_aktif: null };
+                var lastRenderedWrapperWidth = 0;
+                var lastWindowWidth = window.innerWidth;
+                var STATUS_CACHE_KEY = 'eduapi_status_cache';
+
+                function getMeasurer() {
+                    var measurer = document.getElementById('sync-marquee-measurer');
+                    if (!measurer) {
+                        measurer = document.createElement('div');
+                        measurer.id = 'sync-marquee-measurer';
+                        measurer.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;pointer-events:none;top:-9999px;left:-9999px;';
+                        measurer.className = 'text-xs font-mono';
+                        document.body.appendChild(measurer);
+                    }
+                    return measurer;
+                }
 
                 function renderIdleStatus() {
                     var wrapper = document.getElementById('last-update-iso-wrapper');
@@ -678,55 +693,106 @@
                     lastStatusState = { is_running: false, bentuk_aktif: null };
                 }
 
-                function renderRunningStatus(bentukAktif) {
+                function renderRunningStatus(bentukAktif, forceRebuild) {
                     var wrapper = document.getElementById('last-update-iso-wrapper');
                     if (!wrapper || !lastIso) return;
+
+                    var wrapperWidth = wrapper.clientWidth;
+
+                    // Jika status aktif dan bentuk tidak berubah serta lebar wrapper belum berubah signifikan,
+                    // JANGAN sentuh DOM/animasi agar tidak ter-reset kembali ke awal saat scroll
+                    if (!forceRebuild &&
+                        lastStatusState.is_running === true &&
+                        lastStatusState.bentuk_aktif === bentukAktif &&
+                        Math.abs(wrapperWidth - lastRenderedWrapperWidth) < 4) {
+                        return;
+                    }
 
                     var text = 'Sedang Sinkronisasi ' + (bentukAktif ? '(' + bentukAktif + ')' : '');
                     var itemHtml = '<span class="inline-flex items-center text-emerald-400 font-medium shrink-0">' +
                         '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-1.5 inline-block shrink-0"></span>' +
                         text + '</span>';
 
-                    // Ukur lebar teks terlebih dahulu dengan 1 item statis
-                    wrapper.classList.remove('has-overflow');
-                    lastIso.className = 'sync-marquee-track';
-                    lastIso.style.removeProperty('--marquee-speed');
-                    lastIso.innerHTML = '<div class="sync-marquee-item inline-flex items-center">' + itemHtml + '</div>';
+                    // Ukur lebar teks di elemen tersembunyi terpisah tanpa merusak DOM track yang sedang berjalan
+                    var measurer = getMeasurer();
+                    measurer.innerHTML = '<div class="sync-marquee-item inline-flex items-center">' + itemHtml + '</div>';
+                    var itemWidth = measurer.firstElementChild ? measurer.firstElementChild.offsetWidth : 0;
 
-                    // Pengukuran lebar
-                    var itemEl = lastIso.firstElementChild;
-                    var itemWidth = itemEl ? itemEl.offsetWidth : 0;
-                    var wrapperWidth = wrapper.clientWidth;
+                    lastRenderedWrapperWidth = wrapperWidth;
 
-                    // Jika panjang teks melebihi lebar kartu yang tersedia (baik di layar kecil maupun PC/laptop)
+                    // Jika panjang teks melebihi lebar kartu yang tersedia
                     if (itemWidth > wrapperWidth - 16) {
                         wrapper.classList.add('has-overflow');
-                        // Render 2 item untuk loop teks berjalan tanpa jeda terputus
-                        lastIso.innerHTML = '<div class="sync-marquee-item inline-flex items-center pr-10">' + itemHtml + '</div>' +
-                                            '<div class="sync-marquee-item inline-flex items-center pr-10" aria-hidden="true">' + itemHtml + '</div>';
-
                         var singleTotal = itemWidth + 40;
                         var speedSec = Math.max(8, Math.round(singleTotal / 30));
                         lastIso.style.setProperty('--marquee-speed', speedSec + 's');
-                        lastIso.classList.add('is-scrolling');
+
+                        var targetHtml = '<div class="sync-marquee-item inline-flex items-center pr-10">' + itemHtml + '</div>' +
+                                            '<div class="sync-marquee-item inline-flex items-center pr-10" aria-hidden="true">' + itemHtml + '</div>';
+
+                        if (lastIso.innerHTML !== targetHtml) {
+                            lastIso.innerHTML = targetHtml;
+                        }
+                        if (!lastIso.classList.contains('is-scrolling')) {
+                            lastIso.className = 'sync-marquee-track is-scrolling';
+                        }
                     } else {
                         wrapper.classList.remove('has-overflow');
-                        lastIso.classList.remove('is-scrolling');
+                        lastIso.className = 'sync-marquee-track';
+                        lastIso.style.removeProperty('--marquee-speed');
+                        var targetHtml = '<div class="sync-marquee-item inline-flex items-center">' + itemHtml + '</div>';
+                        if (lastIso.innerHTML !== targetHtml) {
+                            lastIso.innerHTML = targetHtml;
+                        }
                     }
 
                     lastStatusState = { is_running: true, bentuk_aktif: bentukAktif };
                 }
 
+                // Pulihkan tampilan awal secara instan (0ms) dari cache lokal
+                try {
+                    var rawCache = localStorage.getItem(STATUS_CACHE_KEY);
+                    if (rawCache) {
+                        var cached = JSON.parse(rawCache);
+                        if (cached) {
+                            if (lastAt && cached.formatted_time) {
+                                lastAt.textContent = cached.formatted_time;
+                            }
+                            if (totalEl && cached.total_data_tersedia != null) {
+                                totalEl.textContent = Number(cached.total_data_tersedia).toLocaleString('id-ID');
+                            }
+                            if (cached.is_running) {
+                                renderRunningStatus(cached.bentuk_aktif);
+                            } else {
+                                renderIdleStatus();
+                            }
+                        }
+                    }
+                } catch (eCache) {}
+
+                // Event listener resize: filter out scroll pada browser mobile yang hanya mengubah innerHeight
                 window.addEventListener('resize', function () {
+                    var currentWidth = window.innerWidth;
+                    if (currentWidth === lastWindowWidth) return;
+                    lastWindowWidth = currentWidth;
+
                     if (lastStatusState.is_running) {
-                        renderRunningStatus(lastStatusState.bentuk_aktif);
+                        var wrapper = document.getElementById('last-update-iso-wrapper');
+                        var curWrapWidth = wrapper ? wrapper.clientWidth : 0;
+                        if (Math.abs(curWrapWidth - lastRenderedWrapperWidth) >= 4) {
+                            renderRunningStatus(lastStatusState.bentuk_aktif, true);
+                        }
                     }
                 });
 
                 if (document.fonts && document.fonts.ready) {
                     document.fonts.ready.then(function () {
                         if (lastStatusState.is_running) {
-                            renderRunningStatus(lastStatusState.bentuk_aktif);
+                            var wrapper = document.getElementById('last-update-iso-wrapper');
+                            var curWrapWidth = wrapper ? wrapper.clientWidth : 0;
+                            if (!lastIso.classList.contains('is-scrolling') || Math.abs(curWrapWidth - lastRenderedWrapperWidth) >= 4) {
+                                renderRunningStatus(lastStatusState.bentuk_aktif, true);
+                            }
                         }
                     });
                 }
@@ -736,11 +802,13 @@
                         .then(function (r) { return r.json(); })
                         .then(function (json) {
                             if (json.status !== 'success') {
-                                if (lastAt) lastAt.textContent = 'Tidak tersedia';
+                                if (lastAt && (!lastAt.textContent || lastAt.textContent === 'Memuat…')) {
+                                    lastAt.textContent = 'Tidak tersedia';
+                                }
                                 return;
                             }
-                            if (lastAt) {
-                                var formattedTime = formatWIB(json.waktu_update_data_terakhir_iso || json.waktu_update_data_terakhir);
+                            var formattedTime = formatWIB(json.waktu_update_data_terakhir_iso || json.waktu_update_data_terakhir);
+                            if (lastAt && lastAt.textContent !== formattedTime) {
                                 lastAt.textContent = formattedTime;
                             }
                             if (lastIso) {
@@ -755,11 +823,27 @@
                                 }
                             }
                             if (totalEl && json.total_data_tersedia != null) {
-                                totalEl.textContent = Number(json.total_data_tersedia).toLocaleString('id-ID');
+                                var formattedTotal = Number(json.total_data_tersedia).toLocaleString('id-ID');
+                                if (totalEl.textContent !== formattedTotal) {
+                                    totalEl.textContent = formattedTotal;
+                                }
                             }
+                            // Simpan snapshot data untuk loading berikutnya yang instan
+                            try {
+                                localStorage.setItem(STATUS_CACHE_KEY, JSON.stringify({
+                                    total_data_tersedia: json.total_data_tersedia,
+                                    formatted_time: formattedTime,
+                                    waktu_update_data_terakhir_iso: json.waktu_update_data_terakhir_iso,
+                                    waktu_update_data_terakhir: json.waktu_update_data_terakhir,
+                                    is_running: json.is_running,
+                                    bentuk_aktif: json.bentuk_aktif
+                                }));
+                            } catch (eSave) {}
                         })
                         .catch(function () {
-                            if (lastAt) lastAt.textContent = 'Gagal memuat';
+                            if (lastAt && (!lastAt.textContent || lastAt.textContent === 'Memuat…')) {
+                                lastAt.textContent = 'Gagal memuat';
+                            }
                         });
                 }
 
@@ -900,19 +984,35 @@
                     });
                 }
 
+                var REKAP_CACHE_KEY = 'eduapi_rekap_cache';
+                try {
+                    var rawRekapCache = sessionStorage.getItem(REKAP_CACHE_KEY);
+                    if (rawRekapCache) {
+                        rekapData = JSON.parse(rawRekapCache);
+                        renderRekap();
+                    }
+                } catch (eRekapCache) {}
+
                 function loadRekap() {
                     fetch(base + '/api/rekap?_t=' + Date.now())
                         .then(function (r) { return r.json(); })
                         .then(function (json) {
                             if (json.status !== 'success') {
-                                rekapTbody.innerHTML = '<tr><td class="px-6 py-10 text-center text-rose-400 font-medium">Gagal memuat rekap data.</td></tr>';
+                                if (!rekapData) {
+                                    rekapTbody.innerHTML = '<tr><td class="px-6 py-10 text-center text-rose-400 font-medium">Gagal memuat rekap data.</td></tr>';
+                                }
                                 return;
                             }
                             rekapData = json;
+                            try {
+                                sessionStorage.setItem(REKAP_CACHE_KEY, JSON.stringify(json));
+                            } catch (eSaveRekap) {}
                             renderRekap();
                         })
                         .catch(function () {
-                            rekapTbody.innerHTML = '<tr><td class="px-6 py-10 text-center text-rose-400 font-medium">Gagal terhubung ke API rekap data.</td></tr>';
+                            if (!rekapData) {
+                                rekapTbody.innerHTML = '<tr><td class="px-6 py-10 text-center text-rose-400 font-medium">Gagal terhubung ke API rekap data.</td></tr>';
+                            }
                         });
                 }
 

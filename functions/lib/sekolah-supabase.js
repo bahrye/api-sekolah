@@ -115,16 +115,21 @@ export async function getStatusSinkronisasiSupabase(supabase) {
       ? row2
       : row1 || row2;
 
-  // Ambil jumlah real-time aktual dari tabel sekolah
-  let totalSekolah = active?.total_sekolah || row1?.total_sekolah || 555008;
-  try {
-    const { count, error: countErr } = await supabase
-      .from('sekolah')
-      .select('*', { count: 'exact', head: true });
-    if (!countErr && count && count > 0) {
-      totalSekolah = count;
-    }
-  } catch (e) {}
+  // Ambil total sekolah yang tersimpan di status_sinkronisasi (sangat instan tanpa scan 555rb+ baris tabel sekolah)
+  let totalSekolah = active?.total_sekolah || row1?.total_sekolah;
+  if (!totalSekolah || totalSekolah <= 0) {
+    try {
+      const { count, error: countErr } = await supabase
+        .from('sekolah')
+        .select('*', { count: 'exact', head: true });
+      if (!countErr && count && count > 0) {
+        totalSekolah = count;
+      }
+    } catch (e) {}
+  }
+  if (!totalSekolah || totalSekolah <= 0) {
+    totalSekolah = 555670;
+  }
 
   const latestIso = active?.updated_at || active?.waktu_selesai_terakhir || new Date().toISOString();
   let isRunning = false;
