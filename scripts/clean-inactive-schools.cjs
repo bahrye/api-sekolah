@@ -18,6 +18,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 const isDryRun = process.argv.includes('--dry-run');
 
 const PROVINCES_TO_CLEAN = [
+  { kode: "020000", nama: "JAWA BARAT", provDbKey: "PROV. JAWA BARAT", expectedExtra: 65 },
   { kode: "040000", nama: "DI YOGYAKARTA", provDbKey: "PROV. D.I. YOGYAKARTA", expectedExtra: 25 },
   { kode: "240000", nama: "NUSA TENGGARA TIMUR", provDbKey: "PROV. NUSA TENGGARA TIMUR", expectedExtra: 23 },
   { kode: "050000", nama: "JAWA TIMUR", provDbKey: "PROV. JAWA TIMUR", expectedExtra: 20 },

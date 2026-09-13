@@ -257,7 +257,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             const isGap = (d.raw_selisih > 0) || ((d.total_api || 0) > (d.total_db || 0));
             const effDuplicates = isGap ? (d.api_duplicates || 0) : 0;
             const effEmptyNpsn = isGap ? (d.api_empty_npsn || 0) : 0;
-            const effUnrecognizedShapes = isGap ? (d.api_unrecognized_shapes || 0) : 0;
+            const effUnrecognizedShapes = isGap ? Math.min(d.raw_selisih, d.api_unrecognized_shapes || 0) : 0;
 
             const warnings = [];
             if (effDuplicates > 0) warnings.push(`<span style="cursor: pointer; text-decoration: underline; color: var(--danger);" onclick="showDuplicateModal('${d.nama}')">⚠️ NPSN Ganda: ${effDuplicates}</span>`);
@@ -747,6 +747,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           const targetTotal = (compItem?.total_db > 0 ? compItem.total_db : (compItem?.total_api || pStat?.total_db || 0));
 
           let nonQueryable = 0;
+          let carriedOverTetap = 0;
           if (targetTotal > baseProcessed) {
             const missing = targetTotal - baseProcessed;
             const knownNq = (typeof log.total_non_queryable === 'number' && log.total_non_queryable > 0)
@@ -755,12 +756,16 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
 
             if (knownNq > 0) {
               nonQueryable = Math.min(missing, knownNq);
+              carriedOverTetap = missing - nonQueryable;
             } else {
-              nonQueryable = missing;
+              // Jika knownNq adalah 0, selisih data berasal dari putaran/chunk sebelumnya (data tetap)
+              carriedOverTetap = missing;
+              nonQueryable = 0;
             }
           }
 
-          const totalData = baseProcessed + nonQueryable;
+          const displayedTetap = (log.total_tidak_berubah || 0) + carriedOverTetap;
+          const totalData = (log.total_baru || 0) + (log.total_diperbarui || 0) + displayedTetap + nonQueryable;
 
           return `<div class="log-item-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -777,7 +782,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
               <div class="log-badge-mini success">+${(log.total_baru || 0).toLocaleString('id-ID')} Baru</div>
               <div class="log-badge-mini info">↻ ${(log.total_diperbarui || 0).toLocaleString('id-ID')} Update</div>
               <div class="log-badge-mini danger">✕ ${(log.total_dihapus || 0).toLocaleString('id-ID')} Hapus</div>
-              <div class="log-badge-mini muted">✓ ${(log.total_tidak_berubah || 0).toLocaleString('id-ID')} Tetap</div>
+              <div class="log-badge-mini muted">✓ ${displayedTetap.toLocaleString('id-ID')} Tetap</div>
               <div class="log-badge-mini ${nonQueryable > 0 ? 'special' : 'muted'}" title="${nonQueryable > 0 ? 'Bentuk pendidikan khusus / non-queryable di API kementerian' : 'Tidak ada data non-queryable'}">${nonQueryable > 0 ? '★ ' : ''}${nonQueryable.toLocaleString('id-ID')} Non-Queryable</div>
             </div>
             <div style="text-align: left; margin-top: 10px; font-weight: 700; font-size: 13px; color: var(--text-subtle); border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; display: flex; justify-content: space-between;">
