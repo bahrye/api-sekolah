@@ -219,14 +219,28 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
               diffCount++;
             }
           });
-          compareCache.value.sort((a, b) => {
-            const aDiff = (!a.is_sinkron_walau_selisih && (a.selisih !== 0 || a.raw_selisih !== 0)) ? 1 : 0;
-            const bDiff = (!b.is_sinkron_walau_selisih && (b.selisih !== 0 || b.raw_selisih !== 0)) ? 1 : 0;
-            if (aDiff !== bDiff) return bDiff - aDiff;
-            return a.nama.localeCompare(b.nama);
-          });
+          if (isActive && activeProvince) {
+            const cleanActive = cleanName(activeProvince);
+            compareCache.value.sort((a, b) => {
+              const aActive = cleanName(a.nama) === cleanActive ? 1 : 0;
+              const bActive = cleanName(b.nama) === cleanActive ? 1 : 0;
+              if (aActive !== bActive) return bActive - aActive;
+              const aDiff = (!a.is_sinkron_walau_selisih && (a.selisih !== 0 || a.raw_selisih !== 0)) ? 1 : 0;
+              const bDiff = (!b.is_sinkron_walau_selisih && (b.selisih !== 0 || b.raw_selisih !== 0)) ? 1 : 0;
+              if (aDiff !== bDiff) return bDiff - aDiff;
+              return a.nama.localeCompare(b.nama);
+            });
+          } else {
+            compareCache.value.sort((a, b) => {
+              const aDiff = (!a.is_sinkron_walau_selisih && (a.selisih !== 0 || a.raw_selisih !== 0)) ? 1 : 0;
+              const bDiff = (!b.is_sinkron_walau_selisih && (b.selisih !== 0 || b.raw_selisih !== 0)) ? 1 : 0;
+              if (aDiff !== bDiff) return bDiff - aDiff;
+              return a.nama.localeCompare(b.nama);
+            });
+          }
 
           compareHtml = compareCache.value.map((d, idx) => {
+            const isThisProvActive = Boolean(isActive && activeProvince && cleanName(activeProvince) === cleanName(d.nama));
             const todayDate = getWibDate();
             const isSyncedToday = Boolean(d.terakhir_sukses && getWibDate(d.terakhir_sukses) === todayDate);
 
@@ -257,8 +271,17 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
               selisihDisplay = `${d.selisih.toLocaleString('id-ID')}`;
             }
 
+            const defaultStatus = statusIcon;
+            let displayStatusHtml = statusIcon;
+            if (isThisProvActive) {
+              displayStatusHtml = '<span class="status-pill active-sync"><svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Sedang Sinkron</span>';
+            }
+
             const displayStyle = idx >= 5 ? 'display: none;' : '';
-            const trClass = idx >= 5 ? 'hidden-row' : '';
+            const trClasses = [
+              idx >= 5 ? 'hidden-row' : '',
+              isThisProvActive ? 'row-active' : ''
+            ].filter(Boolean).join(' ');
 
             const isGap = (d.raw_selisih > 0) || ((d.total_api || 0) > (d.total_db || 0));
             const effDuplicates = isGap ? (d.api_duplicates || 0) : 0;
@@ -278,7 +301,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             const warningHtml = warnings.length > 0 ? `<div style="font-size: 11px; font-weight: 600; color: var(--danger); margin-top: 6px; line-height: 1.4;">${warnings.join('<br>')}</div>` : '';
 
             return `
-                <tr class="${trClass}" style="border-bottom: 1px solid var(--border); ${displayStyle}">
+                <tr class="${trClasses}" data-prov="${cleanName(d.nama)}" style="border-bottom: 1px solid var(--border); ${displayStyle}">
                   <td style="padding: 12px 8px; font-weight: 600; color: var(--text);">${d.nama} <div style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-top: 4px;">Kode: ${d.kode}</div></td>
                   <td style="padding: 12px 8px; text-align: center; color: var(--info); font-weight: 600; font-size: 14px;">
                     ${d.total_api.toLocaleString('id-ID')}
@@ -288,7 +311,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
                     ${d.total_db.toLocaleString('id-ID')}
                   </td>
                   <td style="padding: 12px 8px; text-align: center; color: ${selisihColor}; font-weight: bold; font-size: 14px;">${selisihDisplay}</td>
-                  <td style="padding: 12px 8px; text-align: center; color: ${selisihColor}; font-size: 12px; font-weight: 600;">${statusIcon}</td>
+                  <td class="compare-status-cell" data-default-status="${defaultStatus.replace(/"/g, '&quot;')}" style="padding: 12px 8px; text-align: center; color: ${selisihColor}; font-size: 12px; font-weight: 600;">${displayStatusHtml}</td>
                 </tr>
               `;
           }).join('');
@@ -1107,6 +1130,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
     .status-pill {
       display: inline-flex; align-items: center; justify-content: center; gap: 4px;
       padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 700;
+      white-space: nowrap;
     }
     .status-pill.active-sync {
       background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(236, 72, 153, 0.25));
@@ -1438,16 +1462,40 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         }
       }
 
-      // 7. Update row aktif di Antrean Smart Sync secara dinamis
+      // 7. Update row aktif di Antrean Smart Sync & Perbandingan Data secara dinamis
       const actProv = (status.isRunning && !status.selesai) ? (status.activeProvince || (status.bentukBerikutnya && status.bentukBerikutnya.match(/\\((.*?)\\)/)?.[1])) : null;
       const cleanAct = actProv ? actProv.replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/^PROVINSI|^PROV/, '') : null;
-      const queueRows = document.querySelectorAll('.custom-table tbody tr[data-prov]');
-      queueRows.forEach(tr => {
+      
+      const allDataRows = document.querySelectorAll('.custom-table tbody tr[data-prov]');
+      allDataRows.forEach(tr => {
         const p = tr.getAttribute('data-prov');
         if (cleanAct && p === cleanAct) {
           tr.classList.add('row-active');
         } else {
           tr.classList.remove('row-active');
+        }
+      });
+
+      const compareRows = document.querySelectorAll('#compare-body tr[data-prov]');
+      const activeSyncHtml = '<span class="status-pill active-sync"><svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Sedang Sinkron</span>';
+      compareRows.forEach(tr => {
+        const p = tr.getAttribute('data-prov');
+        const statusCell = tr.querySelector('.compare-status-cell');
+        if (!statusCell) return;
+        if (cleanAct && p === cleanAct) {
+          statusCell.innerHTML = activeSyncHtml;
+          if (tr.classList.contains('hidden-row') && tr.style.display === 'none') {
+            tr.style.display = 'table-row';
+            tr.setAttribute('data-temp-visible', 'true');
+          }
+        } else {
+          if (statusCell.hasAttribute('data-default-status')) {
+            statusCell.innerHTML = statusCell.getAttribute('data-default-status');
+          }
+          if (tr.getAttribute('data-temp-visible') === 'true' && sessionStorage.getItem("compareShowAll") !== "true") {
+            tr.style.display = 'none';
+            tr.removeAttribute('data-temp-visible');
+          }
         }
       });
     }
