@@ -51,6 +51,45 @@ function getSlug(name) {
     .replace(/^_+|_+$/g, '');
 }
 
+function getProvKey(name) {
+  return (name || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .replace(/^PROVINSI|^PROV/, '');
+}
+
+function buildProvVariants(provName) {
+  const cleanProv = provName.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
+  if (cleanProv === 'LUAR NEGERI') return ['LUAR NEGERI'];
+
+  const variants = new Set([
+    provName,
+    cleanProv,
+    `PROV. ${cleanProv}`,
+    `PROVINSI ${cleanProv}`,
+  ]);
+
+  // Varian khusus tanda titik untuk D.I. / DI Yogyakarta dan D.K.I. / DKI Jakarta
+  if (/D\.?I\.?\s+YOGYAKARTA/i.test(cleanProv)) {
+    variants.add('PROV. D.I. YOGYAKARTA');
+    variants.add('PROV. DI YOGYAKARTA');
+    variants.add('D.I. YOGYAKARTA');
+    variants.add('DI YOGYAKARTA');
+    variants.add('PROVINSI D.I. YOGYAKARTA');
+    variants.add('PROVINSI DI YOGYAKARTA');
+  }
+  if (/D\.?K\.?I\.?\s+JAKARTA/i.test(cleanProv)) {
+    variants.add('PROV. D.K.I. JAKARTA');
+    variants.add('PROV. DKI JAKARTA');
+    variants.add('D.K.I. JAKARTA');
+    variants.add('DKI JAKARTA');
+    variants.add('PROVINSI D.K.I. JAKARTA');
+    variants.add('PROVINSI DKI JAKARTA');
+  }
+
+  return Array.from(variants);
+}
+
 function formatSchoolRow(r) {
   return {
     npsn: r.npsn,
@@ -74,34 +113,54 @@ function formatSchoolRow(r) {
 
 async function fetchSchoolsForProvince(provName, expectedTotal = 0) {
   const batchSize = 1000;
-  let offset = 0;
   const rows = [];
+  const provVariants = buildProvVariants(provName);
 
-  // Bangun variasi nama provinsi (fleksibel: 'PROV. GORONTALO', 'GORONTALO', 'PROVINSI GORONTALO')
-  const cleanProv = provName.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
-  const provVariants = cleanProv === 'LUAR NEGERI'
-    ? ['LUAR NEGERI']
-    : [...new Set([provName, `PROV. ${cleanProv}`, `PROVINSI ${cleanProv}`, cleanProv])];
+  let lastNpsn = '';
+  const MAX_RETRIES = 4;
 
   while (true) {
-    const { data, error } = await supabase
-      .from('sekolah')
-      .select('npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan, status_satuan_pendidikan, jenjang_pendidikan, pembina, jalur_pendidikan, nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan')
-      .in('nama_provinsi', provVariants)
-      .order('npsn', { ascending: true })
-      .range(offset, offset + batchSize - 1);
+    let batchData = null;
+    let attempt = 0;
 
-    if (error) {
-      throw new Error(`Gagal mengambil data ${provName} di offset ${offset}: ${error.message}`);
+    // Retry loop dengan exponential backoff jika query timeout / gateway timeout
+    while (attempt < MAX_RETRIES) {
+      try {
+        let query = supabase
+          .from('sekolah')
+          .select('npsn, nama, bentuk_pendidikan, bentuk_pendidikan_group, jenis_pendidikan, status_satuan_pendidikan, jenjang_pendidikan, pembina, jalur_pendidikan, nama_desa, nama_kecamatan, nama_kabupaten, nama_provinsi, alamat_jalan')
+          .in('nama_provinsi', provVariants)
+          .order('npsn', { ascending: true })
+          .limit(batchSize);
+
+        // Keyset pagination (cursor seek O(1) via B-Tree index npsn)
+        if (lastNpsn) {
+          query = query.gt('npsn', lastNpsn);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+
+        batchData = data;
+        break; // Sukses, keluar dari retry loop
+      } catch (err) {
+        attempt++;
+        if (attempt >= MAX_RETRIES) {
+          throw new Error(`Gagal mengambil data ${provName} setelah ${MAX_RETRIES} percobaan (setelah NPSN "${lastNpsn}"): ${err.message}`);
+        }
+        const backoffMs = attempt * 2000;
+        console.warn(`\n   ⚠️ Timeout/Koneksi tersendat (${err.message}). Mencoba lagi (${attempt}/${MAX_RETRIES}) dalam ${backoffMs / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
     }
 
-    if (!data || data.length === 0) break;
+    if (!batchData || batchData.length === 0) break;
 
-    rows.push(...data.map(formatSchoolRow));
-    process.stdout.write(`\r   Mengambil... ${rows.length}${expectedTotal ? ` / ${expectedTotal}` : ''} baris`);
+    rows.push(...batchData.map(formatSchoolRow));
+    lastNpsn = batchData[batchData.length - 1].npsn;
+    process.stdout.write(`\r   Mengambil... ${rows.length}${expectedTotal ? ` / ${expectedTotal}` : ''} baris (terakhir NPSN: ${lastNpsn})`);
 
-    if (data.length < batchSize) break;
-    offset += batchSize;
+    if (batchData.length < batchSize) break;
   }
 
   return rows;
@@ -117,9 +176,9 @@ const DAFTAR_PROVINSI_DEFAULT = [
   { nama: 'PROV. D.K.I. JAKARTA', total: 11585 },
   { nama: 'PROV. GORONTALO', total: 3352 },
   { nama: 'PROV. JAMBI', total: 9246 },
-  { nama: 'PROV. JAWA BARAT', total: 85424 },
+  { nama: 'PROV. JAWA BARAT', total: 85472 },
   { nama: 'PROV. JAWA TENGAH', total: 67113 },
-  { nama: 'PROV. JAWA TIMUR', total: 91670 },
+  { nama: 'PROV. JAWA TIMUR', total: 91714 },
   { nama: 'PROV. KALIMANTAN BARAT', total: 11697 },
   { nama: 'PROV. KALIMANTAN SELATAN', total: 10304 },
   { nama: 'PROV. KALIMANTAN TENGAH', total: 8091 },
@@ -133,6 +192,11 @@ const DAFTAR_PROVINSI_DEFAULT = [
   { nama: 'PROV. NUSA TENGGARA BARAT', total: 14835 },
   { nama: 'PROV. NUSA TENGGARA TIMUR', total: 15219 },
   { nama: 'PROV. PAPUA', total: 2329 },
+  { nama: 'PROV. PAPUA BARAT', total: 1580 },
+  { nama: 'PROV. PAPUA BARAT DAYA', total: 1424 },
+  { nama: 'PROV. PAPUA PEGUNUNGAN', total: 1700 },
+  { nama: 'PROV. PAPUA SELATAN', total: 1276 },
+  { nama: 'PROV. PAPUA TENGAH', total: 1627 },
   { nama: 'PROV. RIAU', total: 13849 },
   { nama: 'PROV. SULAWESI BARAT', total: 4456 },
   { nama: 'PROV. SULAWESI SELATAN', total: 19964 },
@@ -152,18 +216,35 @@ async function run() {
   const isSample = args.includes('--sample');
   const provArg = args.find(a => a.startsWith('--prov='))?.split('=')[1];
 
-  // 1. Ambil daftar provinsi & hitungan total sekolah secara cepat tanpa scan berat
-  // Baseline dari DAFTAR_PROVINSI_DEFAULT
+  // 1. Inisialisasi peta provinsi dari baseline default
   const mergedProvMap = new Map();
   for (const p of DAFTAR_PROVINSI_DEFAULT) {
-    const clean = p.nama.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
-    mergedProvMap.set(clean, {
+    const key = getProvKey(p.nama);
+    mergedProvMap.set(key, {
       nama_provinsi: p.nama,
       total_sekolah: p.total
     });
   }
 
-  // Ambil data terbaru dari provinsi_sync_status (menangkap jika ada provinsi baru/tambahan di DB)
+  // 2. Sinkronkan dengan view agregat riil database (v_rekap_provinsi) jika tersedia
+  try {
+    const { data: vRekap } = await supabase
+      .from('v_rekap_provinsi')
+      .select('nama_provinsi, total_sekolah');
+    if (vRekap && vRekap.length > 0) {
+      for (const r of vRekap) {
+        if (!r.nama_provinsi) continue;
+        const key = getProvKey(r.nama_provinsi);
+        const existing = mergedProvMap.get(key);
+        mergedProvMap.set(key, {
+          nama_provinsi: existing ? existing.nama_provinsi : r.nama_provinsi,
+          total_sekolah: r.total_sekolah || 0
+        });
+      }
+    }
+  } catch (e) {}
+
+  // 3. Cadangan: Ambil data terbaru dari provinsi_sync_status jika belum terisi
   try {
     const { data: statusRows } = await supabase
       .from('provinsi_sync_status')
@@ -171,33 +252,45 @@ async function run() {
     if (statusRows && statusRows.length > 0) {
       for (const s of statusRows) {
         if (!s.nama_provinsi) continue;
-        const clean = s.nama_provinsi.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
-        const provNameInDb = clean === 'LUAR NEGERI' ? 'LUAR NEGERI' : `PROV. ${clean}`;
-        const existing = mergedProvMap.get(clean);
+        const key = getProvKey(s.nama_provinsi);
+        const existing = mergedProvMap.get(key);
 
-        mergedProvMap.set(clean, {
-          nama_provinsi: existing ? existing.nama_provinsi : provNameInDb,
-          total_sekolah: s.total_db !== undefined && s.total_db !== null ? s.total_db : (existing ? existing.total_sekolah : 0)
-        });
+        if (existing) {
+          if (!existing.total_sekolah && s.total_db) {
+            existing.total_sekolah = s.total_db;
+          }
+        } else {
+          const clean = s.nama_provinsi.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
+          const provNameInDb = clean === 'LUAR NEGERI' ? 'LUAR NEGERI' : `PROV. ${clean}`;
+          mergedProvMap.set(key, {
+            nama_provinsi: provNameInDb,
+            total_sekolah: s.total_db || 0
+          });
+        }
       }
     }
   } catch (e) {
     // Fallback aman jika tabel status belum siap
   }
 
-  // Ambil semua provinsi yang memiliki data (> 0 sekolah)
-  const provList = Array.from(mergedProvMap.values()).filter(p => p.total_sekolah > 0);
+  // Ambil semua provinsi yang memiliki data (> 0 sekolah), urutkan alfabetis
+  const provList = Array.from(mergedProvMap.values())
+    .filter(p => p.total_sekolah > 0)
+    .sort((a, b) => a.nama_provinsi.localeCompare(b.nama_provinsi));
 
   let targetProvinces = provList;
 
   if (provArg) {
-    const cleanArg = provArg.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
-    targetProvinces = provList.filter(p =>
-      p.nama_provinsi.toUpperCase().includes(cleanArg) ||
-      p.nama_provinsi.toLowerCase().includes(provArg.toLowerCase())
-    );
+    const keyArg = getProvKey(provArg);
+    targetProvinces = provList.filter(p => {
+      const pKey = getProvKey(p.nama_provinsi);
+      return pKey.includes(keyArg) ||
+             p.nama_provinsi.toLowerCase().includes(provArg.toLowerCase());
+    });
+
     // Jika tidak ada di daftar, tetap proses langsung menggunakan nama argumen input!
     if (targetProvinces.length === 0) {
+      const cleanArg = provArg.toUpperCase().replace(/^(PROVINSI|PROV\.?)\s*/i, '').trim();
       targetProvinces = [{
         nama_provinsi: provArg.toUpperCase().startsWith('PROV') ? provArg : `PROV. ${cleanArg}`,
         total_sekolah: 0
@@ -300,7 +393,7 @@ async function run() {
     }
   }
 
-  // 2. Simpan metadata index.json
+  // 4. Simpan metadata index.json
   const finalIndex = {
     last_updated: new Date().toISOString(),
     total_provinsi: provMap.size,

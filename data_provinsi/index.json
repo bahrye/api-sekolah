@@ -1,7 +1,7 @@
 {
-  "last_updated": "2026-09-12T19:01:17.847Z",
-  "total_provinsi": 36,
-  "total_sekolah": 550734,
+  "last_updated": "2026-09-13T01:22:47.210Z",
+  "total_provinsi": 39,
+  "total_sekolah": 555493,
   "provinsi": [
     {
       "nama": "LUAR NEGERI",
@@ -104,7 +104,7 @@
         "data_jawa_timur_part3.json",
         "data_jawa_timur_part4.json"
       ],
-      "total": 91670
+      "total": 91714
     },
     {
       "nama": "PROV. KALIMANTAN BARAT",
@@ -213,18 +213,42 @@
     {
       "nama": "PROV. PAPUA BARAT",
       "slug": "papua_barat",
-      "total": 1590,
       "files": [
         "data_papua_barat.json"
-      ]
+      ],
+      "total": 1580
+    },
+    {
+      "nama": "PROV. PAPUA BARAT DAYA",
+      "slug": "papua_barat_daya",
+      "files": [
+        "data_papua_barat_daya.json"
+      ],
+      "total": 1424
+    },
+    {
+      "nama": "PROV. PAPUA PEGUNUNGAN",
+      "slug": "papua_pegunungan",
+      "files": [
+        "data_papua_pegunungan.json"
+      ],
+      "total": 1700
     },
     {
       "nama": "PROV. PAPUA SELATAN",
       "slug": "papua_selatan",
-      "total": 1302,
       "files": [
         "data_papua_selatan.json"
-      ]
+      ],
+      "total": 1276
+    },
+    {
+      "nama": "PROV. PAPUA TENGAH",
+      "slug": "papua_tengah",
+      "files": [
+        "data_papua_tengah.json"
+      ],
+      "total": 1627
     },
     {
       "nama": "PROV. RIAU",
@@ -310,7 +334,9 @@
     "papua_selatan": [
       "data_papua_selatan.json"
     ],
-    "prov. papua selatan": "data_papua_selatan.json",
+    "prov. papua selatan": [
+      "data_papua_selatan.json"
+    ],
     "aceh": [
       "data_aceh.json"
     ],
@@ -472,7 +498,9 @@
     "papua_barat": [
       "data_papua_barat.json"
     ],
-    "prov. papua barat": "data_papua_barat.json",
+    "prov. papua barat": [
+      "data_papua_barat.json"
+    ],
     "riau": [
       "data_riau.json"
     ],
@@ -528,6 +556,24 @@
     "prov. sumatera utara": [
       "data_sumatera_utara_part1.json",
       "data_sumatera_utara_part2.json"
+    ],
+    "papua_barat_daya": [
+      "data_papua_barat_daya.json"
+    ],
+    "prov. papua barat daya": [
+      "data_papua_barat_daya.json"
+    ],
+    "papua_tengah": [
+      "data_papua_tengah.json"
+    ],
+    "prov. papua tengah": [
+      "data_papua_tengah.json"
+    ],
+    "papua_pegunungan": [
+      "data_papua_pegunungan.json"
+    ],
+    "prov. papua pegunungan": [
+      "data_papua_pegunungan.json"
     ]
   },
   "npsn_prefix_map": {
@@ -597,7 +643,8 @@
     ],
     "110": [
       "data_kepulauan_riau.json",
-      "data_papua_barat.json"
+      "data_papua_barat.json",
+      "data_papua_barat_daya.json"
     ],
     "112": [
       "data_sumatera_utara.json",
@@ -859,11 +906,14 @@
     ],
     "603": [
       "data_papua.json",
-      "data_papua_selatan.json"
+      "data_papua_selatan.json",
+      "data_papua_tengah.json",
+      "data_papua_pegunungan.json"
     ],
     "604": [
       "data_papua_barat.json",
-      "data_sulawesi_barat.json"
+      "data_sulawesi_barat.json",
+      "data_papua_barat_daya.json"
     ],
     "606": [
       "data_maluku_utara.json"
@@ -904,7 +954,9 @@
       "data_sumatera_barat.json",
       "data_sumatera_selatan.json",
       "data_sumatera_utara.json",
-      "data_sumatera_utara_part1.json"
+      "data_sumatera_utara_part1.json",
+      "data_papua_barat_daya.json",
+      "data_papua_tengah.json"
     ],
     "611": [
       "data_maluku.json"
@@ -952,7 +1004,10 @@
       "data_sumatera_barat.json",
       "data_sumatera_selatan.json",
       "data_sumatera_utara.json",
-      "data_sumatera_utara_part1.json"
+      "data_sumatera_utara_part1.json",
+      "data_papua_barat_daya.json",
+      "data_papua_tengah.json",
+      "data_papua_pegunungan.json"
     ],
     "698": [
       "data_aceh.json",
@@ -990,7 +1045,10 @@
       "data_sumatera_barat.json",
       "data_sumatera_selatan.json",
       "data_sumatera_utara.json",
-      "data_sumatera_utara_part1.json"
+      "data_sumatera_utara_part1.json",
+      "data_papua_barat_daya.json",
+      "data_papua_tengah.json",
+      "data_papua_pegunungan.json"
     ],
     "699": [
       "data_luar_negeri.json",
@@ -1031,7 +1089,10 @@
       "data_sumatera_barat.json",
       "data_sumatera_selatan.json",
       "data_sumatera_utara.json",
-      "data_sumatera_utara_part1.json"
+      "data_sumatera_utara_part1.json",
+      "data_papua_barat_daya.json",
+      "data_papua_tengah.json",
+      "data_papua_pegunungan.json"
     ],
     "700": [
       "data_luar_negeri.json",
@@ -1070,7 +1131,10 @@
       "data_sumatera_barat.json",
       "data_sumatera_selatan.json",
       "data_sumatera_utara.json",
-      "data_sumatera_utara_part1.json"
+      "data_sumatera_utara_part1.json",
+      "data_papua_barat_daya.json",
+      "data_papua_tengah.json",
+      "data_papua_pegunungan.json"
     ],
     "710": [
       "data_aceh.json",
@@ -1319,7 +1383,8 @@
     "749": [
       "data_jawa_barat_part3.json",
       "data_nusa_tenggara_timur.json",
-      "data_sulawesi_tengah.json"
+      "data_sulawesi_tengah.json",
+      "data_jawa_timur_part3.json"
     ],
     "750": [
       "data_bali.json",
@@ -1690,7 +1755,10 @@
       "data_sumatera_barat.json",
       "data_sumatera_selatan.json",
       "data_sumatera_utara.json",
-      "data_sumatera_utara_part2.json"
+      "data_sumatera_utara_part2.json",
+      "data_papua_barat_daya.json",
+      "data_papua_tengah.json",
+      "data_papua_pegunungan.json"
     ],
     "K05": [
       "data_aceh.json",
@@ -1759,7 +1827,10 @@
       "data_sumatera_barat.json",
       "data_sumatera_selatan.json",
       "data_sumatera_utara.json",
-      "data_sumatera_utara_part1.json"
+      "data_sumatera_utara_part1.json",
+      "data_papua_barat_daya.json",
+      "data_papua_tengah.json",
+      "data_papua_pegunungan.json"
     ],
     "K99": [
       "data_aceh.json",
@@ -1798,7 +1869,10 @@
       "data_sumatera_barat.json",
       "data_sumatera_selatan.json",
       "data_sumatera_utara.json",
-      "data_sumatera_utara_part1.json"
+      "data_sumatera_utara_part1.json",
+      "data_papua_barat_daya.json",
+      "data_papua_tengah.json",
+      "data_papua_pegunungan.json"
     ],
     "P29": [
       "data_aceh.json",
@@ -1837,7 +1911,10 @@
       "data_sumatera_selatan.json",
       "data_sumatera_utara.json",
       "data_sumatera_utara_part1.json",
-      "data_sumatera_utara_part2.json"
+      "data_sumatera_utara_part2.json",
+      "data_papua_barat_daya.json",
+      "data_papua_tengah.json",
+      "data_papua_pegunungan.json"
     ],
     "K34": [
       "data_bali.json"
@@ -1897,7 +1974,8 @@
       "data_jawa_barat_part3.json"
     ],
     "P42": [
-      "data_dki_jakarta.json"
+      "data_dki_jakarta.json",
+      "data_jawa_timur_part4.json"
     ],
     "P63": [
       "data_dki_jakarta.json",
@@ -2002,7 +2080,23 @@
     ],
     "P93": [
       "data_sumatera_utara.json",
-      "data_sumatera_utara_part2.json"
+      "data_sumatera_utara_part2.json",
+      "data_jawa_timur_part4.json"
+    ],
+    "K27": [
+      "data_jawa_timur_part3.json"
+    ],
+    "K81": [
+      "data_jawa_timur_part3.json"
+    ],
+    "P40": [
+      "data_jawa_timur_part4.json"
+    ],
+    "P75": [
+      "data_jawa_timur_part4.json"
+    ],
+    "P78": [
+      "data_jawa_timur_part4.json"
     ]
   },
   "sample_schools": [
