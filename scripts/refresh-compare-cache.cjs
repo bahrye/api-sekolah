@@ -116,6 +116,13 @@ async function refreshCache() {
     console.log('✅ Berhasil memperbarui cache_data perbandingan.');
   }
 
+  // Sinkronkan juga total_db ke provinsi_sync_status
+  for (const item of compared) {
+    if (item.total_db > 0) {
+      await supabase.from('provinsi_sync_status').update({ total_db: item.total_db }).eq('nama_provinsi', item.nama);
+    }
+  }
+
   // Tampilkan preview 6 provinsi
   const focus = compared.filter(c => [
     'JAWA BARAT', 'JAWA TENGAH', 'JAWA TIMUR',

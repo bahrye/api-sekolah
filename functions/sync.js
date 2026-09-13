@@ -86,14 +86,20 @@ export async function onRequestGet(context) {
       if (cacheRow && cacheRow.value) {
         const rawCompare = JSON.parse(cacheRow.value);
         const vMap = new Map(vRekapList.map(r => [cleanName(r.nama_provinsi), r.total_sekolah]));
-        const pMap = new Map(provStatusList.map(r => [cleanName(r.nama_provinsi), r]));
+        const pMap = new Map();
+        provStatusList.forEach(r => {
+          const k = cleanName(r.nama_provinsi);
+          if (!pMap.has(k) || ((r.total_db || 0) > (pMap.get(k).total_db || 0))) {
+            pMap.set(k, r);
+          }
+        });
         const todayDateWIB = getWibDate();
 
         rawCompare.forEach(item => {
           const cName = cleanName(item.nama);
-          if (vMap.has(cName)) {
+          if (vMap.has(cName) && vMap.get(cName) > 0) {
             item.total_db = vMap.get(cName);
-          } else if (pMap.has(cName) && pMap.get(cName).total_db > 0) {
+          } else if ((!item.total_db || item.total_db <= 0) && pMap.has(cName) && pMap.get(cName).total_db > 0) {
             item.total_db = pMap.get(cName).total_db;
           }
 
@@ -109,7 +115,7 @@ export async function onRequestGet(context) {
           let selisihVal = item.raw_selisih;
           if (item.raw_selisih > 0) {
             const effDuplicates = (item.api_duplicates || 0);
-            const effUnrecognized = (item.api_unrecognized_shapes || 0);
+            const effUnrecognized = Math.min(item.raw_selisih, item.api_unrecognized_shapes || 0);
             selisihVal = Math.max(0, item.raw_selisih - effDuplicates - effUnrecognized);
           }
           item.selisih = selisihVal;
