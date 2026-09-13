@@ -145,6 +145,19 @@ export async function onRequestGet(context) {
       }
     } catch (e) {}
 
+    const isStatReset = Boolean(selesai || bentukBerikutnya === 'Selesai' || (!isRunning && offsetBerikutnya === 0));
+    if (isStatReset) {
+      totalNonQueryable = 0;
+      activeRow = {
+        ...activeRow,
+        total_baru: 0,
+        total_diperbarui: 0,
+        total_dihapus: 0,
+        total_tidak_berubah: 0,
+        total_tanpa_npsn: 0,
+      };
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,

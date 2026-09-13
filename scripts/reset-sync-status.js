@@ -28,6 +28,7 @@ async function resetSyncStatus() {
     offset_terakhir: 0,
     total_baru: 0,
     total_diperbarui: 0,
+    total_dihapus: 0,
     total_tidak_berubah: 0,
     total_tanpa_npsn: 0,
     total_estimasi: 0,
@@ -53,6 +54,7 @@ async function resetSyncStatus() {
       offset_terakhir: 0,
       total_baru: 0,
       total_diperbarui: 0,
+      total_dihapus: 0,
       total_tidak_berubah: 0,
       total_tanpa_npsn: 0,
       updated_at: now

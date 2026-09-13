@@ -70,19 +70,35 @@ export async function onRequestPost(context) {
       totalEstimasi = 553831;
     }
 
+    const isJobFinished = (isFinished && isCustom && bentukAktif === 'Selesai') || (!isCustom && isFinished);
+
     // Update status di Supabase
     await supabase.from('status_sinkronisasi').upsert({
       id: targetId,
-      bentuk_aktif: isFinished && isCustom && bentukAktif === 'Selesai' ? 'Selesai' : displayBentuk,
+      bentuk_aktif: isJobFinished ? 'Selesai' : displayBentuk,
       offset_terakhir: isFinished ? 0 : (offset || 0),
-      total_baru: totalBaru,
-      total_diperbarui: totalDiperbarui,
-      total_tidak_berubah: totalTidakBerubah,
-      total_tanpa_npsn: totalTanpaNpsn,
+      total_baru: isJobFinished ? 0 : totalBaru,
+      total_diperbarui: isJobFinished ? 0 : totalDiperbarui,
+      total_tidak_berubah: isJobFinished ? 0 : totalTidakBerubah,
+      total_tanpa_npsn: isJobFinished ? 0 : totalTanpaNpsn,
+      total_dihapus: isJobFinished ? 0 : (currentStatus?.total_dihapus || 0),
       total_estimasi: totalEstimasi,
       updated_at: new Date().toISOString(),
       waktu_selesai_terakhir: isFinished ? new Date().toISOString() : (currentStatus?.waktu_selesai_terakhir || null),
     });
+
+    if (isJobFinished) {
+      // Pastikan kedua record (id 1 dan 2) kartu counter-nya di-reset bersih / 0 karena log tersimpan di riwayat
+      try {
+        await supabase.from('status_sinkronisasi').update({
+          total_baru: 0,
+          total_diperbarui: 0,
+          total_tidak_berubah: 0,
+          total_dihapus: 0,
+          total_tanpa_npsn: 0,
+        }).in('id', [1, 2]);
+      } catch (eReset) {}
+    }
 
     // Jika provinsi selesai, jalankan pembersihan data nonaktif, catat ke provinsi_sync_status, log_aktivitas_provinsi, dan npsn_ganda_detail
     let totalDihapus = 0;

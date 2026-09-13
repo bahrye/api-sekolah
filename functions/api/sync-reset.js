@@ -23,6 +23,7 @@ export async function onRequest(context) {
       offset_terakhir: 0,
       total_baru: 0,
       total_diperbarui: 0,
+      total_dihapus: 0,
       total_tidak_berubah: 0,
       total_tanpa_npsn: 0,
       total_estimasi: 0,
@@ -33,7 +34,7 @@ export async function onRequest(context) {
     const { error: err2 } = await supabase
       .from('status_sinkronisasi')
       .update(resetData)
-      .eq('id', 2);
+      .in('id', [1, 2]);
 
     if (err2) throw err2;
 

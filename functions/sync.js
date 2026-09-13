@@ -829,6 +829,13 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           }
         }
 
+        const isStatReset = Boolean(selesai || bentukBerikutnya === 'Selesai' || (!isRunning && offsetBerikutnya === 0));
+        const displayBaru = isStatReset ? '0' : Number(activeRow.total_baru || 0).toLocaleString('id-ID');
+        const displayDiperbarui = isStatReset ? '0' : Number(activeRow.total_diperbarui || 0).toLocaleString('id-ID');
+        const displayDihapus = isStatReset ? '0' : Number(activeRow.total_dihapus || 0).toLocaleString('id-ID');
+        const displayTidakBerubah = isStatReset ? '0' : Number(activeRow.total_tidak_berubah || 0).toLocaleString('id-ID');
+        const displayNonQueryable = isStatReset ? '0' : Number(activeNonQueryable || 0).toLocaleString('id-ID');
+
         const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -1388,17 +1395,18 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
       }
 
       // 4. Update stat boxes
+      const isResetCards = Boolean(status.selesai || status.bentukBerikutnya === 'Selesai' || (!status.isRunning && status.offsetBerikutnya === 0));
       const statBaru = document.getElementById('stat-baru');
-      if (statBaru) statBaru.innerText = Number(status.activeRow?.total_baru || 0).toLocaleString('id-ID');
+      if (statBaru) statBaru.innerText = isResetCards ? '0' : Number(status.activeRow?.total_baru || 0).toLocaleString('id-ID');
       const statDiperbarui = document.getElementById('stat-diperbarui');
-      if (statDiperbarui) statDiperbarui.innerText = Number(status.activeRow?.total_diperbarui || 0).toLocaleString('id-ID');
+      if (statDiperbarui) statDiperbarui.innerText = isResetCards ? '0' : Number(status.activeRow?.total_diperbarui || 0).toLocaleString('id-ID');
       const statDihapus = document.getElementById('stat-dihapus');
-      if (statDihapus) statDihapus.innerText = Number(status.activeRow?.total_dihapus || 0).toLocaleString('id-ID');
+      if (statDihapus) statDihapus.innerText = isResetCards ? '0' : Number(status.activeRow?.total_dihapus || 0).toLocaleString('id-ID');
       const statTidakBerubah = document.getElementById('stat-tidak-berubah');
-      if (statTidakBerubah) statTidakBerubah.innerText = Number(status.activeRow?.total_tidak_berubah || 0).toLocaleString('id-ID');
+      if (statTidakBerubah) statTidakBerubah.innerText = isResetCards ? '0' : Number(status.activeRow?.total_tidak_berubah || 0).toLocaleString('id-ID');
       const statNonQueryable = document.getElementById('stat-non-queryable');
-      if (statNonQueryable && status.total_non_queryable !== undefined) {
-        statNonQueryable.innerText = Number(status.total_non_queryable).toLocaleString('id-ID');
+      if (statNonQueryable) {
+        statNonQueryable.innerText = isResetCards ? '0' : Number(status.total_non_queryable || 0).toLocaleString('id-ID');
       }
 
       // 5. Update info box
@@ -1595,35 +1603,35 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         <div class="stat-icon-wrapper success">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
         </div>
-        <div id="stat-baru" class="stat-val" style="color: var(--success);">${activeRow.total_baru || 0}</div>
+        <div id="stat-baru" class="stat-val" style="color: var(--success);">${displayBaru}</div>
         <div class="stat-label">Baru Ditambahkan</div>
       </div>
       <div class="stat-box">
         <div class="stat-icon-wrapper info">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
         </div>
-        <div id="stat-diperbarui" class="stat-val" style="color: var(--info);">${activeRow.total_diperbarui || 0}</div>
+        <div id="stat-diperbarui" class="stat-val" style="color: var(--info);">${displayDiperbarui}</div>
         <div class="stat-label">Diperbarui</div>
       </div>
       <div class="stat-box">
         <div class="stat-icon-wrapper danger">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
         </div>
-        <div id="stat-dihapus" class="stat-val" style="color: var(--danger);">${activeRow.total_dihapus || 0}</div>
+        <div id="stat-dihapus" class="stat-val" style="color: var(--danger);">${displayDihapus}</div>
         <div class="stat-label">Dihapus (Nonaktif)</div>
       </div>
       <div class="stat-box">
         <div class="stat-icon-wrapper subtle">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
         </div>
-        <div id="stat-tidak-berubah" class="stat-val">${activeRow.total_tidak_berubah || 0}</div>
+        <div id="stat-tidak-berubah" class="stat-val">${displayTidakBerubah}</div>
         <div class="stat-label">Tidak Berubah</div>
       </div>
       <div class="stat-box">
         <div class="stat-icon-wrapper special">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
         </div>
-        <div id="stat-non-queryable" class="stat-val" style="color: #c084fc;">${(activeNonQueryable || 0).toLocaleString('id-ID')}</div>
+        <div id="stat-non-queryable" class="stat-val" style="color: #c084fc;">${displayNonQueryable}</div>
         <div class="stat-label">Non-Queryable</div>
       </div>
     </div>
