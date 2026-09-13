@@ -477,7 +477,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             }, 0)
           : 0;
         const dynamicFullSyncLimit = Math.max(scheduledTodayTotal + 15000, 350000);
-        const BATAS_AMAN = Math.max(100000, isMandatoryUpdateDay ? dynamicFullSyncLimit : 100000);
+        const BATAS_AMAN = Math.max(150000, isMandatoryUpdateDay ? dynamicFullSyncLimit : 150000);
         let syncedToday = 0;
         try {
           const nowWib = new Date(Date.now() + 7 * 60 * 60 * 1000);
@@ -586,11 +586,16 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
 
                     let assignedDayOffset = -1;
                     let assigned = false;
-                    let minOffset = d.isSyncedToday ? 1 : 0;
 
                     for (let j = 0; j < daysSim.length; j++) {
                       let day = daysSim[j];
-                      if (day.offset < minOffset) continue;
+                      
+                      // Jika sudah pernah disinkronkan hari ini, hanya perbolehkan dimajukan ke hari ini (offset 0)
+                      // jika penambahan datanya benar-benar MUAT dalam kuota harian (<= 150.000).
+                      // Jika melebihi kuota harian hari ini, tunda ke hari berikutnya.
+                      if (d.isSyncedToday && day.offset === 0 && (day.used + (d.total_api || 0) > day.limit)) {
+                        continue;
+                      }
                       
                       if (day.used + (d.total_api || 0) <= day.limit) {
                         day.used += (d.total_api || 0);
@@ -608,7 +613,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
                     }
 
                     if (!assigned) {
-                      let newOffset = Math.max(minOffset, daysSim[daysSim.length - 1].offset + 1);
+                      let newOffset = Math.max(d.isSyncedToday ? 1 : 0, daysSim[daysSim.length - 1].offset + 1);
                       const nextDaySimulated = (currentDayOfWeek + newOffset - 1) % 7 + 1;
                       const isNextDayMandatory = (nextDaySimulated === 3 || nextDaySimulated === 4);
                       let nextDayScheduledTotal = (isNextDayMandatory && SCHEDULE[nextDaySimulated])
@@ -617,7 +622,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
                             return sum + (p ? (p.total_api || 0) : 0);
                           }, 0)
                         : 0;
-                      let newLimit = isNextDayMandatory ? Math.max(nextDayScheduledTotal + 15000, 350000) : 100000;
+                      let newLimit = isNextDayMandatory ? Math.max(nextDayScheduledTotal + 15000, 350000) : 150000;
                       
                       let newDay = { offset: newOffset, used: (d.total_api || 0), limit: newLimit, items: 1 };
                       daysSim.push(newDay);

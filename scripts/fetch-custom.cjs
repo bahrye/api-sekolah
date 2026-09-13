@@ -258,6 +258,23 @@ async function fetchCustomData() {
             }
           }
   
+          // Hitung batas aman kuota harian
+          const scheduledTodayTotal = (isMandatoryUpdateDay && SCHEDULE[currentDayOfWeek])
+            ? SCHEDULE[currentDayOfWeek].reduce((sum, name) => {
+                const p = compareJson.data.find(d => cleanName(d.nama) === cleanName(name));
+                return sum + (p ? p.total_api : 0);
+              }, 0)
+            : 0;
+
+          // Kuota aman penulisan baris per hari:
+          // Pada hari Full Sync (Rabu & Kamis), alokasikan kuota yang cukup untuk menyelesaikan seluruh provinsi terjadwal (Rabu: ~303k, Kamis: ~252k).
+          // Pada hari biasa (Smart Sync), batasi aman 150.000 data per hari.
+          const dynamicFullSyncLimit = Math.max(scheduledTodayTotal + 15000, 350000);
+          const BATAS_AMAN_DATA_PER_HARI = Math.max(150000, isMandatoryUpdateDay ? dynamicFullSyncLimit : 150000); 
+          let totalDataSaatIni = compareJson.synced_today || 0;
+
+          console.log(`📊 Kuota yang sudah terpakai hari ini: ${totalDataSaatIni.toLocaleString('id-ID')} / ${BATAS_AMAN_DATA_PER_HARI.toLocaleString('id-ID')}`);
+
           const todayDate = getWibDate();
           const diffCodes = compareJson.data.filter(d => {
             if (!kodeWilayahList.includes(d.kode)) return false;
@@ -270,42 +287,29 @@ async function fetchCustomData() {
               
               if (isMandatoryUpdateDay) {
                 // Pada hari wajib update (Rabu/Kamis), HANYA abaikan jika sudah disinkronkan HARI INI.
-                // Jangan abaikan jika disinkronkan kemarin (Selasa/Rabu), karena hari ini adalah jadwal wajibnya (Full Sync).
                 if (syncedDate === todayDate) {
                   console.log(`✅ ${d.nama} diabaikan (Sudah tersinkronisasi jadwal Full Sync hari ini)`);
                   return false;
                 }
               } else {
-                // Pada hari biasa (Smart Sync), abaikan HANYA jika sudah disinkronkan hari ini.
-                // Jika disinkron kemarin namun masih ada selisih, ia akan disinkron ulang hari ini.
+                // Pada hari biasa (Smart Sync):
+                // Jika sudah disinkronkan hari ini, tapi masih ada selisih, cek apakah kuota harian masih muat (<= 150.000).
+                // Jika masih muat, perbolehkan dimajukan ke hari ini agar selisih segera tuntas!
                 if (syncedDate === todayDate) {
-                  console.log(`✅ ${d.nama} diabaikan (Sudah tersinkronisasi hari ini, tunggu besok jika masih ada selisih)`);
-                  return false;
+                  const sisaKuota = Math.max(0, BATAS_AMAN_DATA_PER_HARI - totalDataSaatIni);
+                  if ((d.total_api || 0) > sisaKuota) {
+                    console.log(`✅ ${d.nama} diabaikan (Sudah disinkronkan hari ini dan kuota sisa (${sisaKuota.toLocaleString('id-ID')}) tidak cukup untuk ${(d.total_api || 0).toLocaleString('id-ID')} data, tunggu besok)`);
+                    return false;
+                  } else {
+                    console.log(`⚡ ${d.nama} dimajukan ke hari ini karena masih ada selisih (${d.selisih}) dan kuota harian masih mencukupi.`);
+                  }
                 }
               }
             }
             return true;
           });
           const syncedCodes = compareJson.data.filter(d => d.selisih === 0 && (d.raw_selisih || 0) === 0 && kodeWilayahList.includes(d.kode));
-  
-          // Hitung total estimasi data provinsi yang terjadwal hari ini (Full Sync)
-          const scheduledTodayTotal = (isMandatoryUpdateDay && SCHEDULE[currentDayOfWeek])
-            ? SCHEDULE[currentDayOfWeek].reduce((sum, name) => {
-                const p = compareJson.data.find(d => cleanName(d.nama) === cleanName(name));
-                return sum + (p ? p.total_api : 0);
-              }, 0)
-            : 0;
-
-          // Kuota aman penulisan baris per hari:
-          // Pada hari Full Sync (Rabu & Kamis), alokasikan kuota yang cukup untuk menyelesaikan seluruh provinsi terjadwal (Rabu: ~303k, Kamis: ~252k).
-          // Pada hari biasa (Smart Sync), batasi aman 100.000 data per hari.
-          const dynamicFullSyncLimit = Math.max(scheduledTodayTotal + 15000, 350000);
-          const BATAS_AMAN_DATA_PER_HARI = Math.max(100000, isMandatoryUpdateDay ? dynamicFullSyncLimit : 100000); 
-          
-          let totalDataSaatIni = compareJson.synced_today || 0;
           let finalTargets = [];
-  
-          console.log(`📊 Kuota yang sudah terpakai hari ini: ${totalDataSaatIni.toLocaleString('id-ID')} / ${BATAS_AMAN_DATA_PER_HARI.toLocaleString('id-ID')}`);
   
           // Urutkan provinsi berdasarkan aturan prioritas:
           if (isMandatoryUpdateDay && isCronSchedule) {
