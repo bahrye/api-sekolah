@@ -17,7 +17,7 @@ export async function onRequest(context) {
   const bentuk = searchParams.get('bentuk');
 
   const DEFAULT_LIMIT = 20;
-  const MAX_LIMIT = 50;
+  const MAX_LIMIT = 20;
 
   let limit = parseInt(searchParams.get('limit'), 10);
   if (!Number.isFinite(limit) || limit < 1) limit = DEFAULT_LIMIT;
@@ -39,8 +39,10 @@ export async function onRequest(context) {
 
   try {
     const supabase = getSupabase(context.env);
-    const sinkron = await getStatusSinkronisasiSupabase(supabase);
-    let rows;
+
+    // Jalankan query status dan query data sekolah secara bersamaan (paralel) agar responsif dan cepat
+    const sinkronPromise = getStatusSinkronisasiSupabase(supabase);
+    let rowsPromise;
 
     if (provinsi || bentuk) {
       const filters = {
@@ -48,12 +50,14 @@ export async function onRequest(context) {
         provinsi: provinsi?.trim() || undefined,
         bentuk: bentuk?.trim() || undefined,
       };
-      rows = await listSekolahFilteredSupabase(supabase, filters, limit, offset);
+      rowsPromise = listSekolahFilteredSupabase(supabase, filters, limit, offset);
     } else {
-      rows = keyword
-        ? await searchSekolahSupabase(supabase, keyword.trim(), limit, offset)
-        : await listSekolahSupabase(supabase, limit, offset);
+      rowsPromise = keyword
+        ? searchSekolahSupabase(supabase, keyword.trim(), limit, offset)
+        : listSekolahSupabase(supabase, limit, offset);
     }
+
+    const [sinkron, rows] = await Promise.all([sinkronPromise, rowsPromise]);
 
     const totalSekolah = sinkron.total_sekolah;
     const formattedResults = rows.map((row) => formatDbRowResponse(row));

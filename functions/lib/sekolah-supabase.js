@@ -12,12 +12,19 @@ export async function countSekolahSupabase(supabase) {
   return count || 0;
 }
 
+function getNextPrefix(prefix) {
+  if (!prefix) return null;
+  const lastChar = prefix.charCodeAt(prefix.length - 1);
+  return prefix.slice(0, -1) + String.fromCharCode(lastChar + 1);
+}
+
 export async function listSekolahSupabase(supabase, limit = 20, offset = 0) {
+  const safeLimit = Math.min(Math.max(1, limit), 20);
   const { data, error } = await supabase
     .from('sekolah')
     .select('*')
     .order('npsn', { ascending: true })
-    .range(offset, offset + limit - 1);
+    .range(offset, offset + safeLimit - 1);
 
   if (error) throw error;
   return data || [];
@@ -27,34 +34,55 @@ export async function searchSekolahSupabase(supabase, keyword, limit = 20, offse
   const cleanKeyword = keyword?.trim() || '';
   if (!cleanKeyword) return [];
 
-  let query = supabase.from('sekolah').select('*');
+  const safeLimit = Math.min(Math.max(1, limit), 20);
 
+  // 1. Exact NPSN match: menggunakan Primary Key (sangat instan < 1ms)
   if (/^\d{8}$/.test(cleanKeyword) || /^[Pp]\d{7}$/.test(cleanKeyword)) {
-    // Exact NPSN match: menggunakan Primary Key (sangat instan < 1ms)
-    query = query.eq('npsn', cleanKeyword.toUpperCase());
-  } else if (/^\d+$/.test(cleanKeyword) || /^[Pp]\d+$/.test(cleanKeyword)) {
-    // Prefix NPSN
-    query = query.like('npsn', `${cleanKeyword.toUpperCase()}%`);
-  } else {
-    // Pencarian Nama Sekolah (Fuzzy / Case-insensitive Trigram GIN index)
-    query = query.ilike('nama', `%${cleanKeyword}%`);
+    const { data, error } = await supabase
+      .from('sekolah')
+      .select('*')
+      .eq('npsn', cleanKeyword.toUpperCase())
+      .limit(1);
+    if (error) throw error;
+    return data || [];
   }
 
-  const { data, error } = await query
-    .order('npsn', { ascending: true })
-    .range(offset, offset + limit - 1);
+  let query = supabase.from('sekolah').select('*');
 
+  // 2. Prefix NPSN: Gunakan B-Tree range scan (GTE & LT) agar instan memanfaatkan Primary Key index
+  if (/^\d+$/.test(cleanKeyword) || /^[Pp]\d+$/.test(cleanKeyword)) {
+    const upper = cleanKeyword.toUpperCase();
+    const nextPrefix = getNextPrefix(upper);
+    query = query
+      .gte('npsn', upper)
+      .lt('npsn', nextPrefix)
+      .order('npsn', { ascending: true })
+      .range(offset, offset + safeLimit - 1);
+  } else {
+    // 3. Pencarian Nama Sekolah (Trigram GIN index)
+    // Hindari order('npsn') agar PostgreSQL tidak mengabaikan GIN index dan melakukan sequential table scan
+    query = query
+      .ilike('nama', `%${cleanKeyword}%`)
+      .range(offset, offset + safeLimit - 1);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return data || [];
 }
 
 export async function listSekolahFilteredSupabase(supabase, filters, limit = 20, offset = 0) {
+  const safeLimit = Math.min(Math.max(1, limit), 20);
   let query = supabase.from('sekolah').select('*');
 
   if (filters.keyword) {
     const cleanKeyword = filters.keyword.trim();
-    if (/^\d+$/.test(cleanKeyword) || /^[Pp]\d+$/.test(cleanKeyword)) {
-      query = query.like('npsn', `${cleanKeyword.toUpperCase()}%`);
+    if (/^\d{8}$/.test(cleanKeyword) || /^[Pp]\d{7}$/.test(cleanKeyword)) {
+      query = query.eq('npsn', cleanKeyword.toUpperCase());
+    } else if (/^\d+$/.test(cleanKeyword) || /^[Pp]\d+$/.test(cleanKeyword)) {
+      const upper = cleanKeyword.toUpperCase();
+      const nextPrefix = getNextPrefix(upper);
+      query = query.gte('npsn', upper).lt('npsn', nextPrefix);
     } else {
       query = query.ilike('nama', `%${cleanKeyword}%`);
     }
@@ -79,9 +107,13 @@ export async function listSekolahFilteredSupabase(supabase, filters, limit = 20,
     query = query.eq('bentuk_pendidikan', filters.bentuk.trim().toUpperCase());
   }
 
-  const { data, error } = await query
-    .order('npsn', { ascending: true })
-    .range(offset, offset + limit - 1);
+  // Jika pencarian nama bebas, hindari order('npsn') agar GIN index tetap efektif
+  const isNameSearch = filters.keyword && !/^\d+$/.test(filters.keyword.trim()) && !/^[Pp]\d+$/i.test(filters.keyword.trim());
+  if (!isNameSearch) {
+    query = query.order('npsn', { ascending: true });
+  }
+
+  const { data, error } = await query.range(offset, offset + safeLimit - 1);
 
   if (error) throw error;
   return data || [];
