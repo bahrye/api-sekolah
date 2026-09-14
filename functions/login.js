@@ -76,76 +76,60 @@ export async function onRequestGet(context) {
   const clientSupabaseAnonKey = env?.SUPABASE_ANON_KEY || '';
 
   try {
-    const { data: results } = await supabase
-      .from('status_sinkronisasi')
-      .select('*')
-      .in('id', [1, 2]);
-
-    let provStatusList = [];
     let compareList = [];
     let lastChecked = 'Belum ada data';
 
-    try {
-      const { data: provRes } = await supabase.from('provinsi_sync_status').select('*');
-      provStatusList = provRes || [];
+    // Optimasi performa: Jalankan query paralel dan hindari query view agregat berat v_rekap_provinsi
+    const [
+      { data: results },
+      { data: provRes },
+      { data: cacheRow }
+    ] = await Promise.all([
+      supabase.from('status_sinkronisasi').select('*').in('id', [1, 2]),
+      supabase.from('provinsi_sync_status').select('nama_provinsi, total_db, terakhir_sukses, api_duplicates, api_empty_npsn, api_unrecognized_shapes'),
+      supabase.from('cache_data').select('value, updated_at').eq('key', 'perbandingan').maybeSingle()
+    ]);
 
-      let vRekapList = [];
-      try {
-        const { data: vRekap } = await supabase.from('v_rekap_provinsi').select('*');
-        vRekapList = vRekap || [];
-      } catch (eV) {}
+    const provStatusList = provRes || [];
 
-      const { data: cacheRow } = await supabase
-        .from('cache_data')
-        .select('value, updated_at')
-        .eq('key', 'perbandingan')
-        .maybeSingle();
+    if (cacheRow && cacheRow.value) {
+      lastChecked = formatWIB(cacheRow.updated_at);
+      const rawCompare = JSON.parse(cacheRow.value);
+      const pMap = new Map();
+      provStatusList.forEach(r => {
+        const k = cleanName(r.nama_provinsi);
+        if (!pMap.has(k) || ((r.total_db || 0) > (pMap.get(k).total_db || 0))) {
+          pMap.set(k, r);
+        }
+      });
 
-      if (cacheRow && cacheRow.value) {
-        lastChecked = formatWIB(cacheRow.updated_at);
-        const rawCompare = JSON.parse(cacheRow.value);
-        const vMap = new Map(vRekapList.map(r => [cleanName(r.nama_provinsi), r.total_sekolah]));
-        const pMap = new Map();
-        provStatusList.forEach(r => {
-          const k = cleanName(r.nama_provinsi);
-          if (!pMap.has(k) || ((r.total_db || 0) > (pMap.get(k).total_db || 0))) {
-            pMap.set(k, r);
-          }
-        });
-        const todayDateWIB = getWibDate();
+      rawCompare.forEach(item => {
+        const cName = cleanName(item.nama);
+        if ((!item.total_db || item.total_db <= 0) && pMap.has(cName) && pMap.get(cName).total_db > 0) {
+          item.total_db = pMap.get(cName).total_db;
+        }
 
-        rawCompare.forEach(item => {
-          const cName = cleanName(item.nama);
-          if (vMap.has(cName) && vMap.get(cName) > 0) {
-            item.total_db = vMap.get(cName);
-          } else if ((!item.total_db || item.total_db <= 0) && pMap.has(cName) && pMap.get(cName).total_db > 0) {
-            item.total_db = pMap.get(cName).total_db;
-          }
+        if (pMap.has(cName)) {
+          const p = pMap.get(cName);
+          if (p.terakhir_sukses) item.terakhir_sukses = p.terakhir_sukses;
+          item.api_duplicates = p.api_duplicates || 0;
+          item.api_empty_npsn = p.api_empty_npsn || 0;
+          item.api_unrecognized_shapes = p.api_unrecognized_shapes || 0;
+        }
 
-          if (pMap.has(cName)) {
-            const p = pMap.get(cName);
-            if (p.terakhir_sukses) item.terakhir_sukses = p.terakhir_sukses;
-            item.api_duplicates = p.api_duplicates || 0;
-            item.api_empty_npsn = p.api_empty_npsn || 0;
-            item.api_unrecognized_shapes = p.api_unrecognized_shapes || 0;
-          }
+        item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);
+        let selisihVal = item.raw_selisih;
+        if (item.raw_selisih > 0) {
+          const effDuplicates = (item.api_duplicates || 0);
+          const effUnrecognized = Math.min(item.raw_selisih, item.api_unrecognized_shapes || 0);
+          selisihVal = Math.max(0, item.raw_selisih - effDuplicates - effUnrecognized);
+        }
+        item.selisih = selisihVal;
+        item.extra_in_db = Math.max(0, (item.total_db || 0) - (item.total_api || 0));
+        item.is_sinkron_walau_selisih = (item.selisih === 0);
+      });
 
-          item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);
-          let selisihVal = item.raw_selisih;
-          if (item.raw_selisih > 0) {
-            const effDuplicates = (item.api_duplicates || 0);
-            const effUnrecognized = Math.min(item.raw_selisih, item.api_unrecognized_shapes || 0);
-            selisihVal = Math.max(0, item.raw_selisih - effDuplicates - effUnrecognized);
-          }
-          item.selisih = selisihVal;
-          item.extra_in_db = Math.max(0, (item.total_db || 0) - (item.total_api || 0));
-          item.is_sinkron_walau_selisih = (item.selisih === 0);
-        });
-
-        compareList = rawCompare;
-      }
-    } catch (e) {
-      console.warn('Gagal memuat cache perbandingan di /login:', e.message);
+      compareList = rawCompare;
     }
 
     const row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakhir: 0 };

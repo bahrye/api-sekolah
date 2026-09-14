@@ -57,35 +57,35 @@ export async function onRequestGet(context) {
   const clientSupabaseAnonKey = env?.SUPABASE_ANON_KEY || '';
 
   try {
-    const { data: results } = await supabase
-      .from('status_sinkronisasi')
-      .select('*')
-      .in('id', [1, 2]);
+    const nowWib = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    const wibDateStr = nowWib.toISOString().split('T')[0];
+    const startOfWibDayUtc = new Date(`${wibDateStr}T00:00:00+07:00`).toISOString();
 
-    let provStatusList = [];
+    // Optimasi performa: Jalankan seluruh query database secara paralel dan hilangkan view agregat berat v_rekap_provinsi
+    const [
+      statusRes,
+      provRes,
+      cacheRes,
+      logsRes,
+      latestLogRes
+    ] = await Promise.all([
+      supabase.from('status_sinkronisasi').select('*').in('id', [1, 2]),
+      supabase.from('provinsi_sync_status').select('nama_provinsi, total_db, terakhir_sukses, api_duplicates, api_empty_npsn, api_unrecognized_shapes'),
+      supabase.from('cache_data').select('value, updated_at').eq('key', 'perbandingan').maybeSingle(),
+      supabase.from('log_aktivitas_provinsi').select('total_baru, total_diperbarui, total_tidak_berubah').gte('waktu_selesai', startOfWibDayUtc),
+      supabase.from('log_aktivitas_provinsi').select('*').order('waktu_selesai', { ascending: false }).limit(5)
+    ]);
+
+    const results = statusRes.data || [];
+    const provStatusList = provRes.data || [];
+    const cacheRow = cacheRes.data;
+    const logs = logsRes.data || [];
+    const logAktivitasList = latestLogRes.data || [];
+
     let compareCache = null;
-    try {
-      const { data: provRes } = await supabase
-        .from('provinsi_sync_status')
-        .select('*');
-      provStatusList = provRes || [];
-
-      let vRekapList = [];
+    if (cacheRow && cacheRow.value) {
       try {
-        const { data: vRekap } = await supabase
-          .from('v_rekap_provinsi')
-          .select('*');
-        vRekapList = vRekap || [];
-      } catch (eV) {}
-
-      const { data: cacheRow } = await supabase
-        .from('cache_data')
-        .select('value, updated_at')
-        .eq('key', 'perbandingan')
-        .single();
-      if (cacheRow && cacheRow.value) {
         const rawCompare = JSON.parse(cacheRow.value);
-        const vMap = new Map(vRekapList.map(r => [cleanName(r.nama_provinsi), r.total_sekolah]));
         const pMap = new Map();
         provStatusList.forEach(r => {
           const k = cleanName(r.nama_provinsi);
@@ -97,9 +97,7 @@ export async function onRequestGet(context) {
 
         rawCompare.forEach(item => {
           const cName = cleanName(item.nama);
-          if (vMap.has(cName) && vMap.get(cName) > 0) {
-            item.total_db = vMap.get(cName);
-          } else if ((!item.total_db || item.total_db <= 0) && pMap.has(cName) && pMap.get(cName).total_db > 0) {
+          if ((!item.total_db || item.total_db <= 0) && pMap.has(cName) && pMap.get(cName).total_db > 0) {
             item.total_db = pMap.get(cName).total_db;
           }
 
@@ -126,8 +124,8 @@ export async function onRequestGet(context) {
         });
 
         compareCache = { value: rawCompare, updated_at: cacheRow.updated_at };
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
 let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakhir: 0 };
         let row2 = results?.find(r => r.id === 2);
 
@@ -507,19 +505,8 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           : 0;
         const dynamicFullSyncLimit = Math.max(scheduledTodayTotal + 15000, 350000);
         const BATAS_AMAN = Math.max(150000, isMandatoryUpdateDay ? dynamicFullSyncLimit : 150000);
-        let syncedToday = 0;
-        try {
-          const nowWib = new Date(Date.now() + 7 * 60 * 60 * 1000);
-          const wibDateStr = nowWib.toISOString().split('T')[0];
-          const startOfWibDayUtc = new Date(`${wibDateStr}T00:00:00+07:00`).toISOString();
-
-          const { data: logs } = await supabase
-            .from('log_aktivitas_provinsi')
-            .select('total_baru, total_diperbarui, total_tidak_berubah')
-            .gte('waktu_selesai', startOfWibDayUtc);
-          const t = (logs || []).reduce((a, l) => a + (l.total_baru || 0) + (l.total_diperbarui || 0) + (l.total_tidak_berubah || 0), 0);
-          syncedToday = t;
-        } catch (e) { }
+        const syncedTodayFromLogs = (logs || []).reduce((a, l) => a + (l.total_baru || 0) + (l.total_diperbarui || 0) + (l.total_tidak_berubah || 0), 0);
+        let syncedToday = syncedTodayFromLogs;
 
         if (isCustom && activeRow.updated_at) {
           const updatedAt = parseDateMs(activeRow.updated_at);
@@ -755,17 +742,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           </div>
         `;
 
-        // Fetch Log Aktivitas (Maksimal 5 data terbaru untuk tampilan dashboard)
-        const limit = 5;
-        let logAktivitasList = [];
-        try {
-          const { data: logRes } = await supabase
-            .from('log_aktivitas_provinsi')
-            .select('*')
-            .order('waktu_selesai', { ascending: false })
-            .limit(limit);
-          logAktivitasList = logRes || [];
-        } catch (e) {}
+        // logAktivitasList sudah diambil secara paralel di awal (Promise.all)
 
         const paginationHtml = '<div style="font-size: 11px; color: var(--text-muted); text-align: right; margin-top: 6px;">Menampilkan maksimal 5 aktivitas sinkronisasi terbaru</div>';
 
@@ -1523,13 +1500,11 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
 
         updateDashboardUI(status);
 
-        // Jika terjadi transisi status atau provinsi berubah, perbarui tabel antrean & log penuh
+        // Jika terjadi transisi status atau pergantian provinsi, perbarui tabel antrean & log penuh
         if (lastKnownState) {
           const stateChanged = (lastKnownState.selesai !== status.selesai) ||
-                               (lastKnownState.bentukBerikutnya !== status.bentukBerikutnya) ||
                                (lastKnownState.isRunning !== status.isRunning) ||
-                               (lastKnownState.activeProvince !== status.activeProvince) ||
-                               (lastKnownState.activeRow?.total_dihapus !== status.activeRow?.total_dihapus);
+                               (lastKnownState.activeProvince !== status.activeProvince);
           if (stateChanged) {
             await fetchFullHtml();
           }
@@ -1833,9 +1808,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
     return new Response(html, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
-        'Pragma': 'no-cache',
-        'Expires': '0',
+        'Cache-Control': 'public, max-age=2, s-maxage=2, stale-while-revalidate=5',
       },
     });
   } catch (err) {

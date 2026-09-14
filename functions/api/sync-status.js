@@ -5,12 +5,20 @@ export async function onRequestGet(context) {
   try {
     const supabase = getSupabase(context.env);
 
-    const { data: results, error } = await supabase
-      .from('status_sinkronisasi')
-      .select('*')
-      .in('id', [1, 2]);
+    const nowWib = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    const wibDateStr = nowWib.toISOString().split('T')[0];
+    const startOfWibDayUtc = new Date(`${wibDateStr}T00:00:00+07:00`).toISOString();
+
+    const [
+      { data: results, error },
+      logsRes
+    ] = await Promise.all([
+      supabase.from('status_sinkronisasi').select('*').in('id', [1, 2]),
+      supabase.from('log_aktivitas_provinsi').select('total_baru, total_diperbarui, total_tidak_berubah').gte('waktu_selesai', startOfWibDayUtc)
+    ]);
 
     if (error) throw error;
+    const logs = logsRes.data || [];
 
     let row1 = results?.find((r) => r.id === 1) || { bentuk_aktif: 'tk', offset_terakhir: 0 };
     let row2 = results?.find((r) => r.id === 2);
@@ -74,22 +82,10 @@ export async function onRequestGet(context) {
     const isMandatoryUpdateDay = (currentDayOfWeek === 3 || currentDayOfWeek === 4);
     const batasAman = isMandatoryUpdateDay ? 350000 : 150000;
 
-    let syncedToday = 0;
-    try {
-      const nowWib = new Date(Date.now() + 7 * 60 * 60 * 1000);
-      const wibDateStr = nowWib.toISOString().split('T')[0];
-      const startOfWibDayUtc = new Date(`${wibDateStr}T00:00:00+07:00`).toISOString();
-
-      const { data: logs } = await supabase
-        .from('log_aktivitas_provinsi')
-        .select('total_baru, total_diperbarui, total_tidak_berubah')
-        .gte('waktu_selesai', startOfWibDayUtc);
-
-      syncedToday = (logs || []).reduce(
-        (acc, l) => acc + (l.total_baru || 0) + (l.total_diperbarui || 0) + (l.total_tidak_berubah || 0),
-        0
-      );
-    } catch (e) {}
+    let syncedToday = (logs || []).reduce(
+      (acc, l) => acc + (l.total_baru || 0) + (l.total_diperbarui || 0) + (l.total_tidak_berubah || 0),
+      0
+    );
 
     if (isCustom && activeRow.updated_at) {
       let t = new Date(activeRow.updated_at).getTime();
