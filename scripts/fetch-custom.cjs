@@ -569,9 +569,9 @@ async function fetchCustomData() {
       if (unrecognized_shapes < 0) unrecognized_shapes = 0;
       console.log(`Mengirim ${fullNpsnList.length} NPSN aktif ke Worker untuk deteksi penghapusan data... (Indikasi Bentuk Baru: ${unrecognized_shapes})`);
       if (unrecognized_shapes > 0) {
-        console.log(`⚠️ Terdeteksi ${unrecognized_shapes} sekolah dari bentuk pendidikan yang belum terdaftar! Menjalankan Discovery Scan...`);
-        const scanRes = await runDiscoveryScan(kodeWilayah, bentukList, currentTotalEstimasi, fullNpsnList, unrecognized_shapes);
-        if (scanRes && scanRes.nonQueryableSchools) {
+        console.log(`⚠️ Terdeteksi ${unrecognized_shapes} sekolah dari bentuk pendidikan yang belum terdaftar! Menjalankan Discovery Scan cerdas...`);
+        const scanRes = await runDiscoveryScan(kodeWilayah, bentukList, currentTotalEstimasi, fullNpsnList, unrecognized_shapes, allSchoolsByProv[kodeWilayah]);
+        if (scanRes && scanRes.nonQueryableSchools && scanRes.nonQueryableSchools.length > 0) {
           allSchoolsByProv[kodeWilayah].push(...scanRes.nonQueryableSchools);
         }
         if (scanRes && scanRes.nonQueryableCount > 0) {
@@ -832,7 +832,7 @@ async function fetchCustomData() {
   }
 }
 
-async function runDiscoveryScan(kodeWilayah, bentukList, totalEstimasi, fullNpsnList, unrecognizedCount) {
+async function runDiscoveryScan(kodeWilayah, bentukList, totalEstimasi, fullNpsnList, unrecognizedCount, schoolsList = []) {
   const limit = 20;
   const initialScannedShapes = new Set(bentukList.map(b => b.replace(/\s+/g, '-')));
   const scannedShapes = new Set(initialScannedShapes);
@@ -841,62 +841,30 @@ async function runDiscoveryScan(kodeWilayah, bentukList, totalEstimasi, fullNpsn
   const nonQueryableSchools = [];
   const allScannedSchools = [];
   let foundNew = false;
-  
-  const maxPages = totalEstimasi ? Math.ceil(totalEstimasi / limit) : 350;
-  
-  const concurrencyLimit = parseInt(process.env.DISCOVERY_CONCURRENCY || '20', 10) || 20;
-  console.log(`Menjalankan scan discovery sebanyak maksimal ${maxPages} halaman dengan concurrency limit ${concurrencyLimit}...`);
-  
   let isAborted = false;
   let foundUnrecognizedCount = 0;
   
-  const offsets = [];
-  for (let page = 0; page < maxPages; page++) {
-    offsets.push(page * limit);
-  }
-  
-  let offsetIndex = 0;
-  
-  const fetchPage = async (offset) => {
-    if (isAborted) return [];
-    const url = `${API_BASE}/${kodeWilayah}?limit=${limit}&offset=${offset}&sortBy=npsn`;
-    try {
-      const res = await fetch(url);
-      const json = await res.json();
-      return json.data || [];
-    } catch (err) {
-      console.error(`Discovery Scan gagal di offset ${offset}:`, err.message);
-      return [];
-    }
-  };
+  const existingNpsnSet = new Set((fullNpsnList || []).map(n => String(n)));
 
-  const processPage = async (offset) => {
-    if (isAborted) return;
-    
-    const data = await fetchPage(offset);
-    if (data.length === 0 || isAborted) {
-      return;
-    }
-    allScannedSchools.push(...data);
-    
-    for (const school of data) {
-      if (isAborted) break;
-      if (!school.bentukPendidikan) continue;
-      const bRaw = school.bentukPendidikan;
-      const bNormalized = bRaw.toLowerCase().trim().replace(/\s+/g, '-');
-      
+  const handleSchool = async (school) => {
+    if (!school || !school.npsn || isAborted) return;
+    const npsnStr = String(school.npsn);
+    const bRaw = school.bentukPendidikan || '';
+    const bNormalized = bRaw.toLowerCase().trim().replace(/\s+/g, '-');
+
+    if (!existingNpsnSet.has(npsnStr) || (bNormalized && !initialScannedShapes.has(bNormalized))) {
+      foundUnrecognizedCount++;
+      existingNpsnSet.add(npsnStr);
+
       if (bNormalized && !initialScannedShapes.has(bNormalized)) {
-        foundUnrecognizedCount++;
-        
         if (!testingShapes.has(bNormalized)) {
           const testPromise = (async () => {
-            if (isAborted) return false;
             const testUrl = `${API_BASE}/${kodeWilayah}?limit=1&offset=0&bentukPendidikan=${bNormalized}`;
             try {
               const testRes = await fetch(testUrl);
               const testText = await testRes.text();
               if (testRes.status === 400 || testText.includes("invalid bentuk pendidikan")) {
-                console.log(`⚠️ Bentuk pendidikan "${bRaw}" (${bNormalized}) tidak dapat dikueri di API filter (400 Bad Request). Akan disinkronkan manual.`);
+                console.log(`⚠️ Bentuk pendidikan "${bRaw}" (${bNormalized}) tidak dapat dikueri di API filter (400 Bad Request). Ditandai non-queryable.`);
                 return false;
               } else {
                 console.log(`✨ Menemukan bentuk pendidikan baru queryable dari API: "${bNormalized}" (${bRaw}) di sekolah "${school.nama}"`);
@@ -908,19 +876,16 @@ async function runDiscoveryScan(kodeWilayah, bentukList, totalEstimasi, fullNpsn
                 if (addRes.ok) {
                   console.log(`✅ Berhasil mendaftarkan bentuk "${bNormalized}" ke database.`);
                   return true;
-                } else {
-                  console.error(`⚠️ Gagal mendaftarkan bentuk "${bNormalized}":`, await addRes.text());
-                  return false;
                 }
+                return false;
               }
             } catch (err) {
-              console.error(`Gagal menguji keabsahan bentuk "${bNormalized}":`, err.message);
               return false;
             }
           })();
           testingShapes.set(bNormalized, testPromise);
         }
-        
+
         const isValid = await testingShapes.get(bNormalized);
         if (isValid) {
           if (!scannedShapes.has(bNormalized)) {
@@ -929,53 +894,148 @@ async function runDiscoveryScan(kodeWilayah, bentukList, totalEstimasi, fullNpsn
             foundNew = true;
           }
         } else {
-          if (school.npsn) {
-            nonQueryableSchools.push(school);
-            if (!fullNpsnList.includes(school.npsn)) {
-              fullNpsnList.push(school.npsn);
-            }
+          nonQueryableSchools.push(school);
+          if (!fullNpsnList.includes(npsnStr)) {
+            fullNpsnList.push(npsnStr);
           }
         }
-        
-        if (unrecognizedCount !== undefined && foundUnrecognizedCount >= unrecognizedCount) {
-          console.log(`🎯 Berhasil menemukan seluruh (${unrecognizedCount}) sekolah bentuk baru/non-queryable. Menghentikan scan discovery lebih awal!`);
-          isAborted = true;
-          break;
+      } else {
+        nonQueryableSchools.push(school);
+        if (!fullNpsnList.includes(npsnStr)) {
+          fullNpsnList.push(npsnStr);
         }
+      }
+
+      if (unrecognizedCount !== undefined && foundUnrecognizedCount >= unrecognizedCount) {
+        console.log(`🎯 Berhasil menemukan seluruh (${unrecognizedCount}) sekolah bentuk baru/non-queryable. Menghentikan scan discovery lebih awal!`);
+        isAborted = true;
       }
     }
   };
 
-  const runWorker = async () => {
-    while (offsetIndex < offsets.length && !isAborted) {
-      const currentOffset = offsets[offsetIndex++];
-      await processPage(currentOffset);
-    }
-  };
+  // 1. STRATEGI CEPAT: Analisis defisit per-kabupaten jika data sub-wilayah tersedia
+  let ranKabScan = false;
+  try {
+    const jumlahRes = await fetch(`${API_JUMLAH_BASE}/${kodeWilayah}?limit=100&offset=0`);
+    if (jumlahRes.ok) {
+      const jumlahJson = await jumlahRes.json();
+      const kabList = (jumlahJson.data || []).filter(k => k.kodeWilayah && k.total > 0);
+      if (kabList.length > 0) {
+        // Hitung sekolah yang sudah ditarik per kabupaten
+        const pulledByKab = new Map();
+        for (const s of schoolsList) {
+          const kabClean = (s.namaKabupaten || '').toUpperCase().replace(/^KAB\.\s*|^KOTA\s*/i, '').trim();
+          if (kabClean) pulledByKab.set(kabClean, (pulledByKab.get(kabClean) || 0) + 1);
+        }
 
-  const workers = [];
-  for (let i = 0; i < Math.min(concurrencyLimit, offsets.length); i++) {
-    workers.push(runWorker());
+        const deficitKabs = [];
+        for (const k of kabList) {
+          const cleanK = (k.namaWilayah || '').toUpperCase().replace(/^KAB\.\s*|^KOTA\s*/i, '').trim();
+          let count = 0;
+          for (const [kName, c] of pulledByKab.entries()) {
+            if (kName === cleanK || kName.includes(cleanK) || cleanK.includes(kName)) {
+              count += c;
+            }
+          }
+          if (count < k.total) {
+            deficitKabs.push({ kode: k.kodeWilayah, nama: k.namaWilayah, total: k.total, pulled: count, diff: k.total - count });
+          }
+        }
+
+        if (deficitKabs.length > 0) {
+          console.log(`⚡ Discovery Cerdas mendeteksi ${deficitKabs.length} wilayah dengan selisih:`, deficitKabs.map(d => `${d.nama} (${d.diff})`).join(', '));
+          ranKabScan = true;
+          for (const dKab of deficitKabs) {
+            if (isAborted) break;
+            const maxKabPages = Math.ceil(dKab.total / limit);
+            for (let p = 0; p < maxKabPages; p++) {
+              if (isAborted) break;
+              const off = p * limit;
+              const kabUrl = `${API_BASE}/${dKab.kode}?limit=${limit}&offset=${off}`;
+              try {
+                const r = await fetch(kabUrl);
+                const j = await r.json();
+                const dList = j.data || [];
+                if (dList.length === 0) break;
+                for (const sc of dList) {
+                  await handleSchool(sc);
+                  if (isAborted) break;
+                }
+              } catch (err) {
+                console.error(`Gagal scan discovery kab ${dKab.nama} offset ${off}:`, err.message);
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (errKab) {
+    console.warn(`Peringatan: Gagal menjalankan discovery scan per-kabupaten: ${errKab.message}`);
   }
 
-  await Promise.all(workers);
-  
+  // 2. FALLBACK: Scan tingkat provinsi jika scan per-kabupaten belum menemukan semua selisih
+  if (!isAborted && (!ranKabScan || (unrecognizedCount !== undefined && foundUnrecognizedCount < unrecognizedCount))) {
+    const maxPages = totalEstimasi ? Math.ceil(totalEstimasi / limit) : 350;
+    const concurrencyLimit = parseInt(process.env.DISCOVERY_CONCURRENCY || '20', 10) || 20;
+    console.log(`Menjalankan scan fallback discovery provinsi maksimal ${maxPages} halaman (concurrency ${concurrencyLimit})...`);
+    
+    const offsets = [];
+    for (let page = 0; page < maxPages; page++) offsets.push(page * limit);
+    let offsetIndex = 0;
+
+    const fetchPage = async (offset) => {
+      if (isAborted) return [];
+      const url = `${API_BASE}/${kodeWilayah}?limit=${limit}&offset=${offset}&sortBy=npsn`;
+      try {
+        const res = await fetch(url);
+        const json = await res.json();
+        return json.data || [];
+      } catch (err) {
+        return [];
+      }
+    };
+
+    const processPage = async (offset) => {
+      if (isAborted) return;
+      const data = await fetchPage(offset);
+      if (data.length === 0 || isAborted) return;
+      allScannedSchools.push(...data);
+      for (const school of data) {
+        if (isAborted) break;
+        await handleSchool(school);
+      }
+    };
+
+    const runWorker = async () => {
+      while (offsetIndex < offsets.length && !isAborted) {
+        const currentOffset = offsets[offsetIndex++];
+        await processPage(currentOffset);
+      }
+    };
+
+    const workers = [];
+    for (let i = 0; i < Math.min(concurrencyLimit, offsets.length); i++) {
+      workers.push(runWorker());
+    }
+    await Promise.all(workers);
+  }
+
   if (nonQueryableSchools.length > 0) {
     console.log(`Upserting ${nonQueryableSchools.length} sekolah dengan bentuk pendidikan non-queryable langsung ke database...`);
     try {
       await postBatchToWorker(nonQueryableSchools, 'ALL', 0, false);
-      console.log(`✅ Sukses menyinkronkan langsung sekolah non-queryable.`);
+      console.log(`✅ Sukses menyinkronkan langsung ${nonQueryableSchools.length} sekolah non-queryable.`);
     } catch (e) {
       console.error(`⚠️ Gagal menyinkronkan langsung sekolah non-queryable:`, e.message);
     }
   }
-  
+
   if (foundNew) {
     console.log(`💡 Pendaftaran bentuk baru selesai. Silakan jalankan ulang sinkronisasi agar data bentuk baru ini ditarik penuh.`);
   } else {
-    console.log(`Discovery Scan selesai. Tidak ada bentuk pendidikan baru yang dapat dikueri.`);
+    console.log(`Discovery Scan selesai. Ditemukan ${nonQueryableSchools.length} data non-queryable.`);
   }
-  
+
   return {
     foundNew,
     nonQueryableCount: nonQueryableSchools.length,

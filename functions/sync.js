@@ -1565,11 +1565,14 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           .on('postgres_changes', { event: '*', schema: 'public', table: 'status_sinkronisasi' }, function(payload) {
             doAutoReload();
           })
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'log_aktivitas_provinsi' }, function(payload) {
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'log_aktivitas_provinsi' }, function(payload) {
             doAutoReload();
             fetchFullHtml();
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'provinsi_sync_status' }, function(payload) {
+            fetchFullHtml();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'cache_data' }, function(payload) {
             fetchFullHtml();
           })
           .subscribe();

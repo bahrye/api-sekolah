@@ -141,11 +141,11 @@ export async function onRequestGet(context) {
       }
 
       const raw_selisih = item.total_api - dbTotal;
+      const unrecShapesInDb = (raw_selisih <= 0) ? 0 : Math.min(raw_selisih, syncInfo?.api_unrecognized_shapes || 0);
       let selisih = raw_selisih;
       if (raw_selisih > 0) {
         const effDuplicates = (syncInfo?.api_duplicates || 0);
-        const effUnrecognized = Math.min(raw_selisih, syncInfo?.api_unrecognized_shapes || 0);
-        selisih = Math.max(0, raw_selisih - effDuplicates - effUnrecognized);
+        selisih = Math.max(0, raw_selisih - effDuplicates - unrecShapesInDb);
       }
       const is_sinkron_walau_selisih = (selisih === 0);
       const extra_in_db = Math.max(0, dbTotal - item.total_api);
@@ -162,7 +162,7 @@ export async function onRequestGet(context) {
         terakhir_sukses: syncInfo?.terakhir_sukses || null,
         api_duplicates: syncInfo?.api_duplicates || 0,
         api_empty_npsn: syncInfo?.api_empty_npsn || 0,
-        api_unrecognized_shapes: syncInfo?.api_unrecognized_shapes || 0,
+        api_unrecognized_shapes: unrecShapesInDb,
       };
     });
 

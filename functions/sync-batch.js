@@ -167,12 +167,15 @@ export async function onRequestPost(context) {
           await supabase.from('status_sinkronisasi').update(statUpdate).in('id', [1, 2]);
         } catch (eStat) {}
 
+        const remainingUnrecognized = Math.max(0, (customParams.totalEstimasi || 0) - currentDbCount);
+        const resolvedUnrecognized = Math.min(customParams.unrecognized_shapes ?? remainingUnrecognized, remainingUnrecognized);
+
         const provStatusData = {
           nama_provinsi: body.namaProvinsi,
           terakhir_sukses: new Date().toISOString(),
           api_duplicates: customParams.duplicates?.length || 0,
           api_empty_npsn: totalTanpaNpsn,
-          api_unrecognized_shapes: customParams.nonQueryableCount ?? (customParams.unrecognized_shapes || 0),
+          api_unrecognized_shapes: resolvedUnrecognized,
         };
         if (currentDbCount > 0) {
           provStatusData.total_db = currentDbCount;
@@ -189,7 +192,7 @@ export async function onRequestPost(context) {
           total_diperbarui: finalDiperbarui,
           total_dihapus: totalDihapus,
           total_tidak_berubah: finalTidakBerubah,
-          total_non_queryable: provStatusData.api_unrecognized_shapes || 0,
+          total_non_queryable: customParams.nonQueryableCount || resolvedUnrecognized || 0,
           waktu_selesai: new Date().toISOString(),
         });
         if (logErr) {
@@ -234,7 +237,7 @@ export async function onRequestPost(context) {
               item.terakhir_sukses = new Date().toISOString();
               item.api_duplicates = customParams.duplicates?.length || 0;
               item.api_empty_npsn = totalTanpaNpsn || 0;
-              item.api_unrecognized_shapes = customParams.nonQueryableCount ?? (customParams.unrecognized_shapes || 0);
+              item.api_unrecognized_shapes = resolvedUnrecognized;
               item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);
               let selisihVal = item.raw_selisih;
               if (item.raw_selisih > 0) {
