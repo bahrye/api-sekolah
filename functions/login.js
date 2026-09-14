@@ -641,20 +641,20 @@ function renderDashboard({
     const queuePos = qIdx + 1;
 
     if (isThisProvActive) {
-      actionBtnHtml = `<button class="btn-action btn-cancel" onclick="confirmCancelSync('${d.nama.replace(/'/g, "\\'")}')" title="Batalkan proses sinkronisasi ${d.nama}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6m0-6l6 6"/></svg> Batalkan Sinkron</button>`;
+      actionBtnHtml = `<button class="btn-action btn-cancel" onclick="onCancelSyncClick(this)" title="Batalkan proses sinkronisasi ${d.nama}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6m0-6l6 6"/></svg> Batalkan Sinkron</button>`;
     } else if (inQueue) {
       actionBtnHtml = `<div class="queue-action-group">
         <span class="badge-queue"><span class="queue-pulse"></span> Antrian #${queuePos}</span>
-        <button class="btn-cancel-queue" onclick="executeCancelQueue('${d.nama.replace(/'/g, "\\'")}')" title="Batalkan antrean ${d.nama}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Batal Antrian</button>
+        <button class="btn-cancel-queue" onclick="onCancelQueueClick(this)" title="Batalkan antrean ${d.nama}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Batal Antrian</button>
       </div>`;
     } else if (isRunning) {
-      actionBtnHtml = `<button class="btn-action btn-add-queue" onclick="executeAddToQueue('${d.nama.replace(/'/g, "\\'")}')" title="Tambahkan ${d.nama} ke antrean sinkronisasi berikutnya"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg> + Antrian</button>`;
+      actionBtnHtml = `<button class="btn-action btn-add-queue" onclick="onAddQueueClick(this)" title="Tambahkan ${d.nama} ke antrean sinkronisasi berikutnya"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg> + Antrian</button>`;
     } else {
-      actionBtnHtml = `<button class="btn-action btn-trigger" onclick="confirmTriggerSync('${d.nama.replace(/'/g, "\\'")}')" title="Picu GitHub Action untuk ${d.nama}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Sinkronkan</button>`;
+      actionBtnHtml = `<button class="btn-action btn-trigger" onclick="onTriggerClick(this)" title="Picu GitHub Action untuk ${d.nama}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Sinkronkan</button>`;
     }
 
     return `
-      <tr class="${trClass}" data-prov="${cleanName(d.nama)}">
+      <tr class="${trClass}" data-prov="${cleanName(d.nama)}" data-prov-name="${d.nama.replace(/"/g, '&quot;')}">
         <td style="text-align: center; color: var(--text-muted); font-size: 12px; font-weight: 600;">${idx + 1}</td>
         <td>
           <div style="font-weight: 700; color: var(--text-main);">${d.nama}</div>
@@ -1242,20 +1242,36 @@ function renderDashboard({
           <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Status Sinkronisasi Sistem</div>
           <div id="live-state-wrapper">
             ${isRunning ? `
-              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                <div class="live-badge running">
-                  <span class="pulse-dot"></span>
-                  <span>Sedang Menyinkronkan — <strong>${activeProvince || 'Semua Wilayah'}</strong></span>
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                  <div class="live-badge running">
+                    <span class="pulse-dot"></span>
+                    <span>Sedang Menyinkronkan — <strong>${activeProvince || 'Semua Wilayah'}</strong></span>
+                  </div>
+                  <button class="btn-action btn-cancel" style="padding: 5px 12px; font-size: 11px;" onclick="confirmCancelSync()" title="Hentikan dan batalkan proses sinkronisasi">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6m0-6l6 6"/></svg>
+                    Batalkan Sinkron
+                  </button>
                 </div>
-                <button class="btn-action btn-cancel" style="padding: 5px 12px; font-size: 11px;" onclick="confirmCancelSync('${(activeProvince || '').replace(/'/g, "\\'")}')" title="Hentikan dan batalkan proses sinkronisasi">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6m0-6l6 6"/></svg>
-                  Batalkan Sinkron
-                </button>
+                ${initialQueue.length > 0 ? `
+                  <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; font-size: 11px; color: #cbd5e1;">
+                    <span style="color: #fbbf24; font-weight: 700;">Antrean Menanti:</span>
+                    ${initialQueue.map((q, idx) => `<span class="badge-queue" style="padding: 3px 8px; font-size: 10px;">#${idx + 1} ${q.provinsi}</span>`).join(' ')}
+                  </div>
+                ` : ''}
               </div>
             ` : `
-              <div class="live-badge idle">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                <span>Sistem Siap (Idle) — Dapat Memulai Sinkronisasi Manual</span>
+              <div>
+                <div class="live-badge idle">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                  <span>Sistem Siap (Idle) — Dapat Memulai Sinkronisasi Manual</span>
+                </div>
+                ${initialQueue.length > 0 ? `
+                  <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; font-size: 11px; color: #cbd5e1;">
+                    <span style="color: #fbbf24; font-weight: 700;">Antrean Menanti:</span>
+                    ${initialQueue.map((q, idx) => `<span class="badge-queue" style="padding: 3px 8px; font-size: 10px;">#${idx + 1} ${q.provinsi}</span>`).join(' ')}
+                  </div>
+                ` : ''}
               </div>
             `}
           </div>
@@ -1408,6 +1424,36 @@ function renderDashboard({
     let selectedProv = null;
     let isCurrentlyRunning = ${isRunning ? 'true' : 'false'};
     let currentQueue = ${JSON.stringify(initialQueue || [])};
+    let activeSyncProvName = ${JSON.stringify(activeProvince || '')};
+
+    function cleanName(name) {
+      if (!name) return '';
+      return String(name).replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/^PROVINSI|^PROV/, '');
+    }
+
+    function getProvFromButton(btn) {
+      return btn?.closest('tr')?.getAttribute('data-prov-name') || btn?.closest('tr')?.querySelector('td:nth-child(2) div:first-child')?.innerText?.trim() || '';
+    }
+
+    function onTriggerClick(btn) {
+      const prov = getProvFromButton(btn);
+      if (prov) confirmTriggerSync(prov);
+    }
+
+    function onCancelSyncClick(btn) {
+      const prov = getProvFromButton(btn) || activeSyncProvName;
+      confirmCancelSync(prov);
+    }
+
+    function onAddQueueClick(btn) {
+      const prov = getProvFromButton(btn);
+      if (prov) executeAddToQueue(prov);
+    }
+
+    function onCancelQueueClick(btn) {
+      const prov = getProvFromButton(btn);
+      if (prov) executeCancelQueue(prov);
+    }
 
     function showToast(msg, isSuccess = true) {
       const toast = document.getElementById('toast');
@@ -1475,6 +1521,7 @@ function renderDashboard({
 
         // Update state lokal seketika
         isCurrentlyRunning = true;
+        activeSyncProvName = selectedProv;
         updateButtonsState(true, selectedProv);
         pollSyncStatus();
       } catch (err) {
@@ -1488,7 +1535,7 @@ function renderDashboard({
     let cancelTargetProv = null;
     let cancelCooldownUntil = 0;
     function confirmCancelSync(provName) {
-      cancelTargetProv = provName || 'yang sedang berjalan';
+      cancelTargetProv = provName || activeSyncProvName || 'yang sedang berjalan';
       const el = document.getElementById('cancel-modal-prov-name');
       if (el) el.innerText = cancelTargetProv;
       const modal = document.getElementById('modal-cancel-confirm');
@@ -1535,6 +1582,7 @@ function renderDashboard({
         btn.disabled = false;
         btn.innerText = 'Ya, Batalkan Sinkron';
       }
+    }
     // Antrean Sinkronisasi (Queue)
     async function executeAddToQueue(provName) {
       const tr = document.querySelector('tr[data-prov="' + cleanName(provName) + '"]');
@@ -1682,7 +1730,10 @@ function renderDashboard({
       if (queueList !== null && Array.isArray(queueList)) {
         currentQueue = queueList;
       }
-      const cleanAct = activeProvName ? activeProvName.replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/^PROVINSI|^PROV/, '') : null;
+      if (activeProvName) {
+        activeSyncProvName = activeProvName;
+      }
+      const cleanAct = activeProvName ? cleanName(activeProvName) : null;
       const liveWrapper = document.getElementById('live-state-wrapper');
 
       if (liveWrapper) {
@@ -1695,11 +1746,10 @@ function renderDashboard({
         }
 
         if (running) {
-          const safeActStr = (activeProvName || '').replace(/'/g, "\\'");
           liveWrapper.innerHTML = '<div>' +
             '<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">' +
             '<div class="live-badge running"><span class="pulse-dot"></span><span>Sedang Menyinkronkan — <strong>' + (activeProvName || 'Semua Wilayah') + '</strong></span></div>' +
-            '<button class="btn-action btn-cancel" style="padding: 5px 12px; font-size: 11px;" onclick="confirmCancelSync(\'' + safeActStr + '\')" title="Hentikan dan batalkan proses sinkronisasi">' +
+            '<button class="btn-action btn-cancel" style="padding: 5px 12px; font-size: 11px;" onclick="confirmCancelSync()" title="Hentikan dan batalkan proses sinkronisasi">' +
             '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6m0-6l6 6"/></svg> Batalkan Sinkron</button>' +
             '</div>' +
             queueBadgesHtml +
@@ -1720,8 +1770,6 @@ function renderDashboard({
         if (!statusCell || !actionCell) return;
 
         const isThis = cleanAct && (p === cleanAct);
-        const rawProv = tr.querySelector('td:nth-child(2) div:first-child')?.innerText || '';
-        const safeRawProv = rawProv.replace(/'/g, "\\'");
 
         // Cek posisi di antrean
         const qIdx = (currentQueue || []).findIndex(q => cleanName(q.provinsi) === p);
@@ -1731,7 +1779,7 @@ function renderDashboard({
         if (isThis) {
           tr.classList.add('row-active');
           statusCell.innerHTML = '<span class="status-pill active-sync"><svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Sedang Sinkron</span>';
-          actionCell.innerHTML = '<button class="btn-action btn-cancel" onclick="confirmCancelSync(\'' + safeRawProv + '\')" title="Batalkan sinkronisasi ' + rawProv + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6m0-6l6 6"/></svg> Batalkan Sinkron</button>';
+          actionCell.innerHTML = '<button class="btn-action btn-cancel" onclick="onCancelSyncClick(this)" title="Batalkan proses sinkronisasi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6m0-6l6 6"/></svg> Batalkan Sinkron</button>';
         } else {
           tr.classList.remove('row-active');
           if (statusCell.hasAttribute('data-default-status')) {
@@ -1741,12 +1789,12 @@ function renderDashboard({
           if (inQueue) {
             actionCell.innerHTML = '<div class="queue-action-group">' +
               '<span class="badge-queue"><span class="queue-pulse"></span> Antrian #' + queuePos + '</span>' +
-              '<button class="btn-cancel-queue" onclick="executeCancelQueue(\'' + safeRawProv + '\')" title="Batalkan antrean ' + rawProv + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Batal Antrian</button>' +
+              '<button class="btn-cancel-queue" onclick="onCancelQueueClick(this)" title="Batalkan antrean"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Batal Antrian</button>' +
               '</div>';
           } else if (running) {
-            actionCell.innerHTML = '<button class="btn-action btn-add-queue" onclick="executeAddToQueue(\'' + safeRawProv + '\')" title="Tambahkan ' + rawProv + ' ke antrean sinkronisasi berikutnya"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg> + Antrian</button>';
+            actionCell.innerHTML = '<button class="btn-action btn-add-queue" onclick="onAddQueueClick(this)" title="Tambahkan ke antrean sinkronisasi berikutnya"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg> + Antrian</button>';
           } else {
-            actionCell.innerHTML = '<button class="btn-action btn-trigger" onclick="confirmTriggerSync(\'' + safeRawProv + '\')" title="Picu GitHub Action untuk ' + rawProv + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Sinkronkan</button>';
+            actionCell.innerHTML = '<button class="btn-action btn-trigger" onclick="onTriggerClick(this)" title="Picu sinkronisasi manual"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Sinkronkan</button>';
           }
         }
       });
