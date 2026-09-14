@@ -104,6 +104,10 @@ async function postBatchToWorker(dataList, bentukAktif, offset, isFinished, cust
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
     body: JSON.stringify(payload)
   });
+  const ct = res.headers.get('content-type') || '';
+  if (res.status === 429 || res.status === 405 || ct.includes('text/html')) {
+    throw new Error(`Cloudflare Worker limit / tidak merespons API (Status ${res.status}). Kuota harian Cloudflare (100k req/hari) kemungkinan telah tercapai.`);
+  }
   const resJson = await res.json().catch(() => ({}));
   if (resJson && resJson.cancelled) {
     console.log('🛑 Sinkronisasi telah dibatalkan dari panel kontrol. Menghentikan workflow runner.');
@@ -167,6 +171,10 @@ async function fetchCustomData() {
     try {
       console.log(`Mengambil daftar bentuk pendidikan dinamis dari Worker...`);
       const res = await fetch(`${WORKER_URL}/api/bentuk-pendidikan`);
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        throw new Error(`Worker mengembalikan respons non-JSON (${ct || 'HTML'}). Kuota harian Cloudflare kemungkinan sedang limit.`);
+      }
       const json = await res.json();
       if (json.ok && json.data && json.data.length > 0) {
         bentukList = json.data;
@@ -237,6 +245,10 @@ async function fetchCustomData() {
       console.log(`Mengambil data perbandingan terbaru (Smart Sync) dari ${WORKER_URL}/api/compare?refresh=true...`);
       const compareRes = await fetch(`${WORKER_URL}/api/compare?refresh=true`);
       if (compareRes.ok) {
+        const compareCt = compareRes.headers.get('content-type') || '';
+        if (!compareCt.includes('application/json')) {
+          throw new Error(`API perbandingan mengembalikan respons bukan JSON (${compareCt || 'HTML'}). Kuota harian Cloudflare 100k kemungkinan telah habis.`);
+        }
         const compareJson = await compareRes.json();
         if (compareJson.success && compareJson.data) {
           // Cek semua provinsi yang ada selisih (selisih != 0)
@@ -468,6 +480,10 @@ async function fetchCustomData() {
         console.log(`🔍 Memeriksa progres sinkronisasi terakhir dari server (${WORKER_URL}/api/sync-status)...`);
         const statusRes = await fetch(`${WORKER_URL}/api/sync-status`);
         if (statusRes.ok) {
+          const sCt = statusRes.headers.get('content-type') || '';
+          if (!sCt.includes('application/json')) {
+            throw new Error(`Respons bukan JSON (${sCt || 'HTML'}). Kuota Worker limit.`);
+          }
           const statusJson = await statusRes.json();
           if (statusJson) {
             // Guard kuota harian sebelum me-resume
