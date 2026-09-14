@@ -104,8 +104,13 @@ async function postBatchToWorker(dataList, bentukAktif, offset, isFinished, cust
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
     body: JSON.stringify(payload)
   });
-  if (!res.ok) throw new Error('Gagal push batch ke Worker: ' + await res.text());
-  return await res.json();
+  const resJson = await res.json().catch(() => ({}));
+  if (resJson && resJson.cancelled) {
+    console.log('🛑 Sinkronisasi telah dibatalkan dari panel kontrol. Menghentikan workflow runner.');
+    process.exit(0);
+  }
+  if (!res.ok) throw new Error('Gagal push batch ke Worker: ' + (resJson.message || JSON.stringify(resJson)));
+  return resJson;
 }
 
 async function cancelQueuedRunsGithub() {

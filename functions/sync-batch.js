@@ -45,6 +45,17 @@ export async function onRequestPost(context) {
       .eq('id', targetId)
       .single();
 
+    // Jika proses telah dibatalkan oleh admin (bentuk_aktif === 'Selesai') dan bukan awal baru, tolak batch agar runner berhenti
+    if (!body.isStart && currentStatus && currentStatus.bentuk_aktif === 'Selesai') {
+      return new Response(
+        JSON.stringify({ ok: false, cancelled: true, message: 'Sinkronisasi telah dibatalkan dari panel kontrol.' }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     let totalBaru = stats.baru;
     let totalDiperbarui = stats.diperbarui;
     let totalTidakBerubah = stats.tidakBerubah;

@@ -82,11 +82,18 @@ export async function onRequestPost(context) {
 
     // 3. Reset status_sinkronisasi di Supabase agar status langsung menjadi Selesai (Idle)
     const nowIso = new Date().toISOString();
+    const fiveMinsAgo = new Date(Date.now() - 300 * 1000).toISOString();
     await supabase
       .from('status_sinkronisasi')
       .update({
         bentuk_aktif: 'Selesai',
-        updated_at: nowIso,
+        offset_terakhir: 0,
+        total_baru: 0,
+        total_diperbarui: 0,
+        total_tidak_berubah: 0,
+        total_dihapus: 0,
+        total_tanpa_npsn: 0,
+        updated_at: fiveMinsAgo,
         waktu_selesai_terakhir: nowIso,
       })
       .in('id', [1, 2]);

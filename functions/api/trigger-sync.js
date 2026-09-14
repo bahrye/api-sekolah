@@ -50,22 +50,41 @@ export async function onRequestPost(context) {
       .select('*')
       .order('id', { ascending: true });
 
-    const activeRow = statusRows?.find(r => r.id === 1) || {};
+    const row1 = statusRows?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakhir: 0 };
+    const row2 = statusRows?.find(r => r.id === 2);
+    let activeRow = row1;
+    let isCustom = false;
+    if (row2 && row2.updated_at && row1.updated_at) {
+      const t1 = new Date(row1.updated_at).getTime();
+      const t2 = new Date(row2.updated_at).getTime();
+      if (t2 > t1) {
+        activeRow = row2;
+        isCustom = true;
+      }
+    } else if (row2 && !row1.updated_at) {
+      activeRow = row2;
+      isCustom = true;
+    }
+
     const bentukBerikutnya = activeRow.bentuk_aktif || '';
-    const isCustom = bentukBerikutnya.includes('(');
     const offsetBerikutnya = activeRow.offset_terakhir || 0;
-    const selesai = isCustom
-      ? (bentukBerikutnya === 'Selesai')
-      : (bentukBerikutnya === 'tk' && offsetBerikutnya === 0 && activeRow.waktu_selesai_terakhir !== null);
+    const isExplicitlyFinished = Boolean(
+      bentukBerikutnya && (bentukBerikutnya === 'Selesai' || bentukBerikutnya.toLowerCase() === 'selesai')
+    );
+    const selesai = isExplicitlyFinished || (
+      isCustom
+        ? false
+        : (bentukBerikutnya === 'tk' && offsetBerikutnya === 0 && activeRow.waktu_selesai_terakhir !== null)
+    );
 
     let isRunning = false;
     let activeProvince = null;
-    if (bentukBerikutnya) {
+    if (bentukBerikutnya && !isExplicitlyFinished) {
       const match = bentukBerikutnya.match(/\((.*?)\)/);
       if (match) activeProvince = match[1];
     }
 
-    if (activeRow.updated_at && !selesai) {
+    if (!isExplicitlyFinished && activeRow.updated_at && !selesai) {
       const lastUpdatedMs = parseDateMs(activeRow.updated_at);
       if (lastUpdatedMs > 0 && (Date.now() - lastUpdatedMs < 120 * 1000)) {
         isRunning = true;

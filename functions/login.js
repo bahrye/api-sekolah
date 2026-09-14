@@ -151,18 +151,23 @@ export async function onRequestGet(context) {
 
     const bentukBerikutnya = activeRow.bentuk_aktif || '';
     const offsetBerikutnya = activeRow.offset_terakhir || 0;
-    const selesai = isCustom
-      ? (bentukBerikutnya === 'Selesai')
-      : (bentukBerikutnya === 'tk' && offsetBerikutnya === 0 && activeRow.waktu_selesai_terakhir !== null);
+    const isExplicitlyFinished = Boolean(
+      bentukBerikutnya && (bentukBerikutnya === 'Selesai' || bentukBerikutnya.toLowerCase() === 'selesai')
+    );
+    const selesai = isExplicitlyFinished || (
+      isCustom
+        ? false
+        : (bentukBerikutnya === 'tk' && offsetBerikutnya === 0 && activeRow.waktu_selesai_terakhir !== null)
+    );
 
     let activeProvince = null;
-    if (activeRow.bentuk_aktif) {
+    if (activeRow.bentuk_aktif && !isExplicitlyFinished) {
       const match = activeRow.bentuk_aktif.match(/\((.*?)\)/);
       if (match) activeProvince = match[1];
     }
 
     let isRunning = false;
-    if (activeRow.updated_at && !selesai) {
+    if (!isExplicitlyFinished && activeRow.updated_at && !selesai) {
       const lastUpdatedMs = parseDateMs(activeRow.updated_at);
       if (lastUpdatedMs > 0 && (Date.now() - lastUpdatedMs < 120 * 1000)) {
         isRunning = true;
@@ -1402,11 +1407,18 @@ function renderDashboard({
 
     // Modal Cancel Sync
     let cancelTargetProv = null;
+    let cancelCooldownUntil = 0;
     function confirmCancelSync(provName) {
       cancelTargetProv = provName || 'yang sedang berjalan';
       const el = document.getElementById('cancel-modal-prov-name');
       if (el) el.innerText = cancelTargetProv;
-      document.getElementById('modal-cancel-confirm').style.display = 'flex';
+      const modal = document.getElementById('modal-cancel-confirm');
+      if (modal) {
+        modal.style.display = 'flex';
+        setTimeout(() => {
+          document.getElementById('btn-do-cancel')?.focus();
+        }, 50);
+      }
     }
 
     function closeCancelModal() {
@@ -1433,10 +1445,11 @@ function renderDashboard({
         closeCancelModal();
         showToast(data.message || 'Sinkronisasi berhasil dibatalkan!');
 
-        // Update state lokal seketika agar tombol kembali ke Sinkronkan
+        // Update state lokal seketika agar tombol kembali ke Sinkronkan dan tahan selama 6 detik dari polling
         isCurrentlyRunning = false;
+        cancelCooldownUntil = Date.now() + 6000;
         updateButtonsState(false, null);
-        pollSyncStatus();
+        setTimeout(pollSyncStatus, 1500);
       } catch (err) {
         showToast(err.message, false);
       } finally {
@@ -1584,6 +1597,10 @@ function renderDashboard({
 
     // Polling Status Realtime
     async function pollSyncStatus() {
+      if (Date.now() < cancelCooldownUntil) {
+        setTimeout(pollSyncStatus, 2000);
+        return;
+      }
       try {
         const res = await fetch('/api/sync-status?_t=' + Date.now(), { cache: 'no-store' });
         if (res.ok) {

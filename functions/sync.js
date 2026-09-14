@@ -158,20 +158,28 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           progressPercent = Math.max(0, Math.round((currentIndex / VALID_BENTUK.length) * 100));
         }
 
-        const selesai = isCustom ? (bentukBerikutnya === 'Selesai') : (bentukBerikutnya === 'tk' && offsetBerikutnya === 0 && activeRow.waktu_selesai_terakhir !== null && progressPercent === 0);
+        const isExplicitlyFinished = Boolean(
+          bentukBerikutnya && (bentukBerikutnya === 'Selesai' || bentukBerikutnya.toLowerCase() === 'selesai')
+        );
+
+        const selesai = isExplicitlyFinished || (
+          isCustom
+            ? false
+            : (bentukBerikutnya === 'tk' && offsetBerikutnya === 0 && activeRow.waktu_selesai_terakhir !== null && progressPercent === 0)
+        );
 
         if (selesai) {
           progressPercent = 100;
         }
 
         let activeProvince = null;
-        if (activeRow.bentuk_aktif) {
+        if (activeRow.bentuk_aktif && !isExplicitlyFinished) {
           const match = activeRow.bentuk_aktif.match(/\((.*?)\)/);
           if (match) activeProvince = match[1];
         }
 
         let isRunning = false;
-        if (activeRow.updated_at && !selesai) {
+        if (!isExplicitlyFinished && activeRow.updated_at && !selesai) {
           const lastUpdatedMs = parseDateMs(activeRow.updated_at);
           if (lastUpdatedMs > 0 && (Date.now() - lastUpdatedMs < 120 * 1000)) { // 120 detik (2 menit)
             isRunning = true;
