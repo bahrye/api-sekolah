@@ -639,7 +639,7 @@ function renderDashboard({
     // Action button state
     let actionBtnHtml = '';
     if (isThisProvActive) {
-      actionBtnHtml = `<button class="btn-action btn-syncing" disabled title="Sedang disinkronkan saat ini"><svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Sedang Berjalan</button>`;
+      actionBtnHtml = `<button class="btn-action btn-cancel" onclick="confirmCancelSync('${d.nama.replace(/'/g, "\\'")}')" title="Batalkan proses sinkronisasi ${d.nama}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6m0-6l6 6"/></svg> Batalkan Sinkron</button>`;
     } else if (isRunning) {
       actionBtnHtml = `<button class="btn-action btn-disabled" disabled title="Sinkronisasi lain sedang berlangsung. Hanya 1 provinsi diperbolehkan dalam satu waktu."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg> Sinkronkan</button>`;
     } else {
@@ -1006,6 +1006,36 @@ function renderDashboard({
       border: 1px solid rgba(129, 140, 248, 0.4);
       cursor: not-allowed;
     }
+    .btn-cancel {
+      background: linear-gradient(135deg, #e11d48, #be123c);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(225, 29, 72, 0.35);
+    }
+    .btn-cancel:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(225, 29, 72, 0.5);
+      background: linear-gradient(135deg, #f43f5e, #e11d48);
+    }
+    .sync-option-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .sync-option-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    .sync-option-card.active {
+      background: rgba(99, 102, 241, 0.12);
+      border-color: rgba(129, 140, 248, 0.45);
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.15);
+    }
 
     /* Modal Styles */
     .modal-overlay {
@@ -1145,9 +1175,15 @@ function renderDashboard({
           <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Status Sinkronisasi Sistem</div>
           <div id="live-state-wrapper">
             ${isRunning ? `
-              <div class="live-badge running">
-                <span class="pulse-dot"></span>
-                <span>Sedang Menyinkronkan — <strong>${activeProvince || 'Semua Wilayah'}</strong></span>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <div class="live-badge running">
+                  <span class="pulse-dot"></span>
+                  <span>Sedang Menyinkronkan — <strong>${activeProvince || 'Semua Wilayah'}</strong></span>
+                </div>
+                <button class="btn-action btn-cancel" style="padding: 5px 12px; font-size: 11px;" onclick="confirmCancelSync('${(activeProvince || '').replace(/'/g, "\\'")}')" title="Hentikan dan batalkan proses sinkronisasi">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6m0-6l6 6"/></svg>
+                  Batalkan Sinkron
+                </button>
               </div>
             ` : `
               <div class="live-badge idle">
@@ -1166,7 +1202,7 @@ function renderDashboard({
       <div class="notice-box">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" style="shrink-0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <span>
-          <strong>Kebijakan Sinkronisasi Tunggal:</strong> Hanya 1 provinsi yang dapat disinkronkan dalam satu waktu. Ketika proses sinkronisasi sedang berjalan, tombol sinkron untuk seluruh provinsi lainnya akan otomatis dinonaktifkan (disabled).
+          <strong>Kebijakan Sinkronisasi Tunggal:</strong> Hanya 1 provinsi yang dapat disinkronkan dalam satu waktu. Jika sinkronisasi sedang berlangsung, Anda dapat membatalkannya kapan saja menggunakan tombol <strong>Batalkan Sinkron</strong>. Saat memulai sinkronisasi, Anda dapat memilih antara melanjutkan posisi terakhir atau memulai dari awal (reset offset).
         </span>
       </div>
     </div>
@@ -1205,19 +1241,73 @@ function renderDashboard({
     </div>
   </div>
 
-  <!-- Modal Konfirmasi Trigger -->
+  <!-- Modal Konfirmasi Trigger & Pilihan Mode -->
   <div id="modal-confirm" class="modal-overlay">
     <div class="modal-box">
       <div class="modal-title">Konfirmasi Sinkronisasi Manual</div>
       <p class="modal-desc">
-        Apakah Anda yakin ingin memicu sinkronisasi manual ke GitHub Actions untuk provinsi <strong id="modal-prov-name" style="color: #38bdf8;">-</strong>?
+        Picu sinkronisasi manual untuk provinsi <strong id="modal-prov-name" style="color: #38bdf8;">-</strong>. Pilih metode sinkronisasi di bawah ini:
       </p>
-      <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #fbbf24;">
-        ⚠️ Selama proses berjalan, sinkronisasi untuk provinsi lain akan dikunci hingga proses ini selesai.
+
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
+        <label class="sync-option-card active" id="card-mode-resume" onclick="selectSyncMode('resume')">
+          <input type="radio" name="sync-mode" value="resume" checked style="accent-color: #6366f1; width: 16px; height: 16px; margin-top: 2px; cursor: pointer;">
+          <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 700; font-size: 13px; color: #fff;">Lanjutkan Sinkron</span>
+              <span style="font-size: 10px; font-weight: 700; background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); padding: 1px 6px; border-radius: 4px;">Rekomendasi</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
+              Melanjutkan dari posisi terakhir (bentuk pendidikan & offset yang tersimpan). Menghemat kuota dan waktu jika sinkronisasi sebelumnya sempat terhenti.
+            </div>
+          </div>
+        </label>
+
+        <label class="sync-option-card" id="card-mode-fresh" onclick="selectSyncMode('fresh')">
+          <input type="radio" name="sync-mode" value="fresh" style="accent-color: #6366f1; width: 16px; height: 16px; margin-top: 2px; cursor: pointer;">
+          <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 700; font-size: 13px; color: #fff;">Mulai dari Awal</span>
+              <span style="font-size: 10px; font-weight: 700; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); padding: 1px 6px; border-radius: 4px;">Reset ke 0</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
+              Mereset offset dan jenjang ke awal (TK, offset 0). Mengambil dan memperbarui ulang seluruh data sekolah provinsi ini dari nol.
+            </div>
+          </div>
+        </label>
+      </div>
+
+      <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #fbbf24; margin-bottom: 20px;">
+        ⚠️ Selama proses berjalan, sinkronisasi untuk provinsi lain akan dikunci hingga proses ini selesai atau dibatalkan.
       </div>
       <div class="modal-actions">
         <button class="btn-modal-cancel" onclick="closeTriggerModal()">Batal</button>
         <button id="btn-do-trigger" class="btn-modal-confirm" onclick="executeTriggerSync()">Mulai Sinkronkan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Konfirmasi Batalkan Sinkron -->
+  <div id="modal-cancel-confirm" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title" style="display: flex; align-items: center; gap: 8px; color: #fb7185;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        Batalkan Sinkronisasi
+      </div>
+      <p class="modal-desc">
+        Apakah Anda yakin ingin menghentikan dan membatalkan proses sinkronisasi untuk provinsi <strong id="cancel-modal-prov-name" style="color: #38bdf8;">-</strong>?
+      </p>
+      <div style="background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 10px; padding: 12px 14px; font-size: 12px; color: #fda4af; line-height: 1.5; margin-bottom: 18px;">
+        ⚠️ <strong>Efek Pembatalan:</strong>
+        <ul style="margin: 6px 0 0 16px;">
+          <li>Workflow run di GitHub Actions akan langsung dibatalkan (dihentikan).</li>
+          <li>Status sistem segera kembali ke <strong>Siap (Idle)</strong> dan tombol sinkron akan aktif kembali.</li>
+          <li>Data yang telah tersimpan di database sebelum pembatalan tetap aman.</li>
+        </ul>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" onclick="closeCancelModal()">Kembali</button>
+        <button id="btn-do-cancel" class="btn-action btn-cancel" style="padding: 9px 18px; font-size: 13px;" onclick="executeCancelSync()">Ya, Batalkan Sinkron</button>
       </div>
     </div>
   </div>
@@ -1259,13 +1349,21 @@ function renderDashboard({
       setTimeout(() => { toast.style.display = 'none'; }, 4000);
     }
 
+    function selectSyncMode(mode) {
+      const radio = document.querySelector('input[name="sync-mode"][value="' + mode + '"]');
+      if (radio) radio.checked = true;
+      document.getElementById('card-mode-resume')?.classList.toggle('active', mode === 'resume');
+      document.getElementById('card-mode-fresh')?.classList.toggle('active', mode === 'fresh');
+    }
+
     function confirmTriggerSync(provName) {
       if (isCurrentlyRunning) {
-        showToast('Sinkronisasi lain sedang berjalan. Harap tunggu hingga selesai.', false);
+        showToast('Sinkronisasi lain sedang berjalan. Harap tunggu hingga selesai atau batalkan terlebih dahulu.', false);
         return;
       }
       selectedProv = provName;
       document.getElementById('modal-prov-name').innerText = provName;
+      selectSyncMode('resume');
       document.getElementById('modal-confirm').style.display = 'flex';
     }
 
@@ -1280,11 +1378,17 @@ function renderDashboard({
       btn.disabled = true;
       btn.innerText = 'Memproses...';
 
+      const modeInput = document.querySelector('input[name="sync-mode"]:checked');
+      const isMulaiAwal = modeInput ? (modeInput.value === 'fresh') : false;
+
       try {
         const res = await fetch('/api/trigger-sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provinsi: selectedProv })
+          body: JSON.stringify({
+            provinsi: selectedProv,
+            mulai_dari_awal: isMulaiAwal
+          })
         });
 
         const data = await res.json();
@@ -1298,15 +1402,62 @@ function renderDashboard({
         }
 
         closeTriggerModal();
-        showToast('Berhasil memicu sinkronisasi manual untuk ' + selectedProv + '!');
+        const modeLabel = isMulaiAwal ? ' (Mulai dari Awal)' : ' (Lanjutkan)';
+        showToast('Berhasil memicu sinkronisasi untuk ' + selectedProv + modeLabel + '!');
 
         // Update state lokal seketika
         isCurrentlyRunning = true;
         updateButtonsState(true, selectedProv);
+        pollSyncStatus();
       } catch (err) {
         btn.disabled = false;
         btn.innerText = 'Mulai Sinkronkan';
         showToast(err.message, false);
+      }
+    }
+
+    // Modal Cancel Sync
+    let cancelTargetProv = null;
+    function confirmCancelSync(provName) {
+      cancelTargetProv = provName || 'yang sedang berjalan';
+      const el = document.getElementById('cancel-modal-prov-name');
+      if (el) el.innerText = cancelTargetProv;
+      document.getElementById('modal-cancel-confirm').style.display = 'flex';
+    }
+
+    function closeCancelModal() {
+      document.getElementById('modal-cancel-confirm').style.display = 'none';
+      cancelTargetProv = null;
+    }
+
+    async function executeCancelSync() {
+      const btn = document.getElementById('btn-do-cancel');
+      btn.disabled = true;
+      btn.innerText = 'Membatalkan...';
+
+      try {
+        const res = await fetch('/api/cancel-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || 'Gagal membatalkan sinkronisasi.');
+        }
+
+        closeCancelModal();
+        showToast(data.message || 'Sinkronisasi berhasil dibatalkan!');
+
+        // Update state lokal seketika agar tombol kembali ke Sinkronkan
+        isCurrentlyRunning = false;
+        updateButtonsState(false, null);
+        pollSyncStatus();
+      } catch (err) {
+        showToast(err.message, false);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Ya, Batalkan Sinkron';
       }
     }
 
@@ -1406,7 +1557,12 @@ function renderDashboard({
 
       if (liveWrapper) {
         if (running) {
-          liveWrapper.innerHTML = '<div class="live-badge running"><span class="pulse-dot"></span><span>Sedang Menyinkronkan — <strong>' + (activeProvName || 'Semua Wilayah') + '</strong></span></div>';
+          const safeActStr = (activeProvName || '').replace(/'/g, "\\'");
+          liveWrapper.innerHTML = '<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">' +
+            '<div class="live-badge running"><span class="pulse-dot"></span><span>Sedang Menyinkronkan — <strong>' + (activeProvName || 'Semua Wilayah') + '</strong></span></div>' +
+            '<button class="btn-action btn-cancel" style="padding: 5px 12px; font-size: 11px;" onclick="confirmCancelSync(\'' + safeActStr + '\')" title="Hentikan dan batalkan proses sinkronisasi">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6m0-6l6 6"/></svg> Batalkan Sinkron</button>' +
+            '</div>';
         } else {
           liveWrapper.innerHTML = '<div class="live-badge idle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg><span>Sistem Siap (Idle) — Dapat Memulai Sinkronisasi Manual</span></div>';
         }
@@ -1420,11 +1576,13 @@ function renderDashboard({
         if (!statusCell || !actionCell) return;
 
         const isThis = cleanAct && (p === cleanAct);
+        const rawProv = tr.querySelector('td:nth-child(2) div:first-child')?.innerText || '';
+        const safeRawProv = rawProv.replace(/'/g, "\\'");
 
         if (isThis) {
           tr.classList.add('row-active');
           statusCell.innerHTML = '<span class="status-pill active-sync"><svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Sedang Sinkron</span>';
-          actionCell.innerHTML = '<button class="btn-action btn-syncing" disabled title="Sedang disinkronkan saat ini"><svg class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Sedang Berjalan</button>';
+          actionCell.innerHTML = '<button class="btn-action btn-cancel" onclick="confirmCancelSync(\'' + safeRawProv + '\')" title="Batalkan sinkronisasi ' + rawProv + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 9l-6 6m0-6l6 6"/></svg> Batalkan Sinkron</button>';
         } else {
           tr.classList.remove('row-active');
           if (statusCell.hasAttribute('data-default-status')) {
@@ -1434,8 +1592,7 @@ function renderDashboard({
           if (running) {
             actionCell.innerHTML = '<button class="btn-action btn-disabled" disabled title="Sinkronisasi lain sedang berlangsung. Hanya 1 provinsi diperbolehkan dalam satu waktu."><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg> Sinkronkan</button>';
           } else {
-            const rawProv = tr.querySelector('td:nth-child(2) div:first-child')?.innerText || '';
-            actionCell.innerHTML = '<button class="btn-action btn-trigger" onclick="confirmTriggerSync(\\'' + rawProv.replace(/'/g, "\\\\'") + '\\')" title="Picu GitHub Action untuk ' + rawProv + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Sinkronkan</button>';
+            actionCell.innerHTML = '<button class="btn-action btn-trigger" onclick="confirmTriggerSync(\'' + safeRawProv + '\')" title="Picu GitHub Action untuk ' + rawProv + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Sinkronkan</button>';
           }
         }
       });

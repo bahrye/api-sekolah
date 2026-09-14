@@ -33,6 +33,7 @@ export async function onRequestPost(context) {
   try {
     const body = await request.json().catch(() => ({}));
     const rawProvinsi = (body.provinsi || '').trim();
+    const isMulaiAwal = body.mulai_dari_awal === true || body.mulai_dari_awal === 'true';
 
     if (!rawProvinsi) {
       return new Response(JSON.stringify({ ok: false, error: 'Nama provinsi wajib dipilih.' }), {
@@ -130,7 +131,7 @@ export async function onRequestPost(context) {
         ref: 'main',
         inputs: {
           pilihan_provinsi: rawProvinsi,
-          mulai_dari_awal: 'false',
+          mulai_dari_awal: isMulaiAwal ? 'true' : 'false',
         },
       }),
     });
@@ -160,12 +161,23 @@ export async function onRequestPost(context) {
 
     // 5. Update status_sinkronisasi segera agar dashboard real-time langsung bereaksi
     try {
-      await supabase.from('status_sinkronisasi').upsert({
-        id: 1,
-        bentuk_aktif: `tk (${rawProvinsi})`,
-        offset_terakhir: 0,
-        updated_at: new Date().toISOString(),
-      });
+      const nowIso = new Date().toISOString();
+      if (isMulaiAwal) {
+        await supabase.from('status_sinkronisasi').upsert({
+          id: 1,
+          bentuk_aktif: `tk (${rawProvinsi})`,
+          offset_terakhir: 0,
+          total_sukses: 0,
+          total_gagal: 0,
+          updated_at: nowIso,
+        });
+      } else {
+        await supabase.from('status_sinkronisasi').upsert({
+          id: 1,
+          bentuk_aktif: `tk (${rawProvinsi})`,
+          updated_at: nowIso,
+        });
+      }
     } catch (dbErr) {
       console.warn('Gagal pre-set status_sinkronisasi:', dbErr.message);
     }
