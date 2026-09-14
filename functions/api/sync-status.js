@@ -11,14 +11,20 @@ export async function onRequestGet(context) {
 
     const [
       { data: results, error },
-      logsRes
+      logsRes,
+      qRowRes
     ] = await Promise.all([
       supabase.from('status_sinkronisasi').select('*').in('id', [1, 2]),
-      supabase.from('log_aktivitas_provinsi').select('total_baru, total_diperbarui, total_tidak_berubah').gte('waktu_selesai', startOfWibDayUtc)
+      supabase.from('log_aktivitas_provinsi').select('total_baru, total_diperbarui, total_tidak_berubah').gte('waktu_selesai', startOfWibDayUtc),
+      supabase.from('cache_data').select('value').eq('key', 'sync_queue').maybeSingle()
     ]);
 
     if (error) throw error;
     const logs = logsRes.data || [];
+    let syncQueue = [];
+    if (qRowRes?.data?.value) {
+      try { syncQueue = JSON.parse(qRowRes.data.value); } catch (e) {}
+    }
 
     let row1 = results?.find((r) => r.id === 1) || { bentuk_aktif: 'tk', offset_terakhir: 0 };
     let row2 = results?.find((r) => r.id === 2);
@@ -176,6 +182,7 @@ export async function onRequestGet(context) {
         activeRow,
         syncedToday,
         batasAman,
+        queue: syncQueue,
       }),
       {
         headers: {

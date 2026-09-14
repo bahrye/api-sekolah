@@ -109,6 +109,60 @@ export async function onRequestPost(context) {
           total_tanpa_npsn: 0,
         }).in('id', [1, 2]);
       } catch (eReset) {}
+
+      // AUTO-CHAINING ANTREAN: Cek apakah ada antrean di cache_data sync_queue
+      try {
+        const { data: qRow } = await supabase
+          .from('cache_data')
+          .select('value')
+          .eq('key', 'sync_queue')
+          .maybeSingle();
+
+        if (qRow && qRow.value) {
+          const queue = JSON.parse(qRow.value);
+          if (Array.isArray(queue) && queue.length > 0) {
+            const nextItem = queue.shift();
+            await supabase.from('cache_data').upsert({
+              key: 'sync_queue',
+              value: JSON.stringify(queue),
+              updated_at: new Date().toISOString(),
+            });
+
+            let githubToken = env.GITHUB_TOKEN || env.GH_TOKEN;
+            if (!githubToken) {
+              const { data: tokRow } = await supabase
+                .from('cache_data')
+                .select('value')
+                .eq('key', 'github_token')
+                .maybeSingle();
+              if (tokRow?.value) githubToken = tokRow.value.trim();
+            }
+
+            if (githubToken && nextItem?.provinsi) {
+              console.log(`[QUEUE] Memulai otomatis antrean berikutnya: ${nextItem.provinsi}`);
+              const repo = 'bahrye/api-sekolah';
+              const wfUrl = `https://api.github.com/repos/${repo}/actions/workflows/sync-sekolah-15m.yml/dispatches`;
+              await fetch(wfUrl, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${githubToken}`,
+                  'Accept': 'application/vnd.github+json',
+                  'User-Agent': 'api-sekolah-queue-dispatcher',
+                },
+                body: JSON.stringify({
+                  ref: 'main',
+                  inputs: {
+                    pilihan_provinsi: nextItem.provinsi,
+                    mulai_dari_awal: Boolean(nextItem.mulai_dari_awal) ? 'true' : 'false',
+                  }
+                }),
+              });
+            }
+          }
+        }
+      } catch (eQueue) {
+        console.warn('[QUEUE] Gagal memproses antrean berikutnya:', eQueue.message);
+      }
     }
 
     // Jika provinsi selesai, jalankan pembersihan data nonaktif, catat ke provinsi_sync_status, log_aktivitas_provinsi, dan npsn_ganda_detail
