@@ -1,7 +1,7 @@
 {
-  "last_updated": "2026-09-13T19:15:32.235Z",
+  "last_updated": "2026-09-14T20:49:12.202Z",
   "total_provinsi": 39,
-  "total_sekolah": 555668,
+  "total_sekolah": 555670,
   "provinsi": [
     {
       "nama": "LUAR NEGERI",
@@ -93,7 +93,7 @@
         "data_jawa_tengah_part2.json",
         "data_jawa_tengah_part3.json"
       ],
-      "total": 67113
+      "total": 67115
     },
     {
       "nama": "PROV. JAWA TIMUR",
