@@ -6,9 +6,7 @@ export async function onRequest(context) {
     'Content-Type': 'application/json;charset=UTF-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-    'Cache-Control': 'no-cache, no-store, must-revalidate',
-    'Pragma': 'no-cache',
-    'Expires': '0',
+    'Cache-Control': 'public, max-age=300, s-maxage=1800, stale-while-revalidate=86400',
   };
 
   if (context.request.method === 'OPTIONS') {

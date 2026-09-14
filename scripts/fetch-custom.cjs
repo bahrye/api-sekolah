@@ -560,6 +560,8 @@ async function fetchCustomData() {
 
   let currentBentukEstimasi = 0;
   let provStats = { baru: 0, diperbarui: 0, tidakBerubah: 0 };
+  let batchBuffer = [];
+  const FLUSH_THRESHOLD = 100;
 
   async function performProvinceCleanup(kodeWilayah, namaWilayah) {
     console.log(`✨ Selesai sinkronisasi seluruh bentuk untuk provinsi ${kodeWilayah} (${namaWilayah}). Melakukan pembersihan...`);
@@ -760,6 +762,28 @@ async function fetchCustomData() {
           offset += limit;
           continue;
         }
+
+        // Flush sisa buffer untuk bentuk ini bila masih ada
+        if (batchBuffer.length > 0) {
+          const provNameDB = kodeWilayah === "360" ? "SEMUA" : PROVINCES[kodeWilayah];
+          const isStartProv = !currentProvinceStarted;
+          const customParams = {
+            bentukList,
+            namaProvinsi: provNameDB,
+            waktuMulai,
+            isStart: isStartProv,
+            totalEstimasi: currentTotalEstimasi
+          };
+          const { stats } = await postBatchToWorker(batchBuffer, bentukAktif, offset, false, customParams);
+          currentProvinceStarted = true;
+          if (stats) {
+            provStats.baru += (stats.baru || 0);
+            provStats.diperbarui += (stats.diperbarui || 0);
+            provStats.tidakBerubah += (stats.tidakBerubah || 0);
+          }
+          console.log(`📦 Flush sisa buffer [${bentukAktif}]: ${batchBuffer.length} sekolah terkirim — ${stats.tidakBerubah} tetap, ${stats.baru} baru, ${stats.diperbarui} update.`);
+          batchBuffer = [];
+        }
         
         offset = 0;
         taskIndex++;
@@ -783,29 +807,48 @@ async function fetchCustomData() {
          totalPulledByProv[kodeWilayah] += dataList.length;
       }
 
-      const customParams = {
-        bentukList,
-        namaProvinsi: provNameDB,
-        waktuMulai,
-        isStart: isStartProv,
-        totalEstimasi: currentTotalEstimasi
-      };
-      
-      const { stats } = await postBatchToWorker(dataList, bentukAktif, offset, false, customParams);
-      currentProvinceStarted = true;
-      if (stats) {
-        provStats.baru += (stats.baru || 0);
-        provStats.diperbarui += (stats.diperbarui || 0);
-        provStats.tidakBerubah += (stats.tidakBerubah || 0);
-      }
-      
-      console.log(`Offset ${offset - limit} [${bentukAktif}]: ${dataList.length} ditarik — ${stats.tidakBerubah} tetap, ${stats.baru} baru, ${stats.diperbarui} update.`);
+      batchBuffer.push(...dataList);
 
-      const jedaMs = stats.baru === 0 && stats.diperbarui === 0 ? 200 : 1000;
-      await new Promise((resolve) => setTimeout(resolve, jedaMs));
+      // Hemat kuota Worker: kumpulkan buffer hingga FLUSH_THRESHOLD (100 sekolah) baru dikirim ke Cloudflare Worker
+      if (batchBuffer.length >= FLUSH_THRESHOLD) {
+        const customParams = {
+          bentukList,
+          namaProvinsi: provNameDB,
+          waktuMulai,
+          isStart: isStartProv,
+          totalEstimasi: currentTotalEstimasi
+        };
+        
+        const { stats } = await postBatchToWorker(batchBuffer, bentukAktif, offset, false, customParams);
+        currentProvinceStarted = true;
+        if (stats) {
+          provStats.baru += (stats.baru || 0);
+          provStats.diperbarui += (stats.diperbarui || 0);
+          provStats.tidakBerubah += (stats.tidakBerubah || 0);
+        }
+        
+        console.log(`Offset ${offset} [${bentukAktif}]: batch ${batchBuffer.length} sekolah dikirim — ${stats.tidakBerubah} tetap, ${stats.baru} baru, ${stats.diperbarui} update.`);
+        batchBuffer = [];
+
+        const jedaMs = stats.baru === 0 && stats.diperbarui === 0 ? 300 : 1000;
+        await new Promise((resolve) => setTimeout(resolve, jedaMs));
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
 
       // Cek batas waktu eksekusi agar keluar rapi sebelum runner di-kill paksa
       if (Date.now() - startTime >= LAMA_MAKSIMAL) {
+        if (batchBuffer.length > 0) {
+          const customParams = {
+            bentukList,
+            namaProvinsi: provNameDB,
+            waktuMulai,
+            isStart: !currentProvinceStarted,
+            totalEstimasi: currentTotalEstimasi
+          };
+          await postBatchToWorker(batchBuffer, bentukAktif, offset, false, customParams);
+          batchBuffer = [];
+        }
         console.log(`\n⏱️ Batas waktu eksekusi run (${maxMinutes} menit) telah tercapai.`);
         const currentT = tasks[taskIndex];
         const nextProv = PROVINCES[currentT.prov] || currentT.prov;

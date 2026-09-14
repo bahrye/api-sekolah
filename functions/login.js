@@ -1800,10 +1800,17 @@ function renderDashboard({
       });
     }
 
-    // Polling Status Realtime
+    // Polling Status Realtime (Hemat Request & Visibility-Aware)
+    let pollTimer = null;
+    function schedulePoll(delay) {
+      if (pollTimer) clearTimeout(pollTimer);
+      pollTimer = setTimeout(pollSyncStatus, delay);
+    }
+
     async function pollSyncStatus() {
+      if (document.hidden) return;
       if (Date.now() < cancelCooldownUntil) {
-        setTimeout(pollSyncStatus, 2000);
+        schedulePoll(2000);
         return;
       }
       try {
@@ -1819,8 +1826,14 @@ function renderDashboard({
         }
       } catch (e) {}
 
-      setTimeout(pollSyncStatus, isCurrentlyRunning ? 2500 : 5000);
+      schedulePoll(isCurrentlyRunning ? 5000 : 20000);
     }
+
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden) {
+        pollSyncStatus();
+      }
+    });
 
     // Supabase Realtime WebSocket
     const clientSupabaseUrl = "${clientSupabaseUrl}";
@@ -1841,7 +1854,7 @@ function renderDashboard({
 
     // Init check
     checkTokenStatus();
-    setTimeout(pollSyncStatus, 2500);
+    schedulePoll(2500);
   </script>
 </body>
 </html>`;

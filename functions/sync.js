@@ -1493,7 +1493,6 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
       }
 
       if (document.hidden) {
-        scheduleNextReload(10000);
         return;
       }
 
@@ -1519,11 +1518,11 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         }
         lastKnownState = status;
 
-        // Interval cepat: 2 detik saat aktif menyinkronkan, 5 detik saat menunggu
-        const nextDelay = status.isRunning ? 2000 : 5000;
+        // Interval adaptif: 3 detik saat aktif menyinkronkan, 20 detik saat menunggu (idle)
+        const nextDelay = status.isRunning ? 3000 : 20000;
         scheduleNextReload(nextDelay);
       } catch (e) {
-        scheduleNextReload(5000);
+        scheduleNextReload(15000);
       } finally {
         isFetchingStatus = false;
       }

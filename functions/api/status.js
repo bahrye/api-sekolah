@@ -4,9 +4,7 @@ import { getStatusSinkronisasiSupabase } from '../lib/sekolah-supabase.js';
 const jsonHeaders = {
   'Content-Type': 'application/json;charset=UTF-8',
   'Access-Control-Allow-Origin': '*',
-  'Cache-Control': 'no-cache, no-store, must-revalidate',
-  'Pragma': 'no-cache',
-  'Expires': '0',
+  'Cache-Control': 'public, max-age=15, s-maxage=30, stale-while-revalidate=60',
 };
 
 /** GET /api/status — metadata publik (tanpa detail proses sync) */

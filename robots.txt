@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /login
+Disallow: /sync
+Disallow: /sync-batch
+Disallow: /mark-synced
+Disallow: /state

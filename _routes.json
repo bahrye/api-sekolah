@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "include": [
+    "/api/*",
+    "/login",
+    "/sync",
+    "/sync-batch",
+    "/mark-synced",
+    "/state"
+  ],
+  "exclude": [
+    "/",
+    "/index.html",
+    "/favicon.svg",
+    "/favicon-sync.svg",
+    "/data_rekap.json",
+    "/503.html",
+    "/robots.txt"
+  ]
+}

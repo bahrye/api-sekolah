@@ -829,14 +829,32 @@
                     });
                 }
 
+                var statusPollTimer = null;
+                var isStatusFetching = false;
+
+                function scheduleStatusPoll(delayMs) {
+                    if (statusPollTimer) clearTimeout(statusPollTimer);
+                    statusPollTimer = setTimeout(function () {
+                        if (!document.hidden) {
+                            loadStatus();
+                        }
+                    }, delayMs);
+                }
+
                 function loadStatus() {
-                    fetch(base + '/api/status?_t=' + Date.now(), { cache: 'no-store' })
+                    if (isStatusFetching) return;
+                    if (document.hidden) return;
+                    isStatusFetching = true;
+
+                    fetch(base + '/api/status')
                         .then(function (r) { return r.json(); })
                         .then(function (json) {
+                            isStatusFetching = false;
                             if (json.status !== 'success') {
                                 if (lastAt && (!lastAt.textContent || lastAt.textContent === 'Memuat…')) {
                                     lastAt.textContent = 'Tidak tersedia';
                                 }
+                                scheduleStatusPoll(60000);
                                 return;
                             }
                             var formattedTime = formatWIB(json.waktu_update_data_terakhir_iso || json.waktu_update_data_terakhir);
@@ -871,17 +889,28 @@
                                     bentuk_aktif: json.bentuk_aktif
                                 }));
                             } catch (eSave) {}
+
+                            // Polling adaptif: 30 detik saat sync aktif, 5 menit saat idle
+                            var nextInterval = json.is_running ? 30000 : 300000;
+                            scheduleStatusPoll(nextInterval);
                         })
                         .catch(function () {
+                            isStatusFetching = false;
                             if (lastAt && (!lastAt.textContent || lastAt.textContent === 'Memuat…')) {
                                 lastAt.textContent = 'Gagal memuat';
                             }
+                            scheduleStatusPoll(60000);
                         });
                 }
 
                 loadStatus();
-                // Polling otomatis setiap 4 detik agar realtime
-                setInterval(loadStatus, 4000);
+
+                // Dengarkan visibilitas: langsung periksa status saat tab dibuka kembali
+                document.addEventListener('visibilitychange', function () {
+                    if (!document.hidden) {
+                        loadStatus();
+                    }
+                });
 
                 var rekapThead = document.getElementById('rekap-thead');
                 var rekapTbody = document.getElementById('rekap-tbody');
@@ -1026,7 +1055,7 @@
                 } catch (eRekapCache) {}
 
                 function loadRekap() {
-                    fetch(base + '/api/rekap?_t=' + Date.now())
+                    fetch(base + '/api/rekap')
                         .then(function (r) { return r.json(); })
                         .then(function (json) {
                             if (json.status !== 'success') {
