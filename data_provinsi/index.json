@@ -1,7 +1,7 @@
 {
-  "last_updated": "2026-09-14T20:49:12.202Z",
+  "last_updated": "2026-09-15T20:03:33.679Z",
   "total_provinsi": 39,
-  "total_sekolah": 555670,
+  "total_sekolah": 555730,
   "provinsi": [
     {
       "nama": "LUAR NEGERI",
@@ -83,7 +83,7 @@
         "data_jawa_barat_part2.json",
         "data_jawa_barat_part3.json"
       ],
-      "total": 85472
+      "total": 85475
     },
     {
       "nama": "PROV. JAWA TENGAH",
@@ -93,7 +93,7 @@
         "data_jawa_tengah_part2.json",
         "data_jawa_tengah_part3.json"
       ],
-      "total": 67115
+      "total": 67170
     },
     {
       "nama": "PROV. JAWA TIMUR",
@@ -104,7 +104,7 @@
         "data_jawa_timur_part3.json",
         "data_jawa_timur_part4.json"
       ],
-      "total": 91714
+      "total": 91716
     },
     {
       "nama": "PROV. KALIMANTAN BARAT",
@@ -1221,7 +1221,8 @@
       "data_kepulauan_bangka_belitung.json",
       "data_sumatera_utara.json",
       "data_sumatera_utara_part1.json",
-      "data_papua_pegunungan.json"
+      "data_papua_pegunungan.json",
+      "data_jawa_tengah_part3.json"
     ],
     "722": [
       "data_maluku_utara.json",
@@ -1232,7 +1233,8 @@
       "data_jawa_barat_part3.json",
       "data_papua.json",
       "data_sulawesi_selatan.json",
-      "data_sulawesi_tengah.json"
+      "data_sulawesi_tengah.json",
+      "data_jawa_tengah_part3.json"
     ],
     "724": [
       "data_kalimantan_barat.json",
@@ -1667,7 +1669,8 @@
     "791": [
       "data_banten.json",
       "data_sumatera_utara.json",
-      "data_sumatera_utara_part1.json"
+      "data_sumatera_utara_part1.json",
+      "data_jawa_tengah_part3.json"
     ],
     "792": [
       "data_aceh.json",
@@ -1683,7 +1686,8 @@
       "data_jawa_barat_part3.json",
       "data_kalimantan_tengah.json",
       "data_nusa_tenggara_timur.json",
-      "data_papua_pegunungan.json"
+      "data_papua_pegunungan.json",
+      "data_jawa_tengah_part3.json"
     ],
     "794": [
       "data_banten.json",
@@ -2048,7 +2052,8 @@
     ],
     "P35": [
       "data_maluku_utara.json",
-      "data_jawa_barat_part3.json"
+      "data_jawa_barat_part3.json",
+      "data_jawa_tengah_part3.json"
     ],
     "P89": [
       "data_maluku_utara.json",
@@ -2178,6 +2183,9 @@
     ],
     "P74": [
       "data_papua_tengah.json"
+    ],
+    "K41": [
+      "data_jawa_tengah_part3.json"
     ]
   },
   "sample_schools": [
