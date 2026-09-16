@@ -1,7 +1,7 @@
 {
-  "last_updated": "2026-09-15T20:03:33.679Z",
+  "last_updated": "2026-09-16T19:58:06.092Z",
   "total_provinsi": 39,
-  "total_sekolah": 555730,
+  "total_sekolah": 555729,
   "provinsi": [
     {
       "nama": "LUAR NEGERI",
@@ -25,7 +25,7 @@
       "files": [
         "data_bali.json"
       ],
-      "total": 6092
+      "total": 6091
     },
     {
       "nama": "PROV. BANTEN",
