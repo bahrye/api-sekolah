@@ -1,7 +1,7 @@
 {
-  "last_updated": "2026-09-16T19:58:06.092Z",
+  "last_updated": "2026-09-17T20:02:34.258Z",
   "total_provinsi": 39,
-  "total_sekolah": 555729,
+  "total_sekolah": 555733,
   "provinsi": [
     {
       "nama": "LUAR NEGERI",
@@ -104,7 +104,7 @@
         "data_jawa_timur_part3.json",
         "data_jawa_timur_part4.json"
       ],
-      "total": 91716
+      "total": 91720
     },
     {
       "nama": "PROV. KALIMANTAN BARAT",
