@@ -54,6 +54,8 @@ jobs:
           CLOUDFLARE_WORKER_URL: ${{ secrets.CLOUDFLARE_WORKER_URL || 'https://api-sekolah-kita.pages.dev' }}
           DATA_SOURCE_URL: ${{ secrets.DATA_SOURCE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET || secrets.SYNC_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_KEY }}
           PILIHAN_BENTUK: "Semua"
           PILIHAN_PROVINSI: ${{ github.event.inputs.pilihan_provinsi || '' }}
           MULAI_DARI_AWAL: ${{ github.event.inputs.mulai_dari_awal || 'false' }}

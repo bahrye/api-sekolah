@@ -2,7 +2,7 @@ import { getSupabase } from '../lib/db.js';
 import { getDataSourceUrl } from '../lib/source-config.js';
 
 const PROVINCES = {
-  '010000': 'DKI JAKARTA', '020000': 'JAWA BARAT', '030000': 'JAWA TENGAH', '040000': 'DI YOGYAKARTA',
+  '010000': 'D.K.I. JAKARTA', '020000': 'JAWA BARAT', '030000': 'JAWA TENGAH', '040000': 'D.I. YOGYAKARTA',
   '050000': 'JAWA TIMUR', '060000': 'ACEH', '070000': 'SUMATERA UTARA', '080000': 'SUMATERA BARAT',
   '090000': 'RIAU', '100000': 'JAMBI', '110000': 'SUMATERA SELATAN', '120000': 'LAMPUNG',
   '130000': 'KALIMANTAN BARAT', '140000': 'KALIMANTAN TENGAH', '150000': 'KALIMANTAN SELATAN',
@@ -86,7 +86,8 @@ export async function onRequestGet(context) {
     const promises = Object.keys(PROVINCES).map(async (kode) => {
       try {
         const res = await fetch(
-          `${apiBase}/${kode}?limit=1&offset=0`
+          `${apiBase}/${kode}?limit=1&offset=0`,
+          { signal: AbortSignal.timeout(8000) }
         );
         const json = await res.json();
         return { kode, nama: PROVINCES[kode], total_api: json.meta ? json.meta.total : 0 };

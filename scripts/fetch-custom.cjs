@@ -1,6 +1,23 @@
 require('dotenv').config();
 const fs = require('fs');
+const path = require('path');
 const { getDataSourceUrl, getDataSourceJumlahUrl } = require('./source-config.cjs');
+
+// Coba muat konfigurasi Supabase jika tersedia untuk operasi direct runner
+const envSbPath = path.join(__dirname, '..', '.env.supabase');
+if (fs.existsSync(envSbPath)) require('dotenv').config({ path: envSbPath });
+const devVarsPath = path.join(__dirname, '..', '.dev.vars');
+if (!process.env.SUPABASE_URL && fs.existsSync(devVarsPath)) require('dotenv').config({ path: devVarsPath });
+
+const { createClient } = require('@supabase/supabase-js');
+let supabaseClient = null;
+const sbUrl = process.env.SUPABASE_URL;
+const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+if (sbUrl && sbKey) {
+  try {
+    supabaseClient = createClient(sbUrl, sbKey, { auth: { persistSession: false } });
+  } catch (e) {}
+}
 
 const API_BASE = getDataSourceUrl();
 const API_JUMLAH_BASE = getDataSourceJumlahUrl();
@@ -11,6 +28,26 @@ const CRON_SECRET = process.env.CRON_SECRET;
 if (!CRON_SECRET) {
   console.error('CRON_SECRET belum diatur. Tambahkan secret CRON_SECRET di GitHub.');
   process.exit(1);
+}
+
+/**
+ * Pembungkus fetch dengan proteksi timeout koneksi dan retry otomatis
+ */
+async function safeFetch(url, options = {}, timeoutMs = 20000, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      return res;
+    } catch (err) {
+      if (attempt === retries) throw err;
+      const delay = attempt * 1500;
+      console.warn(`⚠️ [KONEKSI] Request ke ${url.substring(0, 70)}... gagal (${err.message}). Mencoba ulang (${attempt}/${retries}) dalam ${delay}ms...`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
 }
 
 const BENTUK_GROUP = {
@@ -48,7 +85,7 @@ const getWibDayOfWeek = (d = new Date()) => {
 async function loadProvinces() {
   try {
     console.log("Mengambil referensi kode wilayah provinsi dari API Pusat...");
-    const res = await fetch(`${API_JUMLAH_BASE}/360?limit=100&offset=0`);
+    const res = await safeFetch(`${API_JUMLAH_BASE}/360?limit=100&offset=0`, {}, 15000, 3);
     const result = await res.json();
     if (result && result.data) {
       result.data.forEach(p => {
@@ -58,9 +95,9 @@ async function loadProvinces() {
     }
   } catch (e) {
     console.error("Gagal mengambil referensi provinsi, menggunakan mode fallback", e);
-    // Fallback darurat
+    // Fallback darurat dengan nama terstandar
     PROVINCES = {
-      "010000": "DKI JAKARTA", "020000": "JAWA BARAT", "030000": "JAWA TENGAH", "040000": "DI YOGYAKARTA",
+      "010000": "D.K.I. JAKARTA", "020000": "JAWA BARAT", "030000": "JAWA TENGAH", "040000": "D.I. YOGYAKARTA",
       "050000": "JAWA TIMUR", "060000": "ACEH", "070000": "SUMATERA UTARA", "080000": "SUMATERA BARAT",
       "090000": "RIAU", "100000": "JAMBI", "110000": "SUMATERA SELATAN", "120000": "LAMPUNG",
       "130000": "KALIMANTAN BARAT", "140000": "KALIMANTAN TENGAH", "150000": "KALIMANTAN SELATAN",
@@ -98,12 +135,15 @@ async function postBatchToWorker(dataList, bentukAktif, offset, isFinished, cust
     if (customSyncParams.provStats) {
       payload.provStats = customSyncParams.provStats;
     }
+    if (customSyncParams.totalDihapus !== undefined) {
+      payload.totalDihapus = customSyncParams.totalDihapus;
+    }
   }
-  const res = await fetch(`${WORKER_URL}/sync-batch`, {
+  const res = await safeFetch(`${WORKER_URL}/sync-batch`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
     body: JSON.stringify(payload)
-  });
+  }, 35000, 3);
   const ct = res.headers.get('content-type') || '';
   if (res.status === 429 || res.status === 405 || ct.includes('text/html')) {
     throw new Error(`Cloudflare Worker limit / tidak merespons API (Status ${res.status}). Kuota harian Cloudflare (100k req/hari) kemungkinan telah tercapai.`);
@@ -640,6 +680,49 @@ async function fetchCustomData() {
       console.log(`📊 Terdeteksi ${duplicates.length} NPSN ganda di data API Provinsi ${provNameDB}.`);
     }
 
+    let totalDihapusDirectly = 0;
+    if (supabaseClient && provinceStartedCleanly[kodeWilayah] && fullNpsnList.length > 0) {
+      try {
+        console.log(`🔍 [RUNNER] Memverifikasi data non-aktif langsung ke Supabase untuk ${provNameDB}...`);
+        let from = 0;
+        const dbNpsns = [];
+        let provQuery = (provNameDB || '').replace(/^PROVINSI|^PROV\.?\s*/i, '').trim();
+        if (provQuery.includes('JAKARTA')) provQuery = 'JAKARTA';
+        if (provQuery.includes('YOGYAKARTA')) provQuery = 'YOGYAKARTA';
+
+        while (true) {
+          const { data, error } = await supabaseClient
+            .from('sekolah')
+            .select('npsn')
+            .ilike('nama_provinsi', `%${provQuery}%`)
+            .order('npsn')
+            .range(from, from + 999);
+          if (error || !data || data.length === 0) break;
+          dbNpsns.push(...data.map(d => String(d.npsn)));
+          if (data.length < 1000) break;
+          from += 1000;
+        }
+
+        if (dbNpsns.length > 0) {
+          const activeSet = new Set(fullNpsnList.map(n => String(n)));
+          const staleNpsns = dbNpsns.filter(n => n && !activeSet.has(n));
+          if (staleNpsns.length > 0) {
+            console.log(`🧹 [RUNNER] Ditemukan ${staleNpsns.length} sekolah tidak aktif di ${provNameDB}. Menghapus dari Supabase...`);
+            for (let i = 0; i < staleNpsns.length; i += 100) {
+              const chunk = staleNpsns.slice(i, i + 100);
+              await supabaseClient.from('sekolah').delete().in('npsn', chunk);
+            }
+            totalDihapusDirectly = staleNpsns.length;
+            console.log(`✅ [RUNNER] Berhasil membersihkan ${totalDihapusDirectly} sekolah non-aktif di ${provNameDB}.`);
+          } else {
+            console.log(`✅ [RUNNER] Data ${provNameDB} bersih 100%. Tidak ada sekolah non-aktif.`);
+          }
+        }
+      } catch (errRunnerClean) {
+        console.warn(`⚠️ [RUNNER] Gagal pembersihan langsung via Supabase Client:`, errRunnerClean.message);
+      }
+    }
+
     try {
       const { stats } = await postBatchToWorker([], 'tk', 0, true, {
         bentukList: ['ALL'],
@@ -652,9 +735,11 @@ async function fetchCustomData() {
         duplicates,
         isCleanScan: provinceStartedCleanly[kodeWilayah],
         kodeWilayah,
-        provStats
+        provStats,
+        totalDihapus: totalDihapusDirectly
       });
-      console.log(`🧹 Berhasil membersihkan data lama untuk ${provNameDB}. ${stats?.dihapus || 0} sekolah dihapus dan aktivitas dicatat.`);
+      const finalDihapus = stats?.dihapus || totalDihapusDirectly || 0;
+      console.log(`🧹 Berhasil menyelesaikan sinkronisasi & pembersihan untuk ${provNameDB}. ${finalDihapus} sekolah dihapus dan aktivitas dicatat.`);
     } catch (e) {
       console.error(`Gagal membersihkan data lama untuk ${provNameDB}:`, e);
     }
@@ -690,7 +775,7 @@ async function fetchCustomData() {
       
       try {
         const totalUrl = `${API_BASE}/${kodeWilayah}?limit=1&offset=0`;
-        const totalRes = await fetch(totalUrl);
+        const totalRes = await safeFetch(totalUrl, {}, 15000, 3);
         const totalJson = await totalRes.json();
         currentTotalEstimasi = totalJson.meta ? totalJson.meta.total : 0;
         console.log(`📊 Estimasi total data untuk provinsi ${kodeWilayah} (${namaWilayah}): ${currentTotalEstimasi}`);
@@ -728,17 +813,17 @@ async function fetchCustomData() {
 
     try {
       console.log(`Mengecek API [${bentukAktif.toUpperCase()}] wilayah ${kodeWilayah} (${namaWilayah}) offset ${offset}...`);
-      const response = await fetch(url);
+      const response = await safeFetch(url, {}, 20000, 3);
       
       if (response.status === 400) {
         console.log(`⚠️ Bentuk pendidikan "${bentukAktif}" tidak valid di API kementerian (400 Bad Request).`);
         try {
           console.log(`Menghapus bentuk "${bentukAktif}" dari database bentuk_pendidikan...`);
-          const delRes = await fetch(`${WORKER_URL}/api/bentuk-pendidikan?secret=${CRON_SECRET}`, {
+          const delRes = await safeFetch(`${WORKER_URL}/api/bentuk-pendidikan?secret=${CRON_SECRET}`, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ bentuk: bentukAktif })
-          });
+          }, 10000, 2);
           if (delRes.ok) {
             console.log(`✅ Berhasil menghapus bentuk "${bentukAktif}" dari database.`);
           } else {

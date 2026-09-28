@@ -156,6 +156,7 @@ export async function onRequestPost(context) {
                     mulai_dari_awal: Boolean(nextItem.mulai_dari_awal) ? 'true' : 'false',
                   }
                 }),
+                signal: AbortSignal.timeout(10000),
               });
             }
           }
@@ -166,14 +167,14 @@ export async function onRequestPost(context) {
     }
 
     // Jika provinsi selesai, jalankan pembersihan data nonaktif, catat ke provinsi_sync_status, log_aktivitas_provinsi, dan npsn_ganda_detail
-    let totalDihapus = 0;
+    let totalDihapus = Number(customParams.totalDihapus ?? body.totalDihapus ?? 0);
     if (isFinished && body.namaProvinsi && body.namaProvinsi !== 'SEMUA') {
       try {
         const activeList = customParams.activeNpsnList || body.activeNpsnList;
         const isClean = customParams.isCleanScan || body.isCleanScan;
 
-        // Pembersihan otomatis sekolah non-aktif (yang dihapus dari data pusat)
-        if (isClean && Array.isArray(activeList) && activeList.length > 0) {
+        // Pembersihan otomatis sekolah non-aktif fallback di Worker (hanya jika belum dibersihkan oleh runner)
+        if (totalDihapus === 0 && isClean && Array.isArray(activeList) && activeList.length > 0) {
           try {
             let from = 0;
             const dbNpsns = [];
@@ -181,7 +182,10 @@ export async function onRequestPost(context) {
             if (provQuery.includes('JAKARTA')) provQuery = 'JAKARTA';
             if (provQuery.includes('YOGYAKARTA')) provQuery = 'YOGYAKARTA';
 
-            while (true) {
+            let chunks = 0;
+            const MAX_CHUNKS = 20; // Batasi subrequests agar Cloudflare Pages Function tidak melebihi 50 limit!
+            while (chunks < MAX_CHUNKS) {
+              chunks++;
               const { data, error: fetchErr } = await supabase
                 .from('sekolah')
                 .select('npsn')
@@ -195,13 +199,14 @@ export async function onRequestPost(context) {
               from += 1000;
             }
 
-            if (dbNpsns.length > 0) {
+            // Hanya proses cleanup jika data terambil lengkap (tidak terpotong MAX_CHUNKS)
+            if (dbNpsns.length > 0 && chunks < MAX_CHUNKS) {
               const activeSet = new Set(activeList.map((n) => String(n)));
               const staleNpsns = dbNpsns.filter((n) => n && !activeSet.has(n));
 
               if (staleNpsns.length > 0) {
                 console.log(`[CLEANUP] Ditemukan ${staleNpsns.length} sekolah tidak aktif di ${body.namaProvinsi}. Menghapus dari Supabase...`);
-                for (let i = 0; i < staleNpsns.length; i += 100) {
+                for (let i = 0; i < staleNpsns.length && i < 500; i += 100) {
                   const chunk = staleNpsns.slice(i, i + 100);
                   await supabase.from('sekolah').delete().in('npsn', chunk);
                 }
@@ -209,17 +214,18 @@ export async function onRequestPost(context) {
               }
             }
           } catch (errClean) {
-            console.warn('Gagal membersihkan sekolah non-aktif:', errClean.message);
+            console.warn('Gagal membersihkan sekolah non-aktif di Worker:', errClean.message);
           }
         }
 
         // Ambil hitungan riil dari DB untuk provinsi ini setelah pembersihan sekolah non-aktif
         let currentDbCount = 0;
         try {
+          const provExact = body.namaProvinsi.startsWith('PROV') ? body.namaProvinsi : `PROV. ${body.namaProvinsi}`;
           const { count } = await supabase
             .from('sekolah')
             .select('*', { count: 'exact', head: true })
-            .ilike('nama_provinsi', `%${body.namaProvinsi}%`);
+            .or(`nama_provinsi.eq.${provExact},nama_provinsi.ilike.%${body.namaProvinsi}%`);
           currentDbCount = count || 0;
         } catch (e) {}
 
