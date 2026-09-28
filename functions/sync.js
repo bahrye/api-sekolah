@@ -762,29 +762,12 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
           const pStat = pStatusMap.get(cName);
           const compItem = compDataMap.get(cName);
 
-          const baseProcessed = (log.total_baru || 0) + (log.total_diperbarui || 0) + (log.total_tidak_berubah || 0);
-          const targetTotal = (compItem?.total_db > 0 ? compItem.total_db : (compItem?.total_api || pStat?.total_db || 0));
+          const nonQueryable = (typeof log.total_non_queryable === 'number' && log.total_non_queryable > 0)
+            ? log.total_non_queryable
+            : (pStat?.api_unrecognized_shapes || 0);
 
-          let nonQueryable = 0;
-          let carriedOverTetap = 0;
-          if (targetTotal > baseProcessed) {
-            const missing = targetTotal - baseProcessed;
-            const knownNq = (typeof log.total_non_queryable === 'number' && log.total_non_queryable > 0)
-              ? log.total_non_queryable
-              : (pStat?.api_unrecognized_shapes || 0);
-
-            if (knownNq > 0) {
-              nonQueryable = Math.min(missing, knownNq);
-              carriedOverTetap = missing - nonQueryable;
-            } else {
-              // Jika knownNq adalah 0, selisih data berasal dari putaran/chunk sebelumnya (data tetap)
-              carriedOverTetap = missing;
-              nonQueryable = 0;
-            }
-          }
-
-          const displayedTetap = (log.total_tidak_berubah || 0) + carriedOverTetap;
-          const totalData = (log.total_baru || 0) + (log.total_diperbarui || 0) + displayedTetap + nonQueryable;
+          const displayedTetap = log.total_tidak_berubah || 0;
+          const totalData = (log.total_baru || 0) + (log.total_diperbarui || 0) + (log.total_dihapus || 0) + displayedTetap + nonQueryable;
 
           return `<div class="log-item-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
