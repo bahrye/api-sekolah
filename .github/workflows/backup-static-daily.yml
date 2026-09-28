@@ -60,6 +60,7 @@ jobs:
             echo "has_changes=false" >> $GITHUB_OUTPUT
           else
             git commit -m "chore(backup): perbarui data cadangan statis harian"
+            git pull --rebase origin main || true
             git push
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
