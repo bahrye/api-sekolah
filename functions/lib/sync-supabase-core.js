@@ -8,8 +8,11 @@ export const VALID_BENTUK = [
   'smak', 'smptk', 'smtk', 'sdtk', 'spk-kb', 'spk-sd', 'spk-sma', 'spk-smp', 'spk-tk',
   'spm-ula', 'spm-ulya', 'spm-wustha', 'taman-seminari', 'pdf-ulya', 'pdf-wustha',
   'mak', 'mula-dhammasekha', 'nava-dhammasekha', 'uttama-dhammasekha', 'pondok-pesantren',
-  'smag-k'
+  'smag-k', 'smag.k', 'pratama-widyalaya', 'adi-widyalaya', 'madyama-widyalaya', 'utama-widyalaya',
+  'utama-widyalaya-kejuruan', 'pdf-ula', 'sdlb', 'sekolah-nasional-terintegrasi'
 ];
+
+const knownBentukSet = new Set(VALID_BENTUK.map((b) => b.toLowerCase().replace(/\s+/g, '-')));
 
 export async function sha256Hex(text) {
   const data = new TextEncoder().encode(text);
@@ -49,6 +52,24 @@ export async function syncBatchToSupabase(supabase, dataList = []) {
     if (!item.npsn) {
       tanpaNpsn++;
       continue;
+    }
+
+    // Auto-discovery: daftarkan otomatis bentuk pendidikan baru jika belum terdata
+    if (item.bentukPendidikan) {
+      const bRaw = String(item.bentukPendidikan).trim();
+      const bCode = bRaw.toLowerCase().replace(/\s+/g, '-');
+      if (bCode && !knownBentukSet.has(bCode)) {
+        knownBentukSet.add(bCode);
+        try {
+          await supabase.from('bentuk_pendidikan').upsert({
+            kode: bCode,
+            nama: bRaw.toUpperCase(),
+            kategori: 'UMUM',
+            is_queryable: true,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'kode' });
+        } catch (eBentuk) {}
+      }
     }
     prepared.push({
       item,

@@ -228,14 +228,15 @@ async function fetchCustomData() {
   }
 
   if (!bentukList || bentukList.length === 0) {
-    console.log(`Menggunakan fallback 37 bentuk pendidikan lengkap...`);
+    console.log(`Menggunakan fallback 46 bentuk pendidikan lengkap...`);
     bentukList = [
       'tk', 'kb', 'sps', 'tpa', 'paudq', 'sd', 'smp', 'sma', 'smk', 'slb',
       'skb', 'pkbm', 'kursus', 'ra', 'mi', 'mts', 'ma',
       'smak', 'smptk', 'smtk', 'sdtk', 'spk-kb', 'spk-sd', 'spk-sma', 'spk-smp', 'spk-tk',
       'spm-ula', 'spm-ulya', 'spm-wustha', 'taman-seminari', 'pdf-ulya', 'pdf-wustha',
       'mak', 'mula-dhammasekha', 'nava-dhammasekha', 'uttama-dhammasekha', 'pondok-pesantren',
-      'smag-k'
+      'smag-k', 'smag.k', 'pratama-widyalaya', 'adi-widyalaya', 'madyama-widyalaya', 'utama-widyalaya',
+      'utama-widyalaya-kejuruan', 'pdf-ula', 'sdlb', 'sekolah-nasional-terintegrasi'
     ];
   }
   
@@ -1014,19 +1015,47 @@ async function runDiscoveryScan(kodeWilayah, bentukList, totalEstimasi, fullNpsn
               const testText = await testRes.text();
               if (testRes.status === 400 || testText.includes("invalid bentuk pendidikan")) {
                 console.log(`⚠️ Bentuk pendidikan "${bRaw}" (${bNormalized}) tidak dapat dikueri di API filter (400 Bad Request). Ditandai non-queryable.`);
+                try {
+                  await fetch(`${WORKER_URL}/api/bentuk-pendidikan?secret=${CRON_SECRET}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bentuk: bNormalized, nama: bRaw, is_queryable: false })
+                  });
+                } catch (e) {}
+                if (supabaseClient) {
+                  try {
+                    await supabaseClient.from('bentuk_pendidikan').upsert({
+                      kode: bNormalized,
+                      nama: bRaw.toUpperCase().trim(),
+                      kategori: 'UMUM',
+                      is_queryable: false,
+                      updated_at: new Date().toISOString()
+                    }, { onConflict: 'kode' });
+                  } catch (eSb) {}
+                }
                 return false;
               } else {
                 console.log(`✨ Menemukan bentuk pendidikan baru queryable dari API: "${bNormalized}" (${bRaw}) di sekolah "${school.nama}"`);
                 const addRes = await fetch(`${WORKER_URL}/api/bentuk-pendidikan?secret=${CRON_SECRET}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ bentuk: bNormalized })
+                  body: JSON.stringify({ bentuk: bNormalized, nama: bRaw, is_queryable: true })
                 });
                 if (addRes.ok) {
                   console.log(`✅ Berhasil mendaftarkan bentuk "${bNormalized}" ke database.`);
-                  return true;
                 }
-                return false;
+                if (supabaseClient) {
+                  try {
+                    await supabaseClient.from('bentuk_pendidikan').upsert({
+                      kode: bNormalized,
+                      nama: bRaw.toUpperCase().trim(),
+                      kategori: 'UMUM',
+                      is_queryable: true,
+                      updated_at: new Date().toISOString()
+                    }, { onConflict: 'kode' });
+                  } catch (eSb) {}
+                }
+                return true;
               }
             } catch (err) {
               return false;
