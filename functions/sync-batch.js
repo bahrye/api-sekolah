@@ -283,12 +283,43 @@ export async function onRequestPost(context) {
 
         // Simpan rincian duplikat ke npsn_ganda_detail jika ada (hapus duplikat lama provinsi ini agar selalu konsisten dengan api_duplicates!)
         await supabase.from('npsn_ganda_detail').delete().eq('nama_provinsi', body.namaProvinsi);
+        let countPagination = 0;
+        let countReal = 0;
         if (customParams.duplicates && Array.isArray(customParams.duplicates) && customParams.duplicates.length > 0) {
-          const dupRecords = customParams.duplicates.map((d) => ({
-            npsn: String(d.npsn),
-            nama_provinsi: body.namaProvinsi,
-            sekolah_detail: typeof d.sekolahList === 'string' ? d.sekolahList : JSON.stringify(d.sekolahList || []),
-          }));
+          const dupRecords = customParams.duplicates.map((d) => {
+            let list = Array.isArray(d.sekolahList) ? d.sekolahList : [];
+            if (typeof d.sekolahList === 'string') {
+              try { list = JSON.parse(d.sekolahList); } catch (e) {}
+            }
+            let isIdentical = true;
+            if (list && list.length > 1) {
+              const first = list[0];
+              for (let i = 1; i < list.length; i++) {
+                const cur = list[i];
+                if (
+                  cur.nama !== first.nama ||
+                  cur.bentuk !== first.bentuk ||
+                  cur.status !== first.status ||
+                  cur.kecamatan !== first.kecamatan ||
+                  cur.kabupaten !== first.kabupaten ||
+                  (cur.alamat || '') !== (first.alamat || '')
+                ) {
+                  isIdentical = false;
+                  break;
+                }
+              }
+            } else {
+              isIdentical = false;
+            }
+            if (isIdentical) countPagination++;
+            else countReal++;
+
+            return {
+              npsn: String(d.npsn),
+              nama_provinsi: body.namaProvinsi,
+              sekolah_detail: typeof d.sekolahList === 'string' ? d.sekolahList : JSON.stringify(d.sekolahList || []),
+            };
+          });
           await supabase.from('npsn_ganda_detail').insert(dupRecords);
         }
 
@@ -308,6 +339,8 @@ export async function onRequestPost(context) {
               item.total_db = currentDbCount > 0 ? currentDbCount : (item.total_db || 0);
               item.terakhir_sukses = new Date().toISOString();
               item.api_duplicates = customParams.duplicates?.length || 0;
+              item.api_pagination_duplicates = countPagination;
+              item.api_real_duplicates = countReal;
               item.api_empty_npsn = totalTanpaNpsn || 0;
               item.api_unrecognized_shapes = resolvedUnrecognized;
               item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);

@@ -122,6 +122,49 @@ export async function onRequestGet(context) {
       }
     } catch (e) {}
 
+    // Ambil rincian duplikasi dari npsn_ganda_detail untuk membedakan Paginasi vs Ganda Riil
+    const dupDetailMap = new Map();
+    try {
+      const { data: dupRows } = await supabase
+        .from('npsn_ganda_detail')
+        .select('nama_provinsi, sekolah_detail');
+      (dupRows || []).forEach(r => {
+        const cName = cleanName(r.nama_provinsi);
+        if (!dupDetailMap.has(cName)) {
+          dupDetailMap.set(cName, { pagination: 0, real: 0 });
+        }
+        let list = [];
+        try {
+          list = typeof r.sekolah_detail === 'string' ? JSON.parse(r.sekolah_detail) : (r.sekolah_detail || []);
+        } catch (e) {}
+
+        let isIdentical = true;
+        if (list && list.length > 1) {
+          const first = list[0];
+          for (let i = 1; i < list.length; i++) {
+            const cur = list[i];
+            if (
+              cur.nama !== first.nama ||
+              cur.bentuk !== first.bentuk ||
+              cur.status !== first.status ||
+              cur.kecamatan !== first.kecamatan ||
+              cur.kabupaten !== first.kabupaten ||
+              (cur.alamat || '') !== (first.alamat || '')
+            ) {
+              isIdentical = false;
+              break;
+            }
+          }
+        } else {
+          isIdentical = false;
+        }
+
+        const stat = dupDetailMap.get(cName);
+        if (isIdentical) stat.pagination++;
+        else stat.real++;
+      });
+    } catch (e) {}
+
     const compared = apiData.map((item) => {
       const cName = cleanName(item.nama);
       const syncInfo = statusMap.get(cName);
@@ -153,6 +196,15 @@ export async function onRequestGet(context) {
       const is_sinkron_walau_selisih = (selisih === 0);
       const extra_in_db = Math.max(0, dbTotal - item.total_api);
 
+      const dupStat = dupDetailMap.get(cName) || { pagination: 0, real: 0 };
+      const totalDup = syncInfo?.api_duplicates || 0;
+      let api_pagination_duplicates = dupStat.pagination;
+      let api_real_duplicates = dupStat.real;
+
+      if (totalDup > 0 && api_pagination_duplicates === 0 && api_real_duplicates === 0) {
+        api_pagination_duplicates = totalDup;
+      }
+
       return {
         kode: item.kode,
         nama: item.nama,
@@ -164,6 +216,8 @@ export async function onRequestGet(context) {
         is_sinkron_walau_selisih: is_sinkron_walau_selisih,
         terakhir_sukses: syncInfo?.terakhir_sukses || null,
         api_duplicates: syncInfo?.api_duplicates || 0,
+        api_pagination_duplicates: api_pagination_duplicates,
+        api_real_duplicates: api_real_duplicates,
         api_empty_npsn: syncInfo?.api_empty_npsn || 0,
         api_unrecognized_shapes: unrecShapesInDb,
       };

@@ -127,8 +127,7 @@ export async function onRequestGet(context) {
         let selisihVal = item.raw_selisih;
         if (item.raw_selisih > 0) {
           const effDuplicates = (item.api_duplicates || 0);
-          const effUnrecognized = Math.min(item.raw_selisih, item.api_unrecognized_shapes || 0);
-          selisihVal = Math.max(0, item.raw_selisih - effDuplicates - effUnrecognized);
+          selisihVal = Math.max(0, item.raw_selisih - effDuplicates);
         }
         item.selisih = selisihVal;
         item.extra_in_db = Math.max(0, (item.total_db || 0) - (item.total_api || 0));
@@ -607,7 +606,7 @@ function renderDashboard({
       selisihColor = 'var(--success)';
       statusDisplay = '✅ Sinkron';
       selisihDisplay = '0';
-    } else if (d.selisih === 0 && ((d.api_duplicates || 0) > 0 || (d.api_unrecognized_shapes || 0) > 0)) {
+    } else if (d.selisih === 0 && (d.api_duplicates || 0) > 0) {
       selisihColor = 'var(--success)';
       statusDisplay = '✅ Sinkron';
       selisihDisplay = '0';

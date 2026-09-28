@@ -67,13 +67,15 @@ export async function onRequestGet(context) {
       provRes,
       cacheRes,
       logsRes,
-      latestLogRes
+      latestLogRes,
+      dupRes
     ] = await Promise.all([
       supabase.from('status_sinkronisasi').select('*').in('id', [1, 2]),
       supabase.from('provinsi_sync_status').select('nama_provinsi, total_db, terakhir_sukses, api_duplicates, api_empty_npsn, api_unrecognized_shapes'),
       supabase.from('cache_data').select('value, updated_at').eq('key', 'perbandingan').maybeSingle(),
       supabase.from('log_aktivitas_provinsi').select('total_baru, total_diperbarui, total_tidak_berubah').gte('waktu_selesai', startOfWibDayUtc),
-      supabase.from('log_aktivitas_provinsi').select('*').order('waktu_selesai', { ascending: false }).limit(5)
+      supabase.from('log_aktivitas_provinsi').select('*').order('waktu_selesai', { ascending: false }).limit(5),
+      supabase.from('npsn_ganda_detail').select('nama_provinsi, sekolah_detail')
     ]);
 
     const results = statusRes.data || [];
@@ -81,6 +83,44 @@ export async function onRequestGet(context) {
     const cacheRow = cacheRes.data;
     const logs = logsRes.data || [];
     const logAktivitasList = latestLogRes.data || [];
+
+    // Ambil rincian duplikasi dari npsn_ganda_detail untuk membedakan Paginasi vs Ganda Riil
+    const dupDetailMap = new Map();
+    (dupRes.data || []).forEach(r => {
+      const cName = cleanName(r.nama_provinsi);
+      if (!dupDetailMap.has(cName)) {
+        dupDetailMap.set(cName, { pagination: 0, real: 0 });
+      }
+      let list = [];
+      try {
+        list = typeof r.sekolah_detail === 'string' ? JSON.parse(r.sekolah_detail) : (r.sekolah_detail || []);
+      } catch (e) {}
+
+      let isIdentical = true;
+      if (list && list.length > 1) {
+        const first = list[0];
+        for (let i = 1; i < list.length; i++) {
+          const cur = list[i];
+          if (
+            cur.nama !== first.nama ||
+            cur.bentuk !== first.bentuk ||
+            cur.status !== first.status ||
+            cur.kecamatan !== first.kecamatan ||
+            cur.kabupaten !== first.kabupaten ||
+            (cur.alamat || '') !== (first.alamat || '')
+          ) {
+            isIdentical = false;
+            break;
+          }
+        }
+      } else {
+        isIdentical = false;
+      }
+
+      const stat = dupDetailMap.get(cName);
+      if (isIdentical) stat.pagination++;
+      else stat.real++;
+    });
 
     let compareCache = null;
     if (cacheRow && cacheRow.value) {
@@ -108,6 +148,22 @@ export async function onRequestGet(context) {
             item.api_empty_npsn = p.api_empty_npsn || 0;
             item.api_unrecognized_shapes = p.api_unrecognized_shapes || 0;
           }
+
+          const dupStat = dupDetailMap.get(cName) || { pagination: 0, real: 0 };
+          const totalDup = item.api_duplicates || 0;
+          let api_pagination_duplicates = dupStat.pagination;
+          let api_real_duplicates = dupStat.real;
+
+          if (totalDup > 0 && api_pagination_duplicates === 0 && api_real_duplicates === 0) {
+            if (item.api_pagination_duplicates !== undefined || item.api_real_duplicates !== undefined) {
+              api_pagination_duplicates = item.api_pagination_duplicates || 0;
+              api_real_duplicates = item.api_real_duplicates || 0;
+            } else {
+              api_pagination_duplicates = totalDup;
+            }
+          }
+          item.api_pagination_duplicates = api_pagination_duplicates;
+          item.api_real_duplicates = api_real_duplicates;
 
           item.raw_selisih = (item.total_api || 0) - (item.total_db || 0);
           let selisihVal = item.raw_selisih;
@@ -292,20 +348,27 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
 
             const isGap = (d.raw_selisih > 0) || ((d.total_api || 0) > (d.total_db || 0));
             const effDuplicates = isGap ? (d.api_duplicates || 0) : 0;
+            const effPaginationDuplicates = isGap ? (d.api_pagination_duplicates || 0) : 0;
+            const effRealDuplicates = isGap ? (d.api_real_duplicates || 0) : 0;
             const effEmptyNpsn = isGap ? (d.api_empty_npsn || 0) : 0;
             const effUnrecognizedShapes = isGap ? Math.min(d.raw_selisih, d.api_unrecognized_shapes || 0) : 0;
 
             const warnings = [];
-            if (effDuplicates > 0) warnings.push(`<span style="cursor: pointer; text-decoration: underline; color: var(--danger);" onclick="showDuplicateModal('${d.nama}')">⚠️ NPSN Ganda: ${effDuplicates}</span>`);
-            if (effEmptyNpsn > 0) warnings.push(`⚠️ NPSN Kosong: ${effEmptyNpsn}`);
-            if (effUnrecognizedShapes > 0) warnings.push(`⚠️ Bentuk Pendidikan Baru: ${effUnrecognizedShapes}`);
+            if (effPaginationDuplicates > 0) {
+              warnings.push(`<span style="cursor: pointer; text-decoration: underline; color: var(--success); font-weight: 600;" onclick="showDuplicateModal('${d.nama}')">✅ NPSN Paginasi: ${effPaginationDuplicates}</span>`);
+            }
+            if (effRealDuplicates > 0) {
+              warnings.push(`<span style="cursor: pointer; text-decoration: underline; color: var(--danger); font-weight: 600;" onclick="showDuplicateModal('${d.nama}')">⚠️ NPSN Ganda: ${effRealDuplicates}</span>`);
+            }
+            if (effEmptyNpsn > 0) warnings.push(`<span style="color: var(--danger); font-weight: 600;">⚠️ NPSN Kosong: ${effEmptyNpsn}</span>`);
+            if (effUnrecognizedShapes > 0) warnings.push(`<span style="color: var(--danger); font-weight: 600;">⚠️ Bentuk Pendidikan Baru: ${effUnrecognizedShapes}</span>`);
 
             // Fallback jika ada selisih yang belum teridentifikasi
             if (d.raw_selisih > 0 && effDuplicates === 0 && effEmptyNpsn === 0 && effUnrecognizedShapes === 0) {
-              warnings.push(`⚠️ Indikasi Data Invalid / Sinkron Terputus: ${d.raw_selisih}`);
+              warnings.push(`<span style="color: var(--danger); font-weight: 600;">⚠️ Indikasi Data Invalid / Sinkron Terputus: ${d.raw_selisih}</span>`);
             }
 
-            const warningHtml = warnings.length > 0 ? `<div style="font-size: 11px; font-weight: 600; color: var(--danger); margin-top: 6px; line-height: 1.4;">${warnings.join('<br>')}</div>` : '';
+            const warningHtml = warnings.length > 0 ? `<div style="font-size: 11px; margin-top: 6px; line-height: 1.4;">${warnings.join('<br>')}</div>` : '';
 
             return `
                 <tr class="${trClasses}" data-prov="${cleanName(d.nama)}" style="border-bottom: 1px solid var(--border); ${displayStyle}">
@@ -1712,7 +1775,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
       const title = document.getElementById('modal-title');
       const content = document.getElementById('modal-content');
       
-      title.innerText = 'Detail NPSN Ganda - Provinsi ' + provinsi;
+      title.innerHTML = '<span class="spin-icon">🔄</span> Memuat data NPSN...';
       content.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-muted);"><span class="spin-icon">🔄</span> Memuat data NPSN...</div>';
       modal.style.display = 'block';
       
@@ -1721,6 +1784,8 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
         const json = await res.json();
         if (json.success && json.data && json.data.length > 0) {
           let html = '';
+          let countIdentical = 0;
+          let countDifferent = 0;
           json.data.forEach(function(item) {
             var isIdentical = true;
             if (item.sekolahList && item.sekolahList.length > 1) {
@@ -1741,10 +1806,13 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
               isIdentical = false;
             }
 
+            if (isIdentical) countIdentical++;
+            else countDifferent++;
+
             var borderColor = isIdentical ? 'var(--success)' : 'var(--danger)';
             var badgeHtml = isIdentical 
-              ? '<span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 8px; border: 1px solid rgba(16, 185, 129, 0.3);">Data Identik (Paginasi API)</span>'
-              : '<span style="background: rgba(244, 63, 94, 0.15); color: #fb7185; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 8px; border: 1px solid rgba(244, 63, 94, 0.3);">Data Berbeda (NPSN Ganda)</span>';
+              ? '<span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 8px; border: 1px solid rgba(16, 185, 129, 0.3);">✅ NPSN Paginasi (Data Identik)</span>'
+              : '<span style="background: rgba(244, 63, 94, 0.15); color: #fb7185; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-left: 8px; border: 1px solid rgba(244, 63, 94, 0.3);">⚠️ NPSN Ganda (Data Berbeda)</span>';
 
             html += '<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; margin-bottom: 12px; border-left: 4px solid ' + borderColor + ';">' +
                     '<div style="font-weight: 700; color: var(--primary-light); font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">NPSN: ' + item.npsn + badgeHtml + '</div>' +
@@ -1758,9 +1826,20 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
             });
             html += '</div></div>';
           });
+
+          let modalHeaderTitle = '';
+          if (countDifferent === 0) {
+            modalHeaderTitle = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Detail NPSN Paginasi - Provinsi ' + provinsi;
+          } else if (countIdentical === 0) {
+            modalHeaderTitle = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> Detail NPSN Ganda - Provinsi ' + provinsi;
+          } else {
+            modalHeaderTitle = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Detail Duplikasi NPSN - Provinsi ' + provinsi;
+          }
+          title.innerHTML = modalHeaderTitle;
           content.innerHTML = html;
         } else {
-          content.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">Tidak ada detail data NPSN ganda yang disimpan untuk provinsi ini. Jalankan sync ulang untuk memperbarui detail.</div>';
+          title.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Detail Duplikasi NPSN - Provinsi ' + provinsi;
+          content.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">Tidak ada detail data NPSN ganda/paginasi yang disimpan untuk provinsi ini. Jalankan sync ulang untuk memperbarui detail.</div>';
         }
       } catch (e) {
         content.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--danger);">Gagal memuat detail data: ' + e.message + '</div>';
