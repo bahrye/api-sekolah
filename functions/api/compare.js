@@ -146,7 +146,9 @@ export async function onRequestGet(context) {
       let selisih = raw_selisih;
       if (raw_selisih > 0) {
         const effDuplicates = (syncInfo?.api_duplicates || 0);
-        selisih = Math.max(0, raw_selisih - effDuplicates - unrecShapesInDb);
+        // HANYA NPSN ganda / paginasi API yang ditoleransi untuk mengurangi selisih!
+        // api_unrecognized_shapes (Bentuk Pendidikan Baru) TIDAK BOLEH mengurangi selisih agar tetap terdeteksi Belum Sinkron!
+        selisih = Math.max(0, raw_selisih - effDuplicates);
       }
       const is_sinkron_walau_selisih = (selisih === 0);
       const extra_in_db = Math.max(0, dbTotal - item.total_api);

@@ -281,14 +281,15 @@ export async function onRequestPost(context) {
           console.warn('Gagal membersihkan log lama di sync-batch:', eCleanLog.message);
         }
 
-        // Simpan rincian duplikat ke npsn_ganda_detail jika ada
+        // Simpan rincian duplikat ke npsn_ganda_detail jika ada (hapus duplikat lama provinsi ini agar selalu konsisten dengan api_duplicates!)
+        await supabase.from('npsn_ganda_detail').delete().eq('nama_provinsi', body.namaProvinsi);
         if (customParams.duplicates && Array.isArray(customParams.duplicates) && customParams.duplicates.length > 0) {
           const dupRecords = customParams.duplicates.map((d) => ({
             npsn: String(d.npsn),
             nama_provinsi: body.namaProvinsi,
             sekolah_detail: typeof d.sekolahList === 'string' ? d.sekolahList : JSON.stringify(d.sekolahList || []),
           }));
-          await supabase.from('npsn_ganda_detail').upsert(dupRecords, { onConflict: 'npsn,nama_provinsi' });
+          await supabase.from('npsn_ganda_detail').insert(dupRecords);
         }
 
         // Update cache_data 'perbandingan' seketika agar perbandingan data langsung sinkron tanpa jeda
@@ -313,8 +314,9 @@ export async function onRequestPost(context) {
               let selisihVal = item.raw_selisih;
               if (item.raw_selisih > 0) {
                 const effDup = (item.api_duplicates || 0);
-                const effUnrec = (item.api_unrecognized_shapes || 0);
-                selisihVal = Math.max(0, item.raw_selisih - effDup - effUnrec);
+                // HANYA effDup (NPSN ganda / paginasi API) yang ditoleransi!
+                // effUnrec (Bentuk Baru) TIDAK BOLEH mengurangi selisih agar tetap terdeteksi Belum Sinkron!
+                selisihVal = Math.max(0, item.raw_selisih - effDup);
               }
               item.selisih = selisihVal;
               item.extra_in_db = Math.max(0, (item.total_db || 0) - (item.total_api || 0));

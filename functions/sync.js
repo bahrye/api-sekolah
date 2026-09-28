@@ -113,8 +113,9 @@ export async function onRequestGet(context) {
           let selisihVal = item.raw_selisih;
           if (item.raw_selisih > 0) {
             const effDuplicates = (item.api_duplicates || 0);
-            const effUnrecognized = Math.min(item.raw_selisih, item.api_unrecognized_shapes || 0);
-            selisihVal = Math.max(0, item.raw_selisih - effDuplicates - effUnrecognized);
+            // HANYA effDuplicates yang boleh mengurangi selisih!
+            // effUnrecognized TIDAK BOLEH mengurangi selisih agar bentuk baru tetap terdeteksi Belum Sinkron!
+            selisihVal = Math.max(0, item.raw_selisih - effDuplicates);
           }
           item.selisih = selisihVal;
           item.extra_in_db = Math.max(0, (item.total_db || 0) - (item.total_api || 0));
@@ -259,7 +260,7 @@ let row1 = results?.find(r => r.id === 1) || { bentuk_aktif: 'tk', offset_terakh
               selisihColor = 'var(--success)';
               statusIcon = '✅ Sinkron';
               selisihDisplay = '0';
-            } else if (d.selisih === 0 && ((d.api_duplicates || 0) > 0 || (d.api_unrecognized_shapes || 0) > 0)) {
+            } else if (d.selisih === 0 && (d.api_duplicates || 0) > 0) {
               selisihColor = 'var(--success)';
               statusIcon = '✅ Sinkron';
               selisihDisplay = '0';

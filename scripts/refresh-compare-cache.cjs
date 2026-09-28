@@ -82,8 +82,7 @@ async function refreshCache() {
     let selisih = raw_selisih;
     if (raw_selisih > 0) {
       const effDuplicates = (syncInfo?.api_duplicates || 0);
-      const effUnrecognized = Math.min(raw_selisih, syncInfo?.api_unrecognized_shapes || 0);
-      selisih = Math.max(0, raw_selisih - effDuplicates - effUnrecognized);
+      selisih = Math.max(0, raw_selisih - effDuplicates);
     }
     const is_sinkron_walau_selisih = (selisih === 0);
     const extra_in_db = Math.max(0, dbTotal - item.total_api);
