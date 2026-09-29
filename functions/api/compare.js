@@ -81,19 +81,33 @@ export async function onRequestGet(context) {
 
     const statusMap = new Map((statusRows || []).map((s) => [cleanName(s.nama_provinsi), s]));
 
-    // Query data pusat
+    // Query data pusat — dengan retry 3x dan timeout 12 detik per percobaan
     const apiBase = getDataSourceUrl(context.env);
-    const promises = Object.keys(PROVINCES).map(async (kode) => {
-      try {
-        const res = await fetch(
-          `${apiBase}/${kode}?limit=1&offset=0`,
-          { signal: AbortSignal.timeout(8000) }
-        );
-        const json = await res.json();
-        return { kode, nama: PROVINCES[kode], total_api: json.meta ? json.meta.total : 0 };
-      } catch (e) {
-        return { kode, nama: PROVINCES[kode], total_api: 0 };
+
+    async function fetchApiTotal(kode, retries = 3, timeoutMs = 12000) {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          const res = await fetch(
+            `${apiBase}/${kode}?limit=1&offset=0`,
+            { signal: AbortSignal.timeout(timeoutMs) }
+          );
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          const total = json.meta ? json.meta.total : null;
+          if (total !== null && total >= 0) return total;
+          throw new Error('meta.total tidak ditemukan dalam response');
+        } catch (e) {
+          if (attempt === retries) return 0; // Semua percobaan gagal
+          // Tunggu sebentar sebelum retry (backoff: 500ms, 1000ms)
+          await new Promise(r => setTimeout(r, attempt * 500));
+        }
       }
+      return 0;
+    }
+
+    const promises = Object.keys(PROVINCES).map(async (kode) => {
+      const total_api = await fetchApiTotal(kode);
+      return { kode, nama: PROVINCES[kode], total_api };
     });
 
     const apiData = await Promise.all(promises);
@@ -223,14 +237,23 @@ export async function onRequestGet(context) {
       };
     });
 
-    // Simpan ke cache_data
-    try {
-      await supabase.from('cache_data').upsert({
-        key: 'perbandingan',
-        value: JSON.stringify(compared),
-        updated_at: new Date().toISOString(),
-      });
-    } catch (e) {}
+    // Validasi sebelum simpan cache — jangan overwrite jika mayoritas total_api = 0
+    // (indikasi API Pusat sedang bermasalah / timeout massal)
+    const validApiCount = compared.filter(c => c.total_api > 0).length;
+    const totalProvinsi = compared.length;
+    const partial_api_failure = validApiCount < Math.ceil(totalProvinsi * 0.5);
+
+    if (!partial_api_failure) {
+      try {
+        await supabase.from('cache_data').upsert({
+          key: 'perbandingan',
+          value: JSON.stringify(compared),
+          updated_at: new Date().toISOString(),
+        });
+      } catch (e) {}
+    }
+    // Jika partial_api_failure, cache lama tetap dipertahankan (tidak di-overwrite)
+    // sehingga UI tidak menampilkan data 0 yang salah.
 
     return new Response(
       JSON.stringify({
@@ -238,6 +261,9 @@ export async function onRequestGet(context) {
         data: compared,
         synced_today,
         from_cache: false,
+        partial_api_failure,
+        valid_api_count: validApiCount,
+        total_provinsi: totalProvinsi,
       }),
       {
         headers: {

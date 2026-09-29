@@ -42,17 +42,41 @@ async function refreshCache() {
   const { data: statusRows } = await supabase.from('provinsi_sync_status').select('*');
   const statusMap = new Map((statusRows || []).map(s => [cleanName(s.nama_provinsi), s]));
 
-  // 2. Query data untuk 38 provinsi
-  const apiPromises = Object.keys(PROVINCES).map(async (kode) => {
-    try {
-      const res = await fetch(`${API_BASE}/${kode}?limit=1&offset=0`);
-      const json = await res.json();
-      return { kode, nama: PROVINCES[kode], total_api: json.meta ? json.meta.total : 0 };
-    } catch (e) {
-      return { kode, nama: PROVINCES[kode], total_api: 0 };
+  // Helper: fetch dengan retry 3x dan timeout 15 detik per percobaan
+  async function fetchApiTotal(kode, retries = 3, timeoutMs = 15000) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        const res = await fetch(`${API_BASE}/${kode}?limit=1&offset=0`, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        const total = json.meta ? json.meta.total : null;
+        if (total !== null && total >= 0) return total;
+        throw new Error('meta.total tidak ditemukan dalam response');
+      } catch (e) {
+        if (attempt === retries) {
+          console.warn(`  ⚠️  [${kode}] ${PROVINCES[kode]}: gagal setelah ${retries}x percobaan — ${e.message}`);
+          return 0;
+        }
+        // Backoff: 500ms, 1000ms, ...
+        await new Promise(r => setTimeout(r, attempt * 500));
+      }
     }
+    return 0;
+  }
+
+  // 2. Query data untuk 38 provinsi (paralel, masing-masing dengan retry)
+  console.log(`  Fetching ${Object.keys(PROVINCES).length} provinsi dari API Pusat...`);
+  const apiPromises = Object.keys(PROVINCES).map(async (kode) => {
+    const total_api = await fetchApiTotal(kode);
+    return { kode, nama: PROVINCES[kode], total_api };
   });
   const apiData = await Promise.all(apiPromises);
+
+  const validCount = apiData.filter(d => d.total_api > 0).length;
+  console.log(`  ℹ️  API Pusat: ${validCount}/${apiData.length} provinsi berhasil diambil datanya.`);
 
   // 3. Ambil count riil dari v_rekap_provinsi
   const dbTotalsMap = new Map();
@@ -157,22 +181,32 @@ async function refreshCache() {
     };
   });
 
-  const { error } = await supabase.from('cache_data').upsert({
-    key: 'perbandingan',
-    value: JSON.stringify(compared),
-    updated_at: new Date().toISOString()
-  });
+  // Validasi sebelum simpan ke cache_data
+  // Jangan overwrite cache lama jika mayoritas total_api = 0 (API Pusat bermasalah)
+  const totalProvinsi = compared.length;
+  const partial_api_failure = validCount < Math.ceil(totalProvinsi * 0.5);
 
-  if (error) {
-    console.error('Error saat menyimpan ke cache_data:', error);
+  if (partial_api_failure) {
+    console.warn(`⚠️  Hanya ${validCount}/${totalProvinsi} provinsi berhasil dari API Pusat.`);
+    console.warn('   Cache lama TIDAK diperbarui untuk menghindari data 0 yang salah tampil di UI.');
   } else {
-    console.log('✅ Berhasil memperbarui cache_data perbandingan.');
-  }
+    const { error } = await supabase.from('cache_data').upsert({
+      key: 'perbandingan',
+      value: JSON.stringify(compared),
+      updated_at: new Date().toISOString()
+    });
 
-  // Sinkronkan juga total_db ke provinsi_sync_status
-  for (const item of compared) {
-    if (item.total_db > 0) {
-      await supabase.from('provinsi_sync_status').update({ total_db: item.total_db }).eq('nama_provinsi', item.nama);
+    if (error) {
+      console.error('Error saat menyimpan ke cache_data:', error);
+    } else {
+      console.log('✅ Berhasil memperbarui cache_data perbandingan.');
+    }
+
+    // Sinkronkan juga total_db ke provinsi_sync_status
+    for (const item of compared) {
+      if (item.total_db > 0) {
+        await supabase.from('provinsi_sync_status').update({ total_db: item.total_db }).eq('nama_provinsi', item.nama);
+      }
     }
   }
 
