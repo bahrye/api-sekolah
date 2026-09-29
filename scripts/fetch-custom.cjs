@@ -405,6 +405,22 @@ async function fetchCustomData() {
             });
           }
   
+          // Cari kode provinsi yang saat ini sedang aktif disinkronkan (jika ada)
+          // agar bisa dipaksa masuk finalTargets walaupun kuota melebihi batas
+          let kodeProvAktif = null;
+          try {
+            const compareJsonData = compareJson.data || [];
+            const statusRes2 = await fetch(`${WORKER_URL}/api/sync-status`);
+            if (statusRes2.ok) {
+              const statusJson2 = await statusRes2.json();
+              if (statusJson2?.activeProvince) {
+                const cleanAktif = cleanName(statusJson2.activeProvince);
+                const found = compareJsonData.find(d => cleanName(d.nama) === cleanAktif);
+                if (found) kodeProvAktif = found.kode;
+              }
+            }
+          } catch (eAktif) {}
+
           for (const p of diffCodes) {
             if (totalDataSaatIni + p.total_api <= BATAS_AMAN_DATA_PER_HARI) {
               finalTargets.push(p.kode);
@@ -414,6 +430,12 @@ async function fetchCustomData() {
               finalTargets.push(p.kode);
               totalDataSaatIni += p.total_api;
               break;
+            } else if (kodeProvAktif && p.kode === kodeProvAktif && !finalTargets.includes(kodeProvAktif)) {
+              // ✅ Provinsi ini sedang aktif berjalan → paksa lanjutkan sampai selesai
+              // meski kuota melebihi BATAS_AMAN, tapi JANGAN tambah provinsi lain sesudahnya.
+              console.log(`⚡ ${p.nama} sedang aktif berjalan — dilanjutkan sampai selesai meski kuota tersisa ${Math.max(0, BATAS_AMAN_DATA_PER_HARI - totalDataSaatIni).toLocaleString('id-ID')} < estimasi ${(p.total_api || 0).toLocaleString('id-ID')} data.`);
+              finalTargets.unshift(p.kode); // Taruh di depan agar dieksekusi duluan
+              break; // Stop — jangan antre provinsi lain sesudahnya
             }
           }
   
@@ -528,9 +550,14 @@ async function fetchCustomData() {
           const statusJson = await statusRes.json();
           if (statusJson) {
             // Guard kuota harian sebelum me-resume
-            if (isCronSchedule && statusJson.syncedToday && statusJson.batasAman && statusJson.syncedToday >= statusJson.batasAman) {
-              console.log(`🛑 Kuota harian sudah penuh (${statusJson.syncedToday.toLocaleString('id-ID')} / ${statusJson.batasAman.toLocaleString('id-ID')}). Tidak melanjutkan antrean.`);
+            // Pengecualian: jika ada provinsi yang SEDANG AKTIF berjalan (belum selesai),
+            // tetap izinkan resume untuk melanjutkan provinsi tersebut sampai tuntas.
+            const sedangAktif = statusJson.activeRow && !statusJson.selesai;
+            if (isCronSchedule && statusJson.syncedToday && statusJson.batasAman && statusJson.syncedToday >= statusJson.batasAman && !sedangAktif) {
+              console.log(`🛑 Kuota harian sudah penuh (${statusJson.syncedToday.toLocaleString('id-ID')} / ${statusJson.batasAman.toLocaleString('id-ID')}) dan tidak ada sinkronisasi yang sedang aktif. Tidak melanjutkan antrean.`);
               return;
+            } else if (isCronSchedule && statusJson.syncedToday && statusJson.batasAman && statusJson.syncedToday >= statusJson.batasAman && sedangAktif) {
+              console.log(`⚡ Kuota harian terlampaui (${statusJson.syncedToday.toLocaleString('id-ID')} / ${statusJson.batasAman.toLocaleString('id-ID')}), tapi ada provinsi yang sedang aktif. Melanjutkan sampai selesai, lalu berhenti.`);
             }
 
             if (!statusJson.selesai && statusJson.activeRow) {
