@@ -1,7 +1,7 @@
 {
-  "last_updated": "2026-11-12T22:40:35.003Z",
+  "last_updated": "2026-11-13T22:25:05.217Z",
   "total_provinsi": 39,
-  "total_sekolah": 540609,
+  "total_sekolah": 555675,
   "provinsi": [
     {
       "nama": "LUAR NEGERI",
@@ -90,9 +90,10 @@
       "slug": "jawa_tengah",
       "files": [
         "data_jawa_tengah_part1.json",
-        "data_jawa_tengah_part2.json"
+        "data_jawa_tengah_part2.json",
+        "data_jawa_tengah_part3.json"
       ],
-      "total": 52057
+      "total": 67123
     },
     {
       "nama": "PROV. JAWA TIMUR",
@@ -396,11 +397,13 @@
     ],
     "jawa_tengah": [
       "data_jawa_tengah_part1.json",
-      "data_jawa_tengah_part2.json"
+      "data_jawa_tengah_part2.json",
+      "data_jawa_tengah_part3.json"
     ],
     "prov. jawa tengah": [
       "data_jawa_tengah_part1.json",
-      "data_jawa_tengah_part2.json"
+      "data_jawa_tengah_part2.json",
+      "data_jawa_tengah_part3.json"
     ],
     "jawa_timur": [
       "data_jawa_timur_part1.json",
