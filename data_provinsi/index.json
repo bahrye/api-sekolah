@@ -1,7 +1,7 @@
 {
-  "last_updated": "2026-11-17T23:50:16.745Z",
+  "last_updated": "2026-11-18T23:21:01.859Z",
   "total_provinsi": 39,
-  "total_sekolah": 555675,
+  "total_sekolah": 555676,
   "provinsi": [
     {
       "nama": "LUAR NEGERI",
@@ -83,7 +83,7 @@
         "data_jawa_barat_part2.json",
         "data_jawa_barat_part3.json"
       ],
-      "total": 85474
+      "total": 85475
     },
     {
       "nama": "PROV. JAWA TENGAH",
